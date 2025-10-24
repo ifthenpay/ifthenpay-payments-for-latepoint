@@ -1,5 +1,6 @@
 # **LatePoint - ifthenpay Payment Gateway**
-### 📘 User Guide 
+
+### 📘 User Guide
 
 Read in ![Portuguese](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/pt.png) [Portuguese](README_PT.md) or ![English](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/en.png) [English](README.md)
 
@@ -23,14 +24,13 @@ Read in ![Portuguese](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/as
 
 This plugin effectively integrates ifthenpay's payment gateway into LatePoint's checkout process, enabling secure, easy, and versatile online payments via:
 
-- **PIX** 🇧🇷: Rapid Brazilian payment method utilizing QR codes or Pix keys.
-- **BIZUM** 📲: Quick, mobile-based payment widely adopted in Spain.
-- **MB WAY** 📱: Instant smartphone-based payments popular in Portugal.
-- **Payshop** 💼: Fixed-value payment vouchers available at Portuguese retail outlets.
 - **Multibanco** 🏧: Traditional Portuguese ATM network payments via reference numbers.
+- **MB WAY** 📱: Instant smartphone-based payments popular in Portugal.
 - **Credit Card (Visa & MasterCard)** 💳: Reliable and secure credit card payments.
+- **Payshop** 💼: Fixed-value payment vouchers available at Portuguese retail outlets.
 - **Google Pay** 🌐: Effortless transactions through Google's digital wallet.
-- **Apple Pay** 🍎: Secure payments via Apple devices.
+- **Apple Pay** 🍎: Secure paym ents via Apple devices.
+- **PIX** 🇧🇷: Rapid Brazilian payment method utilizing QR codes or Pix keys.
 
 This integration helps businesses using LatePoint to enhance customer satisfaction by providing trusted, efficient, and convenient payment solutions.
 

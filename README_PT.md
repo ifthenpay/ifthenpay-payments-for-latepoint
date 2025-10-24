@@ -1,5 +1,6 @@
-# **LatePoint - Gateway de Pagamentos ifthenpay**  
-### 📘 Guia do Utilizador 
+# **LatePoint - Gateway de Pagamentos ifthenpay**
+
+### 📘 Guia do Utilizador
 
 Leia em ![Português](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/pt.png) [Português](README_PT.md) ou ![Inglês](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/en.png) [Inglês](README.md)
 
@@ -23,14 +24,13 @@ O **LatePoint** é um sistema intuitivo e poderoso de agendamento de marcações
 
 Este plugin integra de forma eficaz a gateway de pagamentos da ifthenpay no processo de checkout do LatePoint, permitindo pagamentos online seguros, fáceis e versáteis através de:
 
-- **PIX** 🇧🇷: Método de pagamento brasileiro rápido, utilizando QR codes ou chaves Pix.
-- **BIZUM** 📲: Pagamento móvel rápido, amplamente utilizado em Espanha.
-- **MB WAY** 📱: Pagamentos instantâneos via smartphone, populares em Portugal.
-- **Payshop** 💼: Vouchers de pagamento de valor fixo disponíveis em estabelecimentos portugueses.
 - **Multibanco** 🏧: Pagamentos através da rede de caixas Multibanco usando referências.
+- **MB WAY** 📱: Pagamentos instantâneos via smartphone, populares em Portugal.
 - **Cartão de Crédito (Visa & MasterCard)** 💳: Pagamentos com cartão de crédito fiáveis e seguros.
+- **Payshop** 💼: Vouchers de pagamento de valor fixo disponíveis em estabelecimentos portugueses.
 - **Google Pay** 🌐: Transações fáceis através da carteira digital da Google.
 - **Apple Pay** 🍎: Pagamentos seguros via dispositivos Apple.
+- **PIX** 🇧🇷: Método de pagamento brasileiro rápido, utilizando QR codes ou chaves Pix.
 
 Esta integração ajuda empresas que utilizam o LatePoint a aumentar a satisfação dos clientes, oferecendo soluções de pagamento confiáveis, eficientes e convenientes.
 
