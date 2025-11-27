@@ -1,0 +1,157 @@
+#paymentProcessorToggler_ifthenpay {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+#togglePaymentSettings_ifthenpay.os-togglable-item-body {
+  padding: 0 !important;
+}
+
+#paymentProcessorToggler_ifthenpay .os-col-6 {
+  padding-block: 0.75rem;
+}
+
+#paymentProcessorToggler_ifthenpay .sub-section-label h3,
+#paymentProcessorToggler_ifthenpay label.ifthenpay-section-label {
+  margin: 1rem 0 0.5rem;
+  font-weight: 600;
+}
+
+#paymentProcessorToggler_ifthenpay input,
+#paymentProcessorToggler_ifthenpay select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  height: 2.25rem;
+  font-size: 0.875rem;
+}
+
+#paymentProcessorToggler_ifthenpay .validate-button {
+  padding: 0.45rem 1rem;
+  height: 2.25rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  width: 100%;
+}
+
+#paymentProcessorToggler_ifthenpay
+  .sub-section-content
+  > .os-row:first-child
+  .os-col-6 {
+  display: flex;
+  flex-direction: column;
+}
+
+#paymentProcessorToggler_ifthenpay label[for="ifthenpay-gateway-key-select"] {
+  margin-bottom: 0.5rem;
+}
+
+#paymentProcessorToggler_ifthenpay select.ifthenpay-gateway-select {
+  margin-top: 0;
+  width: 100% !important;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-methods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--os-background, #fff);
+  border: 1px solid var(--os-border, #ddd);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-item:hover {
+  background: var(--os-background-hover, #f5f5f5);
+  border: 1px solid #1d7bff;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-checkbox {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-icon {
+  width: auto;
+  height: 1rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-dropdown {
+  flex-shrink: 0;
+  width: 16rem;
+  padding: 0.4rem 0.6rem;
+  height: 2rem;
+  font-size: 0.875rem;
+}
+
+#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row .os-col-6 {
+  flex: 1;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-left,
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-right {
+  display: contents;
+}
+
+@media (max-width: 768px) {
+  #paymentProcessorToggler_ifthenpay .ifthenpay-method-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  #paymentProcessorToggler_ifthenpay
+    .ifthenpay-method-item
+    > .ifthenpay-method-checkbox,
+  #paymentProcessorToggler_ifthenpay
+    .ifthenpay-method-item
+    > .ifthenpay-method-icon,
+  #paymentProcessorToggler_ifthenpay
+    .ifthenpay-method-item
+    > .ifthenpay-method-name {
+    display: inline-block;
+    margin-right: 0.5rem;
+  }
+
+  #paymentProcessorToggler_ifthenpay .ifthenpay-method-dropdown {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  #paymentProcessorToggler_ifthenpay .ifthenpay-default-method {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  #paymentProcessorToggler_ifthenpay .ifthenpay-methods-list {
+    gap: 0.75rem;
+  }
+}

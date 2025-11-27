@@ -1,145 +1,149 @@
-# **LatePoint - ifthenpay Payment Gateway**
+# ifthenpay | Payments for LatePoint
 
-### 📘 User Guide
+Adds ifthenpay payment methods to LatePoint: cards, wallets, local bank transfers; supports orders and invoices for appointment bookings.
 
-Read in ![Portuguese](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/pt.png) [Portuguese](README_PT.md) or ![English](https://github.com/ifthenpay/WHMCS/raw/assets/version_8/assets/en.png) [English](README.md)
-
-### 📌 Table of Contents
-
-1. [Introduction 🚀](#1-introduction-🚀)
-2. [Requirements 📋](#2-requirements-📋)
-3. [Installation 📥](#3-installation-📥)
-4. [Configuration ⚙️](#4-configuration-️)
-5. [Customer Experience 🧑‍💻](#5-customer-experience-🧑‍💻)
-6. [Language Support 🌍](#6-language-support-🌍)
-7. [Support & Maintenance 🛠️](#7-support--maintenance-🛠️)
+Includes merchant backoffice (basic sales), and secure signed callbacks for automatic payment confirmation.
 
 ---
 
-### 1. Introduction 🚀
+## Table of Contents
 
-**Ifthenpay** is a Portuguese digital payments provider established in 2004, specializing in omnichannel payment solutions. It seamlessly integrates with numerous ERPs, e-commerce platforms, and invoicing software, offering businesses a comprehensive approach to managing online financial transactions through diverse payment methods.
+- [Description](#description)
+- [Key Features](#key-features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [External Services](#external-services)
+- [Screenshots](#screenshots)
+- [Support](#support)
 
-**LatePoint** is an intuitive and powerful appointment scheduling system designed for WordPress, empowering businesses to efficiently manage bookings and deliver a smooth scheduling experience to customers.
+## Description
 
-This plugin effectively integrates ifthenpay's payment gateway into LatePoint's checkout process, enabling secure, easy, and versatile online payments via:
+This plugin integrates the ifthenpay payment gateway with LatePoint to enable seamless payment processing for appointment bookings. It supports multiple payment methods, including local options like Multibanco and MB WAY, as well as international ones like PIX. Payments are handled via secure pay-by-link, ensuring no sensitive card data is stored on your site. When a customer books an appointment, they can select their preferred payment method, and a secure payment page opens for completion.
 
-- **Multibanco** 🏧: Traditional Portuguese ATM network payments via reference numbers.
-- **MB WAY** 📱: Instant smartphone-based payments popular in Portugal.
-- **Credit Card (Visa & MasterCard)** 💳: Reliable and secure credit card payments.
-- **Payshop** 💼: Fixed-value payment vouchers available at Portuguese retail outlets.
-- **Google Pay** 🌐: Effortless transactions through Google's digital wallet.
-- **Apple Pay** 🍎: Secure paym ents via Apple devices.
-- **PIX** 🇧🇷: Rapid Brazilian payment method utilizing QR codes or Pix keys.
+### In plain terms you get:
 
-This integration helps businesses using LatePoint to enhance customer satisfaction by providing trusted, efficient, and convenient payment solutions.
+- One-time payments for bookings
+- Support for invoices and orders
+- Merchant backoffice (basic sales) on web + mobile
+- Secure automatic payment confirmations (no card numbers stored)
 
-### 2. Requirements 📋
+All settings are made in LatePoint. The plugin is built so store owners can manage payments without needing deep technical knowledge.
 
-To successfully use the LatePoint ifthenpay plugin, ensure your environment meets these requirements:
+## Key Features
 
-- **WordPress:** Version 6.5 or higher.
-- **LatePoint Plugin:** Installed and active on your WordPress site.
-- **PHP:** Version 7.4 or higher.
+1. Easy integration with LatePoint booking flow
+2. Invoice payments (Orders & Invoices support)
+3. Secure pay-by-link transactions
+4. Automatic payment confirmation (fast access)
+5. Multiple local payment types (cards, wallets, transfers, vouchers)
+6. Merchant backoffice (basic sales & refund reports)
+7. Security first (signed callbacks, no card data stored)
 
-Additionally, to integrate and utilize the ifthenpay payment gateway:
+## Requirements
 
-- An active **ifthenpay account** is required.
-- Contact ifthenpay support to request your **Backoffice Key** and activate your **Gateway Keys**.
-- Once a valid Backoffice Key is provided in the plugin settings, available Gateway Keys will automatically load.
+- An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
+- A Dynamic Gateway Key (request this from ifthenpay support/helpdesk).
+- The payment methods you want enabled on that Gateway Key (our helpdesk team will guide you).
+- WordPress 6.5+ and PHP 7.4+, and LatePoint installed and activated.
+- HTTPS (SSL) enabled on your site.
 
-For more information, visit the [ifthenpay official website](https://www.ifthenpay.com).
+## Installation
 
-### 3. Installation 📥
+1. In your WordPress admin, go to **Plugins → Add New** and search for **ifthenpay | Payments for LatePoint**, then click **Install Now**.
+2. Or download `ifthenpay-payments-for-latepoint.zip` and upload under **Plugins → Add New → Upload Plugin**.
+3. Activate **LatePoint** and **ifthenpay for LatePoint**.
+4. Navigate to **LatePoint → Settings → Payments**, enter your ifthenpay Backoffice Key & Gateway Key, and click **Connect**.
 
-Follow these steps to install the LatePoint ifthenpay Payment Gateway Plugin:
+## Frequently Asked Questions
 
-1. **Download the Plugin**
+<details>
+<summary><strong>What do I need to get started?</strong></summary>
+A valid ifthenpay account (register at https://ifthenpay.com/aderir/), LatePoint plugin active, WordPress 6.5+ and PHP 7.4+.
+</details>
 
-   - [Download](https://github.com/ifthenpay/latepoint-payment-addon/releases/download/v1.0.0/latepoint-payment-addon-v1.0.0.zip) the latest release of the plugin as a `.zip` file from the official repository.
+<details>
+<summary><strong>How do I configure it?</strong></summary>
+1. Go to **LatePoint → Settings → Payments**.  
+2. Enable the ifthenpay gateway, enter your Backoffice Key & Gateway Key, click **Sync**.  
+3. Select the payment methods (including invoices) you want to offer.
+</details>
 
-![github-releases](./assets/github-releases.png)
+<details>
+<summary><strong>How does the payment process work?</strong></summary>
+Payments are processed securely through ifthenpay's pay-by-link system. Customers select a payment method during booking, and a secure payment page opens for completion. Once paid, the status is verified and the booking is confirmed automatically.
+</details>
 
-2. **Upload to WordPress**
+<details>
+<summary><strong>Are payment details stored?</strong></summary>
+No. The plugin does not store card numbers or full bank details. Only small references needed for matching payments are kept.
+</details>
 
-   - In your WordPress admin dashboard, go to **Plugins > Add New**.
-   - Click **Upload Plugin**, select the downloaded `.zip` file, and click **Install Now**.
+<details>
+<summary><strong>Is there a sandbox?</strong></summary>
+ifthenpay may provide test entities; if unavailable, use a low-value live test.
+</details>
 
-3. **Activate the Plugin**
+<details>
+<summary><strong>Which payment methods are supported?</strong></summary>
+Any ifthenpay method attached to your Gateway Key (e.g. Multibanco, MB WAY, Payshop, Pix, Credit Card if provisioned).
+</details>
 
-   - After installation, click **Activate Plugin**.
+<details>
+<summary><strong>How secure is the integration?</strong></summary>
+Requests are encrypted over HTTPS; data is minimized; no card details are stored. Payments are handled off-site by ifthenpay, ensuring PCI compliance.
+</details>
 
-4. **Verify LatePoint Installation**
+## External Services
 
-   - Ensure the LatePoint plugin is installed and active, as this payment gateway requires it.
+This plugin integrates with the ifthenpay payment platform to process payments for LatePoint bookings. ifthenpay is a third-party service that provides secure payment processing for various methods including cards, wallets, and local bank transfers.
 
-5. **Proceed to Configuration**
-   - Once activated, configure the plugin as described in the following section.
+- **LatePoint** (appointment-booking plugin): we extend its framework classes (`OsFormHelper`, `OsSettingsHelper`, etc.).
+- **ifthenpay Backoffice & Integrations**
+  - **What it is and what it is used for**: The ifthenpay Backoffice is the merchant dashboard for managing payment integrations. The plugin uses the ifthenpay API to retrieve account configuration, generate payment links, and process payments.
+  - **What data is sent and when**:
+    - During setup: Backoffice Key and Gateway Key (stored securely in site settings) to authenticate and retrieve available payment methods.
+    - During payment processing: Minimal transaction details including transaction ID, amount, and booking details to generate payment references.
+  - **End-User License Agreement (EULA)**: [EULA](https://ifthenpay.com/eula/)
+  - **Privacy Policy**: [Privacy Policy](https://ifthenpay.com/politica-de-privacidade/)
 
-Your plugin is now installed and ready for setup.
+All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 
-### 4. Configuration ⚙️
+## Screenshots
 
-To configure the LatePoint ifthenpay Payment Gateway:
+Below are screenshots demonstrating key features and interfaces of the plugin:
 
-1. Go to your WordPress dashboard.
-2. Navigate to **LatePoint > Settings > Payments**.
-3. Under the **Payments** tab, activate the **ifthenpay Gateway** toggler, enter your **Backoffice Key** provided by ifthenpay and click **Connect**.
+1. **(Admin Only) Backoffice Synchronization under LatePoint Payments Settings**  
+   ![Backoffice Synchronization](.wordpress-org/screenshot-1.png)
 
-![latepoint_payment_settings](./assets/latepoint_payment_settings.png)
+2. **(Admin Only) Gateway Settings under LatePoint Payments Settings**  
+   ![Gateway Settings](.wordpress-org/screenshot-2.png)
 
-4. After validating the key, the plugin will automatically fetch available **Gateway Keys**. Select the key corresponding to the desired account.
-5. Select and configure the available **Payment Methods**. For each method, use the checkbox to activate or deactivate it, and select the associated payment account from the dropdown.
-6. Choose a **Default Payment Method** to streamline user checkout.
-7. Optionally add a custom **Description** to appear during checkout.
+3. **(Customers Experience) Payment Gateway selection while booking.**  
+   ![Payment Gateway Selection](.wordpress-org/screenshot-3.png)
 
-![ifthenpay_admin_config](./assets/ifthenpay_admin_config.png)
+4. **(Customers Experience) ifthenpay secure payment (for invoices or orders) screen.**  
+   ![ifthenpay Secure Payment](.wordpress-org/screenshot-4.png)
 
-8. Save your configuration.
+5. **(Customers Experience) Booking confirmation with payment status.**  
+   ![Booking Confirmation](.wordpress-org/screenshot-5.png)
 
-### 5. Customer Experience 🧑‍💻
+## Support
 
-1. **Choose Payment Method**
+For assistance use the [WordPress.org support forum](https://wordpress.org/support/plugin/ifthenpay-payments-for-latepoint/):
 
-   During booking, if payments are enabled, customers select a payment method. They can choose **ifthenpay Gateway** and proceed to pay securely.
+Include when opening a ticket:
 
-![ifthenpay_admin_checkout](./assets/ifthenpay_select_checkout.png)
+- Backoffice account
+- Site URL + plugin version
+- Exact error message + log excerpts / screenshots
 
-2. **Secure Payment Page**
+Pre-checks:
 
-   They are redirected to a secure ifthenpay page to pay using their preferred method (e.g., Google Pay, credit card).
+- Payment method enabled on Gateway Key AND mapped to Integration
+- Running current recommended versions of WordPress, PHP & LatePoint
 
-![ifthenpay_gateway](./assets/ifthenpay_gateway.png)
+Commercial helpdesk available (no direct email required): [helpdesk.ifthenpay.com](https://helpdesk.ifthenpay.com/)
 
-3. **Confirmation & Return**
-
-   After completing the payment, customers are returned to your site. Their appointment is confirmed, and payment status is reflected immediately in LatePoint.
-
-![latepoint_booking_confirmed](./assets/booking_confirmed.png)
-
-### 6. Language Support 🌍
-
-This plugin currently supports the following languages:
-
-- 🇵🇹 **Portuguese (Portugal)** — `pt-PT`
-- 🇪🇸 **Spanish (Spain)** — `es-ES`
-- 🇬🇧 **English (UK)** — `en-UK`
-- 🇫🇷 **French (France)** — `fr-FR`
-
-The plugin will automatically adapt its text and interface to match the language configured in your WordPress settings, ensuring a seamless experience for both admins and customers.
-
-### 7. Support & Maintenance 🛠️
-
-If you encounter issues or need assistance, please refer to the following resources:
-
-- 📖 [Official ifthenpay FAQ](https://helpdesk.ifthenpay.com/en/support/home)
-- 📬 Support Email: `suporte@ifthenpay.com`
-- 🧰 [LatePoint Knowledge Base](https://wpdocs.latepoint.com/)
-
-#### Keeping the Plugin Updated:
-
-- Always use the latest versions of WordPress, LatePoint, and this plugin.
-- Review the changelog before updating.
-- After updates, test payment flows to ensure functionality.
-
-Regular updates and active monitoring will ensure continued compatibility and optimal performance.
+- **ifthenpay support**: [suporte@ifthenpay.com](mailto:suporte@ifthenpay.com)
+- **LatePoint docs**: [LatePoint docs](https://wpdocs.latepoint.com/)
