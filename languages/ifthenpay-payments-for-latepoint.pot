@@ -1,0 +1,193 @@
+# Copyright (C) 2025 ifthenpay
+# This file is distributed under the GPL v3.
+msgid ""
+msgstr ""
+"Project-Id-Version: ifthenpay | Payments for LatePoint 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ifthenpay-payments-for-latepoint\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2025-07-28T15:43:47+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: ifthenpay-payments-for-latepoint\n"
+
+#. Plugin Name of the plugin
+#: ifthenpay-payments-for-latepoint.php
+msgid "ifthenpay | Payments for LatePoint"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: ifthenpay-payments-for-latepoint.php
+msgid "https://github.com/ifthenpay/latepoint-payment-addon"
+msgstr ""
+
+#. Description of the plugin
+#: ifthenpay-payments-for-latepoint.php
+msgid "LatePoint addon for payments with ifthenpay"
+msgstr ""
+
+#. Author of the plugin
+#: ifthenpay-payments-for-latepoint.php
+#: ifthenpay-payments-for-latepoint.php:311
+msgid "ifthenpay"
+msgstr ""
+
+#. Author URI of the plugin
+#: ifthenpay-payments-for-latepoint.php
+msgid "https://ifthenpay.com/"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:188
+msgid "Missing payment token"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:199
+msgid "Payment record not found"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:219
+msgid "Payment was cancelled"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:220
+msgid "Payment failed"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:265
+msgid "⏳ Loading…"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:266
+#: lib/views/admin-form-renderer.php:136
+msgid "No accounts."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:267
+#: lib/views/admin-form-renderer.php:141
+msgid "Activate"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:268
+msgid "⚠️ Select at least one Payment Method"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:284
+msgid "⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically."
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:60
+msgid "Backoffice Key Valid ✅"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:105
+msgid "Missing required keys."
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:189
+msgid "Nothing to pay"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:248
+msgid "Payment completed"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:256
+msgid "Payment cancelled"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:265
+msgid "Payment failed due to payment verification error"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:324
+msgid "Your activation request has been sent to support."
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-controller.php:329
+msgid "Failed to send the activation email. Please try again later."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:46
+msgid "Invalid Backoffice Key format. Expected 1234-5678-9012-3456."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:60
+msgid "Unexpected response when validating Backoffice Key."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:76
+msgid "Backoffice Key not recognized or has no entities. Please contact support."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:93
+msgid "No Gateway Keys found for this Backoffice Key. Please contact ifthenpay to activate a gateway."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:143
+msgid "Invalid response from ifthenpay Pay-by-Link API."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:184
+msgid "Invalid response (GET) from ifthenpay API."
+msgstr ""
+
+#: lib/helpers/ifthenpay-api-client.php:211
+msgid "Invalid JSON from ifthenpay API."
+msgstr ""
+
+#. translators: %1$s: order id, %2$s: admin description
+#: lib/helpers/ifthenpay-data-formatter.php:129
+#, php-format
+msgid "Order #%1$s - %2$s"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:26
+msgid "Backoffice Configuration"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:34
+msgid "Backoffice Key"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:48
+msgid "Connect"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:51
+msgid "Connecting..."
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:69
+msgid "Payments Configuration"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:88
+msgid "Gateway Key"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:101
+msgid "Payment Methods"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:166
+msgid "Default Method"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:181
+msgid "Other Configuration"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:186
+msgid "Gateway Close Button Text"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:192
+msgid "Description"
+msgstr ""
+
+#: lib/views/admin-form-renderer.php:200
+msgid "Deadline (days)"
+msgstr ""
