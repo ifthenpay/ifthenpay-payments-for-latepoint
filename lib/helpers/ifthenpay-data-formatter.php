@@ -32,6 +32,9 @@ class IfthenpayDataFormatter
             $method_key = $entry['Entity'] ?? '';
             if (!$method_key) continue;
 
+            // Filter out invisible methods
+            if (! ($entry['IsVisible'] ?? true)) continue;
+
             $methods[$method_key] = [
                 'position' => (int) ($entry['Position'] ?? 0),
                 'image'    => $entry['SmallImageUrl'] ?? '',

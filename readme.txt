@@ -2,9 +2,9 @@
 Contributors: ifthenpay
 Tags: ifthenpay, latepoint, payments, booking, invoices
 Requires at least: 6.5
-Tested up to: 6.8
+Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.3
+Stable tag: 2.0.5
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -96,6 +96,19 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Changelog ==
 
+= 2.0.5 =  
+* Bump tested up to 6.9  
+* Added Filter out of invisible methods  
+
+= 2.0.3 =  
+* Generic class naming and inefficiencies.  
+* Added the prefix 'Ifthenpay' to 'AdminFormRenderer' static class.  
+* Cleaned up settings clearing logic and improved error status handling in the controller.  
+* Removed unused ifthenpay_nonce from localized variables and JavaScript AJAX calls.  
+
+= 2.0.1 =  
+* Versioning fixes and remove unnecessary 'load_plugin_text_domain'.  
+
 = 2.0.0 =  
 * Added support for invoice payments (Orders & Invoices).  
 * Clarified ifthenpay account requirement and subscription link.  
@@ -104,6 +117,15 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 * Initial stable release.
 
 == Upgrade Notice ==
+
+= 2.0.5 =  
+Bump tested up to 6.9; Filter out of invisible methods added.
+
+= 2.0.3 =  
+Generic class naming fixes and other improvements.
+
+= 2.0.1 =  
+Versioning fixes.
 
 = 2.0.0 =  
 Invoice payments now supported;
