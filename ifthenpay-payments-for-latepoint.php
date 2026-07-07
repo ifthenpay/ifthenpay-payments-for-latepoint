@@ -4,7 +4,7 @@
  * Plugin Name:         ifthenpay | Payments for LatePoint
  * Plugin URI:          https://github.com/ifthenpay/ifthenpay-payments-for-latepoint
  * Description:         LatePoint addon for payments with ifthenpay
- * Version:             2.0.5
+ * Version:             2.1.0
  * Requires at least:   6.5
  * Tested up to:        6.9
  * Requires PHP:        7.4
@@ -35,7 +35,7 @@ if (! class_exists('IfthenpayPaymentsForLatepoint')) :
          * Addon version.
          *
          */
-        public $version = '2.0.5';
+        public $version = '2.1.0';
         public $db_version = '2.0.0';
         public $addon_name = 'ifthenpay-payments-for-latepoint';
 

@@ -18,9 +18,8 @@ if (! class_exists('OsPaymentsIfthenpayController')) :
         {
             parent::__construct();
 
-            // Front-end / public AJAX
-            $this->action_access['public']  = array_merge($this->action_access['public'], ['get_ifthenpay_options', 'update_payment_repo_by_modal_url']);
-            $this->action_access['customer'] = array_merge($this->action_access['customer'], ['get_payment_options']);
+            // Front-end / public AJAX (accessible to both guests and authenticated users)
+            $this->action_access['public']  = array_merge($this->action_access['public'], ['get_order_ifthenpay_options', 'get_transaction_ifthenpay_options', 'update_payment_repo_by_modal_url']);
         }
 
         /**

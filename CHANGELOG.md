@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format loosely follows Keep a Changelog recommendations.
 
+## [2.1.0] - 2026-07-07
+
+### Fixed
+
+- Updated public access whitelist in controller to use correct method names (`get_order_ifthenpay_options`, `get_transaction_ifthenpay_options`) instead of deprecated `get_ifthenpay_options`.
+- Removed non-existent `get_payment_options` from customer access whitelist.
+
 ## [2.0.5] - 2026-05-07
 
 ### Updated

@@ -4,7 +4,7 @@ Tags: ifthenpay, latepoint, payments, booking, invoices
 Requires at least: 6.5
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.5
+Stable tag: 2.1.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -72,6 +72,9 @@ Any ifthenpay method attached to your Gateway Key (e.g. Multibanco, MB WAY, Pays
 = How secure is the integration? =  
 Requests are encrypted over HTTPS; data is minimized; no card details are stored. Payments are handled off-site by ifthenpay, ensuring PCI compliance.
 
+= Why are payment links failing or setup timing out? =  
+Your server firewall or VPN may be blocking outbound requests. The plugin must connect to ifthenpay APIs to function. Ensure your network administrator allows outbound HTTPS traffic to ifthenpay domains.
+
 == External Services ==
 
 This plugin integrates with the ifthenpay payment platform to process payments for LatePoint bookings. ifthenpay is a third-party service that provides secure payment processing for various methods including cards, wallets, and local bank transfers.
@@ -84,6 +87,9 @@ This plugin integrates with the ifthenpay payment platform to process payments f
     - During payment processing: Minimal transaction details including transaction ID, amount, and booking details to generate payment references.  
   - **End-User License Agreement (EULA)**: [EULA](https://ifthenpay.com/eula/)  
   - **Privacy Policy**: [Privacy Policy](https://ifthenpay.com/politica-de-privacidade/)
+- **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:  
+  - api.ifthenpay.com (https://api.ifthenpay.com)  
+  - ifthenpay.com (https://ifthenpay.com)
 
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 
@@ -96,27 +102,34 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Changelog ==
 
+= 2.1.0 =  
+* Fixed: Updated public access whitelist in controller to use correct method names (get_order_ifthenpay_options, get_transaction_ifthenpay_options) instead of deprecated get_ifthenpay_options.  
+* Fixed: Removed non-existent get_payment_options from customer access whitelist.
+
 = 2.0.5 =  
-* Bump tested up to 6.9  
-* Added Filter out of invisible methods  
+* Updated: Bumped "Tested up to" to WordPress 6.9 in all relevant files.  
+* Added: Filter out of invisible methods.
 
 = 2.0.3 =  
-* Generic class naming and inefficiencies.  
-* Added the prefix 'Ifthenpay' to 'AdminFormRenderer' static class.  
-* Cleaned up settings clearing logic and improved error status handling in the controller.  
-* Removed unused ifthenpay_nonce from localized variables and JavaScript AJAX calls.  
+* Fixed: Generic class naming and inefficiencies.  
+* Fixed: Added the prefix 'Ifthenpay' to 'AdminFormRenderer' static class.  
+* Fixed: Cleaned up settings clearing logic and improved error status handling in the controller.  
+* Fixed: Removed unused ifthenpay_nonce from localized variables and JavaScript AJAX calls.
 
 = 2.0.1 =  
-* Versioning fixes and remove unnecessary 'load_plugin_text_domain'.  
+* Fixed: Versioning fixes and remove unnecessary 'load_plugin_text_domain'.
 
 = 2.0.0 =  
-* Added support for invoice payments (Orders & Invoices).  
-* Clarified ifthenpay account requirement and subscription link.  
+* Added: Support for invoice payments (Orders & Invoices).  
+* Changed: Clarified ifthenpay account requirement and subscription link.
 
 = 1.0.0 =  
 * Initial stable release.
 
 == Upgrade Notice ==
+
+= 2.1.0 =  
+Controller access whitelist fixes for proper payment endpoint routing.
 
 = 2.0.5 =  
 Bump tested up to 6.9; Filter out of invisible methods added.
