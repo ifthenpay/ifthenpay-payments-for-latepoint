@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format loosely follows Keep a Changelog recommendations.
 
+## [2.1.1] - 2026-08-31
+
+### Changed
+
+- Payment charge reference is now the payment `token` instead of the ifthenpay `transaction_id`, so merchants can reconcile payments more easily.
+
+### Fixed
+
+- Increased the payment status verification timeout from 10s to 45s to give slower payment methods enough time to confirm before giving up.
+- Applied WPCS (PHPCBF), ESLint, and Prettier formatting baseline across the plugin (tabs, single quotes, WPCS spacing).
+
 ## [2.1.0] - 2026-07-07
 
 ### Fixed

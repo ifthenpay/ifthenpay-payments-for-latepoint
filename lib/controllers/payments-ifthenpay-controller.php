@@ -298,7 +298,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 		 * @param int    $interval Seconds between attempts.
 		 * @return bool True if verified.
 		 */
-		private function verifyPaymentWithRetry( string $txid, int $timeout = 10, int $interval = 3 ): bool {
+		private function verifyPaymentWithRetry( string $txid, int $timeout = 45, int $interval = 3 ): bool {
 			$deadline = time() + $timeout;
 			do {
 				if ( IfthenpayAPIClient::get_payment_status_by_transaction_id( $txid ) ) {

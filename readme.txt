@@ -4,7 +4,7 @@ Tags: ifthenpay, latepoint, payments, booking, invoices
 Requires at least: 6.5
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -102,7 +102,12 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Changelog ==
 
-= 2.1.0 =  
+= 2.1.1 =
+* Changed: Payment charge reference is now the payment token instead of the ifthenpay transaction ID, so merchants can reconcile payments more easily.
+* Fixed: Increased the payment status verification timeout from 10s to 45s to give slower payment methods enough time to confirm before giving up.
+* Fixed: Applied WPCS (PHPCBF), ESLint, and Prettier formatting baseline across the plugin (tabs, single quotes, WPCS spacing).
+
+= 2.1.0 =
 * Fixed: Updated public access whitelist in controller to use correct method names (get_order_ifthenpay_options, get_transaction_ifthenpay_options) instead of deprecated get_ifthenpay_options.  
 * Fixed: Removed non-existent get_payment_options from customer access whitelist.
 
@@ -128,7 +133,10 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Upgrade Notice ==
 
-= 2.1.0 =  
+= 2.1.1 =
+Payments now reconcile by token for easier merchant bookkeeping; longer payment confirmation timeout; formatting cleanup.
+
+= 2.1.0 =
 Controller access whitelist fixes for proper payment endpoint routing.
 
 = 2.0.5 =  

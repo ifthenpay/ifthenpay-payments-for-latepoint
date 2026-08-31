@@ -4,7 +4,7 @@
  * Plugin Name:         ifthenpay | Payments for LatePoint
  * Plugin URI:          https://github.com/ifthenpay/ifthenpay-payments-for-latepoint
  * Description:         LatePoint addon for payments with ifthenpay
- * Version:             2.1.0
+ * Version:             2.1.1
  * Requires at least:   6.5
  * Tested up to:        6.9
  * Requires PHP:        7.4
@@ -33,7 +33,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		/**
 		 * Addon version.
 		 */
-		public $version    = '2.1.0';
+		public $version    = '2.1.1';
 		public $db_version = '2.0.0';
 		public $addon_name = 'ifthenpay-payments-for-latepoint';
 
@@ -170,8 +170,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 */
 		private function process_payment_by_intent( $intent_model ): array {
 			// 1) Token must exist
-			$txid = $intent_model->get_payment_data_value( 'token' );
-			if ( ! $txid ) {
+			$token = $intent_model->get_payment_data_value( 'token' );
+			if ( ! $token ) {
 				$msg = __( 'Missing payment token', 'ifthenpay-payments-for-latepoint' );
 				$intent_model->add_error( 'payment_error', $msg );
 				return array(
@@ -181,7 +181,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			// 2) Record must exist
-			$payment = IfthenpayPaymentRepository::get_by_transaction_id( $txid );
+			$payment = IfthenpayPaymentRepository::get_by_token( $token );
 			if ( ! $payment ) {
 				$msg = __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' );
 				$intent_model->add_error( 'payment_error', $msg );
@@ -196,7 +196,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				return array(
 					'status'    => LATEPOINT_STATUS_SUCCESS,
 					'processor' => $this->processor_code,
-					'charge_id' => $payment->transaction_id,
+					'charge_id' => $token,
 					'kind'      => LATEPOINT_TRANSACTION_KIND_CAPTURE,
 				);
 			}

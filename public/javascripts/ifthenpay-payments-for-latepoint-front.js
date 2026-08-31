@@ -118,7 +118,6 @@ class LatepointPaymentsIfthenpayFront {
 				return;
 			}
 			const params = new URL(href).searchParams;
-			console.log('Gateway Params:', params.toString());
 			if (params.has('ifthenpay_return') && params.has('txid')) {
 				this.verify(
 					type,
@@ -166,10 +165,10 @@ class LatepointPaymentsIfthenpayFront {
 		// Handle response
 		if (resp.status === 'success') {
 			if (type === 'order') {
-				$form.find('[name="cart[payment_token]"]').val(txid);
+				$form.find('[name="cart[payment_token]"]').val(token);
 				latepoint_submit_booking_form($form);
 			} else {
-				$form.find('[name="payment_token"]').val(txid);
+				$form.find('[name="payment_token"]').val(token);
 				$form.trigger('submit');
 			}
 		} else if (type === 'order') {

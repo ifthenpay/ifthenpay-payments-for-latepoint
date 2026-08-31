@@ -381,7 +381,6 @@ class LatepointPaymentsIfthenpayAdmin {
 				latepoint_timestamped_ajaxurl(),
 				payload,
 				(res) => {
-					console.log(res);
 					if (res.status === 'success') {
 						alert(
 							res.message ||
