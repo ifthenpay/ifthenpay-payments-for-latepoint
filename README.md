@@ -107,15 +107,15 @@ This plugin integrates with the ifthenpay payment platform to process payments f
 
 - **LatePoint** (appointment-booking plugin): we extend its framework classes (`OsFormHelper`, `OsSettingsHelper`, etc.).
 - **ifthenpay Backoffice & Integrations**
-  - **What it is and what it is used for**: The ifthenpay Backoffice is the merchant dashboard for managing payment integrations. The plugin uses the ifthenpay API to retrieve account configuration, generate payment links, and process payments.
-  - **What data is sent and when**:
-    - During setup: Backoffice Key and Gateway Key (stored securely in site settings) to authenticate and retrieve available payment methods.
-    - During payment processing: Minimal transaction details including transaction ID, amount, and booking details to generate payment references.
-  - **End-User License Agreement (EULA)**: [EULA](https://ifthenpay.com/eula/)
-  - **Privacy Policy**: [Privacy Policy](https://ifthenpay.com/politica-de-privacidade/)
+    - **What it is and what it is used for**: The ifthenpay Backoffice is the merchant dashboard for managing payment integrations. The plugin uses the ifthenpay API to retrieve account configuration, generate payment links, and process payments.
+    - **What data is sent and when**:
+        - During setup: Backoffice Key and Gateway Key (stored securely in site settings) to authenticate and retrieve available payment methods.
+        - During payment processing: Minimal transaction details including transaction ID, amount, and booking details to generate payment references.
+    - **End-User License Agreement (EULA)**: [EULA](https://ifthenpay.com/eula/)
+    - **Privacy Policy**: [Privacy Policy](https://ifthenpay.com/politica-de-privacidade/)
 - **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:
-  - [api.ifthenpay.com](https://api.ifthenpay.com)
-  - [ifthenpay.com](https://ifthenpay.com)
+    - [api.ifthenpay.com](https://api.ifthenpay.com)
+    - [ifthenpay.com](https://ifthenpay.com)
 
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 
