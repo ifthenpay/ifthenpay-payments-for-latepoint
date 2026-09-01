@@ -93,7 +93,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
 
 			// MODELS
-			// include_once(dirname( __FILE__ ) . '/lib/models/example_model.php' );
+			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 		}
 
 		public function init_hooks() {
@@ -369,6 +369,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 */
 		public function init() {
 			// Set up localisation.
+
+			// Cheap on every request when already current; upgrades the schema on an in-place
+			// plugin update, not only on (re)activation.
+			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 		}
 
 		public function latepoint_init() {
@@ -385,6 +389,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				require_once __DIR__ . '/lib/helpers/ifthenpay-payments-repository.php';
 			}
 			IfthenpayPaymentRepository::create_table();
+
+			if ( ! class_exists( 'IfthenpayLpTransactionRepository' ) ) {
+				require_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
+			}
+			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 
 			// Optional: save version to maintain manual control
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
