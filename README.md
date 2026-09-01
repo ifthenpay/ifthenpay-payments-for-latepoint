@@ -15,6 +15,7 @@ Includes merchant backoffice (basic sales), and secure signed callbacks for auto
 - [Frequently Asked Questions](#frequently-asked-questions)
 - [External Services](#external-services)
 - [Screenshots](#screenshots)
+- [Development](#development)
 - [Support](#support)
 
 ## Description
@@ -137,6 +138,24 @@ Below are screenshots demonstrating key features and interfaces of the plugin:
 
 5. **(Customers Experience) Booking confirmation with payment status.**  
    ![Booking Confirmation](.wordpress-org/screenshot-5.png)
+
+## Development
+
+This plugin has **no `composer.json`, no `vendor/`, no PSR-4 autoload** — that's deliberate, not an
+oversight. It follows the LatePoint addon-starter pattern: files load through explicit `include_once`
+calls in `includes()`, hooked to `latepoint_includes`, with global prefixed class names under `lib/`.
+Introducing Composer here would diverge from every other LatePoint addon.
+
+Because of that, this plugin's PHP test tooling (PHPUnit, wp-phpunit, Brain Monkey) lives as dev
+dependencies in the **dev-env repo root** (`/workspace/repo`), not in this folder. Run tests from
+there:
+
+```bash
+cd /workspace/repo
+composer test:unit   # tests/unit — no WordPress booted
+composer test:int    # tests/integration — real wordpress_test DB
+composer test        # both
+```
 
 ## Support
 
