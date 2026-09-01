@@ -98,6 +98,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
 			// VIEWS (renderers)
@@ -105,6 +106,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			// MODELS
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
+
+			// CLI.
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				include_once __DIR__ . '/lib/cli/ifthenpay-lp-cli-commands.php';
+			}
 		}
 
 		public function init_hooks() {
@@ -142,6 +148,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Validate the Backoffice Key on every save — fires for every OsModel save, so this
 			// must filter tightly to just this one setting (see validate_backoffice_key_on_save()).
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
+			// Register the callback URL after a save that included a Gateway Key — post-save and
+			// non-blocking, unlike the Backoffice Key check above: a registration failure must not
+			// stop the settings themselves from saving (see register_callback_on_settings_updated()).
+			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
 
 			add_filter( 'latepoint_get_all_payment_times', array( $this, 'add_all_payment_methods_to_payment_times' ) );
 			add_filter( 'latepoint_get_enabled_payment_times', array( $this, 'add_enabled_payment_methods_to_payment_times' ) );
@@ -288,6 +298,27 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 		}
 
+		/**
+		 * Fires after every settings save (see SettingsController::update()) — registers the
+		 * callback URL only when a Gateway Key was actually part of this save. Outcome is stored
+		 * by IfthenpayLpCallbackRegistration itself, for add_settings_fields() to surface on the
+		 * next render; never blocks or unwinds the settings save that just happened.
+		 *
+		 * @param array<string,mixed> $settings The submitted settings, keyed by setting name.
+		 */
+		public function register_callback_on_settings_updated( $settings ) {
+			if ( ! isset( $settings['ifthenpay_gateway_key'] ) ) {
+				return;
+			}
+
+			$gateway_key = sanitize_text_field( $settings['ifthenpay_gateway_key'] );
+			if ( '' === $gateway_key ) {
+				return;
+			}
+
+			IfthenpayLpCallbackRegistration::register( $gateway_key );
+		}
+
 		public function localized_vars_for_admin( $localized_vars ) {
 			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'validate_key' );
 			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'activate_account_by_entity' );
@@ -388,6 +419,14 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 					$dataset['accounts'] ?? array(),
 					IfthenpayLpMethodCatalog::get() ?? array()
 				);
+
+				// The last registration outcome for the currently saved Gateway Key (003 T-12) —
+				// stored by register_callback_on_settings_updated() after a save, surfaced here so
+				// a merchant sees a failure without re-entering the form.
+				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
+				if ( $gateway_key ) {
+					IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
+				}
 
 				IfthenpayAdminFormRenderer::render_others_configuration();
 			}

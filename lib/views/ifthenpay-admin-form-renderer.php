@@ -124,6 +124,29 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
+	 * The last callback registration outcome for the currently saved Gateway Key (003 T-12) —
+	 * silent on success or when nothing was ever attempted; only a confirmed failure is worth a
+	 * merchant's attention, matching the same "outages are neutral, only rejection is an alert"
+	 * split as render_connection_status() above.
+	 *
+	 * @param array{success:bool,message:string,registered_at:int}|null $status IfthenpayLpCallbackRegistration::get_status()'s result.
+	 */
+	public static function render_callback_status( ?array $status ): void {
+		if ( null === $status || $status['success'] ) {
+			return;
+		}
+
+		self::render_status_pill(
+			'error',
+			sprintf(
+				/* translators: %s: reason the callback registration failed */
+				esc_html__( 'The payment notification URL could not be registered with ifthenpay: %s', 'ifthenpay-payments-for-latepoint' ),
+				esc_html( $status['message'] )
+			)
+		);
+	}
+
+	/**
 	 * @param array<string,string>               $gatewaykeys `{GatewayKey: Alias}` — IfthenpayLpGatewayDataset::get()'s own shape (003 T-05), used directly as the select's value=>label options.
 	 * @param array<string,array<string,string>> $accounts    `{GatewayKey: {methodKey: accountKey}}` — same dataset, every gateway at once (003 T-11): the JS re-reads this client-side when the gateway select changes, no per-gateway round trip.
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog (IfthenpayLpMethodCatalog::get()), position-sorted for display.
