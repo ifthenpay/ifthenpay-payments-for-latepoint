@@ -86,23 +86,21 @@ class TransactionRepositoryMigrationTest extends WP_UnitTestCase {
 
 		// Force the plugin's real upgrade path to run again, as it would on an in-place update.
 		delete_option( 'ifthenpay_lp_transactions_schema_version' );
-		// @phpstan-ignore-next-line class.notFound (loaded via the plugin's own `latepoint_includes` bootstrap; tests/ is analysed on its own, so PHPStan can't see it here)
 		IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 
 		// The in-flight payment still settles: it exists in the new table, findable by token.
-
-		// @phpstan-ignore-next-line class.notFound (see note above)
 		$migrated = IfthenpayLpTransactionRepository::find_by_token( 'legacy-inflight' );
 		$this->assertNotNull( $migrated );
+		// @phpstan-ignore-next-line property.notFound (find_by_token() returns a raw $wpdb->get_row() stdClass, same untyped-object pattern the rest of the codebase uses)
 		$this->assertSame( 'realtime', $migrated->kind );
-		// @phpstan-ignore-next-line class.notFound (see note above)
+		// @phpstan-ignore-next-line property.notFound (see note above)
 		$this->assertSame( IfthenpayLpTransactionRepository::METHOD_PAYBYLINK, $migrated->method );
+		// @phpstan-ignore-next-line property.notFound (see note above)
 		$this->assertSame( 'PENDING', $migrated->status );
+		// @phpstan-ignore-next-line property.notFound (see note above)
 		$this->assertSame( 'https://pay.example/legacy-inflight', $migrated->paybylink_url );
 
 		// The already-settled row is not duplicated into the new table...
-
-		// @phpstan-ignore-next-line class.notFound (see note above)
 		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( 'legacy-settled' ) );
 
 		// ...but stays readable: the old table was renamed, not dropped.

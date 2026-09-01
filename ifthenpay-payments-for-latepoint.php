@@ -85,6 +85,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			// HELPERS
 			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-exception.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-credential-exception.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-transport-exception.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-data-formatter.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 

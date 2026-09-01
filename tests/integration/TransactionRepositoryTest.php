@@ -16,7 +16,6 @@ class TransactionRepositoryTest extends WP_UnitTestCase {
 	 * Asserts the UNIQUE(request_id) index rejects a second row with the same request_id.
 	 */
 	public function test_duplicate_request_id_is_refused_by_the_database(): void {
-		// @phpstan-ignore-next-line class.notFound (loaded via the plugin's own `latepoint_includes` bootstrap; tests/ is analysed on its own, so PHPStan can't see it here)
 		$first = IfthenpayLpTransactionRepository::insert(
 			array(
 				'token'      => 'tok-' . wp_generate_password( 12, false ),
@@ -30,7 +29,6 @@ class TransactionRepositoryTest extends WP_UnitTestCase {
 
 		global $wpdb;
 		$suppress = $wpdb->suppress_errors( true );
-		// @phpstan-ignore-next-line class.notFound (see note above)
 		$second   = IfthenpayLpTransactionRepository::insert(
 			array(
 				'token'      => 'tok-' . wp_generate_password( 12, false ),
@@ -49,7 +47,6 @@ class TransactionRepositoryTest extends WP_UnitTestCase {
 	 * Asserts a record can be found by request_id alone, method unknown ahead of time.
 	 */
 	public function test_settlement_lookup_by_request_id_needs_no_method_knowledge(): void {
-		// @phpstan-ignore-next-line class.notFound (see note above)
 		IfthenpayLpTransactionRepository::insert(
 			array(
 				'token'      => 'tok-' . wp_generate_password( 12, false ),
@@ -62,11 +59,12 @@ class TransactionRepositoryTest extends WP_UnitTestCase {
 
 		// The caller does not know — and does not need to know — that this record is a Payshop
 		// payment before looking it up; the method comes back as data on the found record.
-		// @phpstan-ignore-next-line class.notFound (see note above)
 		$found = IfthenpayLpTransactionRepository::find_by_request_id( 'LOOKUP-REQUEST-ID' );
 
 		$this->assertNotNull( $found );
+		// @phpstan-ignore-next-line property.notFound (find_by_request_id() returns a raw $wpdb->get_row() stdClass, same untyped-object pattern the rest of the codebase uses)
 		$this->assertSame( 'PAYSHOP', $found->method );
+		// @phpstan-ignore-next-line property.notFound (see note above)
 		$this->assertSame( 'PENDING', $found->status );
 	}
 }

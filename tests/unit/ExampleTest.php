@@ -52,7 +52,6 @@ final class ExampleTest extends TestCase {
 				'Main'      => 'ABC123',
 				'Secondary' => 'DEF456',
 			),
-			// @phpstan-ignore-next-line class.notFound (loaded via require_once above; nothing autoloads in this plugin, so PHPStan can't see it when tests/ is analysed on its own)
 			IfthenpayDataFormatter::format_gateway_keys( $raw )
 		);
 	}
