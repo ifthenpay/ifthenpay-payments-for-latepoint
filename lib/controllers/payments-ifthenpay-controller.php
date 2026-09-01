@@ -149,7 +149,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 
 				// 2) Build Payload & Generate Pay-by-Link
 				$payload    = IfthenpayDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
-				$api_result = IfthenpayAPIClient::create_pay_by_link(
+				$api_result = IfthenpayLpPayByLink::create(
 					OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
 					$payload
 				);

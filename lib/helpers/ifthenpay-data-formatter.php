@@ -57,11 +57,8 @@ class IfthenpayDataFormatter {
 			'amount'          => self::format_amount( $amount ),
 			'description'     => self::build_description( $intent ),
 			'lang'            => self::get_language(),
-			// 'expiredate'      => self::get_expire_date(),
 			'accounts'        => self::build_accounts_string(),
 			'selected_method' => self::get_selected_method(),
-			// 'btnCloseUrl'     => home_url('/'),
-			// 'btnCloseLabel'   => OsSettingsHelper::get_settings_value('ifthenpay_gateway_close_text', __('Close', 'ifthenpay-payments-for-latepoint')),
 		);
 
 		// Return URLs embedding token
@@ -120,14 +117,6 @@ class IfthenpayDataFormatter {
 	private static function get_language(): string {
 		$lang = substr( get_locale(), 0, 2 );
 		return in_array( $lang, array( 'pt', 'en', 'es', 'fr' ), true ) ? $lang : 'pt';
-	}
-
-	/**
-	 * Compute expire date based on admin 'ifthenpay_deadline'.
-	 */
-	private static function get_expire_date(): string {
-		$days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_deadline' );
-		return gmdate( 'Ymd', strtotime( "+{$days} days" ) );
 	}
 
 	/**

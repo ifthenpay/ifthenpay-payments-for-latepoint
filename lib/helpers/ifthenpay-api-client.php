@@ -4,42 +4,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * What remains here is only what 003 T-11 did not migrate: creating a Pay By Link and polling its
- * transaction status, both plain public API calls that take no Backoffice Key at all (path/body
- * auth only). Everything that needed the Backoffice Key — key validation, the gateway/methods
- * dataset — now goes through IfthenpayLpApiClient and friends instead; do not add new callers here.
+ * The one thing left here: polling a payment's status by transaction ID, used by
+ * verifyPaymentWithRetry() in the controller. Not migrated to IfthenpayLpApiClient — the
+ * `/gateway/transaction/status` endpoint it calls was never independently verified the way every
+ * operation in contracts/api.md was (live curl, or read from the Moodle reference plugin); it is
+ * inherited as-is from the pre-revamp plugin. It is also entangled with a known, unfixed
+ * verification gap in update_payment_repo_by_modal_url() (see 001's research.md) — migrating this
+ * one call in isolation would look like a fix without being one. Leave both to 001, which already
+ * scopes the real fix. Do not add new callers here.
  */
 class IfthenpayAPIClient {
 
 	const BASE_API_PUBLIC             = 'https://api.ifthenpay.com';
-	const ENDPOINT_PAY_BY_LINK        = '/gateway/pinpay';
 	const ENDPOINT_TRANSACTION_STATUS = '/gateway/transaction/status';
-
-	/**
-	 * Create a “Pay by Link” on ifthenpay.
-	 *
-	 * @param string $gateway_key
-	 * @param array  $payload
-	 * @return object { pin_code, pinpay_url, redirect_url }
-	 * @throws Exception
-	 */
-	public static function create_pay_by_link( string $gateway_key, array $payload ) {
-		$url = rtrim( self::BASE_API_PUBLIC, '/' )
-			. self::ENDPOINT_PAY_BY_LINK
-			. '/' . rawurlencode( $gateway_key );
-
-		$response = self::post( $url, $payload );
-
-		if ( empty( $response['PinCode'] ) || empty( $response['PinpayUrl'] ) || empty( $response['RedirectUrl'] ) ) {
-			throw new Exception( esc_html__( 'Invalid response from ifthenpay Pay-by-Link API.', 'ifthenpay-payments-for-latepoint' ) );
-		}
-
-		return (object) array(
-			'pin_code'     => $response['PinCode'],
-			'pinpay_url'   => $response['PinpayUrl'],
-			'redirect_url' => $response['RedirectUrl'],
-		);
-	}
 
 	/**
 	 * Get payment status by Transaction ID.
@@ -73,33 +50,6 @@ class IfthenpayAPIClient {
 
 		if ( ! is_array( $decoded ) && ! is_bool( $decoded ) ) {
 			throw new Exception( esc_html__( 'Invalid response (GET) from ifthenpay API.', 'ifthenpay-payments-for-latepoint' ) );
-		}
-
-		return $decoded;
-	}
-
-	/**
-	 * POST request helper.
-	 *
-	 * @throws Exception
-	 */
-	private static function post( string $url, array $data ): array {
-		$args = array(
-			'headers' => array( 'Content-Type' => 'application/json' ),
-			'body'    => wp_json_encode( $data ),
-			'timeout' => 10,
-		);
-
-		$resp = wp_remote_post( $url, $args );
-		if ( is_wp_error( $resp ) ) {
-			throw new Exception( esc_html( $resp->get_error_message() ) );
-		}
-
-		$body    = wp_remote_retrieve_body( $resp );
-		$decoded = json_decode( $body, true );
-
-		if ( ! is_array( $decoded ) ) {
-			throw new Exception( esc_html__( 'Invalid JSON from ifthenpay API.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		return $decoded;
