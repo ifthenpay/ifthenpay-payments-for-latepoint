@@ -208,10 +208,14 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 				);
 
 				// 3) Persist as PENDING
-				IfthenpayPaymentRepository::create(
-					$token,
-					$intent_model->id,
-					$api_result->redirect_url
+				IfthenpayLpTransactionRepository::insert(
+					array(
+						'token'         => $token,
+						'intent_id'     => $intent_model->id,
+						'kind'          => 'realtime',
+						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+						'paybylink_url' => $api_result->redirect_url,
+					)
 				);
 
 				// 4) Success JSON
@@ -249,8 +253,8 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 			try {
 				// Success path: verify then mark PAID
 				if ( $type === 'success' && $this->verifyPaymentWithRetry( $txid ) ) {
-					IfthenpayPaymentRepository::update_transaction_id( $token, $txid );
-					IfthenpayPaymentRepository::update_status( $token, 'PAID' );
+					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
+					IfthenpayLpTransactionRepository::update_status( $token, 'PAID' );
 					$this->send_json(
 						array(
 							'status'  => LATEPOINT_STATUS_SUCCESS,
@@ -260,7 +264,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 				}
 				// Cancelled by user: mark CANCELLED and return error
 				elseif ( $type === 'cancel' ) {
-					IfthenpayPaymentRepository::update_status( $token, 'CANCELLED' );
+					IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
 					$this->send_json(
 						array(
 							'status'  => LATEPOINT_STATUS_ERROR,
@@ -270,8 +274,8 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 				}
 				// All other cases (error or failed payment verification): mark FAILED and return error
 				else {
-					IfthenpayPaymentRepository::update_status( $token, 'FAILED' );
-					IfthenpayPaymentRepository::update_transaction_id( $token, $txid );
+					IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
+					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 					$this->send_json(
 						array(
 							'status'  => LATEPOINT_STATUS_ERROR,

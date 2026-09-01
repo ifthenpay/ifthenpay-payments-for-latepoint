@@ -21,6 +21,14 @@ class IfthenpayLpTransactionRepository {
 	private const CACHE_GROUP           = 'ifthenpay_lp_transactions';
 
 	/**
+	 * Method value for rows migrated from — or newly created through — the realtime Pay By Link
+	 * flow. The flow only ever knows it went through Pay By Link, never which underlying ifthenpay
+	 * method (MB WAY, card, …) the customer picked on ifthenpay's own hosted page, so a real
+	 * per-method code (`MB`, `MBWAY`, …) is not available here the way it is for deferred methods.
+	 */
+	public const METHOD_PAYBYLINK = 'PAYBYLINK';
+
+	/**
 	 * The fully qualified table name.
 	 */
 	private static function table_name(): string {
@@ -39,6 +47,7 @@ class IfthenpayLpTransactionRepository {
 		}
 
 		self::create_table();
+		self::migrate_legacy_pending_and_retire();
 		update_option( self::SCHEMA_VERSION_OPTION, self::SCHEMA_VERSION );
 	}
 
@@ -114,6 +123,100 @@ class IfthenpayLpTransactionRepository {
 	 */
 	public static function find_by_token( string $token ): ?object {
 		return self::find_one( 'token', $token );
+	}
+
+	/**
+	 * Sets the status column.
+	 *
+	 * @param string $token  Our correlation handle.
+	 * @param string $status New status value.
+	 */
+	public static function update_status( string $token, string $status ): bool {
+		return self::update_columns( $token, array( 'status' => $status ) );
+	}
+
+	/**
+	 * Merges data into the method_data JSON column, preserving keys already there. For anything
+	 * genuinely method-specific that arrives after the initial insert — e.g. the realtime flow's
+	 * ifthenpay transaction id, used for status polling and unrelated to request_id (a different
+	 * ifthenpay identifier space, from the reference-creation APIs, not Pay By Link).
+	 *
+	 * @param string              $token Our correlation handle.
+	 * @param array<string,mixed> $data  Keys to set or overwrite.
+	 */
+	public static function update_method_data( string $token, array $data ): bool {
+		$record = self::find_by_token( $token );
+		if ( ! $record ) {
+			return false;
+		}
+
+		$existing = $record->method_data ? json_decode( $record->method_data, true ) : array();
+		$merged   = array_merge( is_array( $existing ) ? $existing : array(), $data );
+
+		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ) );
+	}
+
+	/**
+	 * Shared column update by token, with cache invalidation.
+	 *
+	 * @param string              $token Our correlation handle.
+	 * @param array<string,mixed> $data  Column => value.
+	 */
+	private static function update_columns( string $token, array $data ): bool {
+		global $wpdb;
+		$updated = (bool) $wpdb->update( self::table_name(), $data, array( 'token' => $token ) );
+
+		if ( $updated ) {
+			wp_cache_delete( "token_{$token}", self::CACHE_GROUP );
+		}
+
+		return $updated;
+	}
+
+	/**
+	 * One-time upgrade step: copies still-PENDING rows from the old, single-purpose
+	 * {prefix}ifthenpay_payments table into this one, then renames the old table to `_legacy` so
+	 * it stays readable for audits — never DROP on upgrade. No-ops on a fresh install (old table
+	 * never existed) or if it already ran (the `_legacy` table is already there).
+	 *
+	 * The old table never recorded a per-record gateway_key, amount, or expiry, so migrated rows
+	 * leave those NULL. That is safe here: migrated rows are always `kind = 'realtime'`, and the
+	 * realtime flow does not use gateway_key/amount/expiry validation — those only matter to the
+	 * deferred callback path, which never sees a realtime-kind record.
+	 */
+	private static function migrate_legacy_pending_and_retire(): void {
+		global $wpdb;
+		$old_table    = $wpdb->prefix . 'ifthenpay_payments';
+		$legacy_table = $old_table . '_legacy';
+
+		$legacy_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $legacy_table ) ) === $legacy_table;
+		if ( $legacy_exists ) {
+			return;
+		}
+
+		$old_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_table ) ) === $old_table;
+		if ( ! $old_exists ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- $old_table has no user-controlled part (built from $wpdb->prefix); a one-time upgrade step, not a request-path query.
+		$pending = $wpdb->get_results( "SELECT token, intent_id, paybylink_url FROM `{$old_table}` WHERE status = 'PENDING'" );
+
+		foreach ( $pending as $row ) {
+			self::insert(
+				array(
+					'token'         => $row->token,
+					'intent_id'     => (int) $row->intent_id,
+					'kind'          => 'realtime',
+					'method'        => self::METHOD_PAYBYLINK,
+					'status'        => 'PENDING',
+					'paybylink_url' => $row->paybylink_url,
+				)
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery -- table names can't be placeholders; both are built from $wpdb->prefix, no user-controlled part.
+		$wpdb->query( "RENAME TABLE `{$old_table}` TO `{$legacy_table}`" );
 	}
 
 	/**

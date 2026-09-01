@@ -86,7 +86,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// HELPERS
 			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-data-formatter.php';
-			include_once __DIR__ . '/lib/helpers/ifthenpay-payments-repository.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
 			// VIEWS (renderers)
@@ -181,7 +180,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			// 2) Record must exist
-			$payment = IfthenpayPaymentRepository::get_by_token( $token );
+			$payment = IfthenpayLpTransactionRepository::find_by_token( $token );
 			if ( ! $payment ) {
 				$msg = __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' );
 				$intent_model->add_error( 'payment_error', $msg );
@@ -384,12 +383,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		public function on_activate() {
 			do_action( 'latepoint_on_addon_activate', $this->addon_name, $this->version );
 
-			// Create the ifthenpay payments table
-			if ( ! class_exists( 'IfthenpayPaymentRepository' ) ) {
-				require_once __DIR__ . '/lib/helpers/ifthenpay-payments-repository.php';
-			}
-			IfthenpayPaymentRepository::create_table();
-
+			// Create/upgrade the ifthenpay_transactions table. On a site still running the old
+			// single-purpose ifthenpay_payments table, this also migrates its PENDING rows and
+			// renames it to _legacy — see IfthenpayLpTransactionRepository::migrate_legacy_pending_and_retire().
 			if ( ! class_exists( 'IfthenpayLpTransactionRepository' ) ) {
 				require_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 			}
