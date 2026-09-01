@@ -15,3 +15,8 @@ require dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
+
+// WP core time constants some lib/ classes use in cache-TTL calculations.
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
