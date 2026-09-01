@@ -141,8 +141,10 @@ final class ApiClientTest extends TestCase {
 	}
 
 	/**
-	 * Callback activation answers plain text, not JSON — with $expects_json=false, `OK` comes
-	 * back as-is, no exception.
+	 * Callback activation answers plain text, not JSON — with $expects_json=false, the body comes
+	 * back as-is, no exception. VERIFIED live (003 T-12c): that body is actually the bare JSON
+	 * string literal `"OK"`, quotes included, not the unquoted `OK` the contract once assumed —
+	 * this method's whole job is to pass it through untouched either way, not to normalise it.
 	 */
 	public function test_plain_text_ok_is_returned_as_is_when_json_not_expected(): void {
 		$this->mock_http( 200, ifthenpay_lp_fixture( 'callback-activation-ok.txt' ) );
@@ -154,11 +156,11 @@ final class ApiClientTest extends TestCase {
 			false
 		);
 
-		$this->assertSame( 'OK', $result );
+		$this->assertSame( '"OK"', $result );
 	}
 
 	/**
-	 * Same endpoint, the failure shape — still plain text, still not an exception. `INVALID` is
+	 * Same endpoint, the failure shape — still plain text, still not an exception. `"INVALID"` is
 	 * data for the caller to interpret, not a transport-level problem.
 	 */
 	public function test_plain_text_invalid_is_returned_as_is_when_json_not_expected(): void {
@@ -171,6 +173,6 @@ final class ApiClientTest extends TestCase {
 			false
 		);
 
-		$this->assertSame( 'INVALID', $result );
+		$this->assertSame( '"INVALID"', $result );
 	}
 }

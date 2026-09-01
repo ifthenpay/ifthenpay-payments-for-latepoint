@@ -73,7 +73,10 @@ final class CallbackRegistrationTest extends TestCase {
 	}
 
 	/**
-	 * A plain-text "OK" from ifthenpay registers success and is stored as such.
+	 * The real response — the bare JSON string literal `"OK"`, quotes included, VERIFIED live
+	 * (003 T-12c) — registers success. A naive `'OK' === trim($response)` check would miss this
+	 * shape entirely and silently record every real success as a failure; this is the regression
+	 * that live call caught.
 	 */
 	public function test_ok_response_registers_success(): void {
 		Functions\when( 'is_wp_error' )->justReturn( false );
@@ -86,6 +89,19 @@ final class CallbackRegistrationTest extends TestCase {
 		$status = IfthenpayLpCallbackRegistration::get_status( 'GATEWAY-1' );
 		$this->assertTrue( $status['success'] );
 		$this->assertSame( '', $status['message'] );
+	}
+
+	/**
+	 * A bare, unquoted "OK" — the shape the contract originally assumed — is also recognized, in
+	 * case ifthenpay's own response shape ever reverts.
+	 */
+	public function test_bare_unquoted_ok_also_registers_success(): void {
+		Functions\when( 'is_wp_error' )->justReturn( false );
+		Functions\when( 'wp_remote_request' )->justReturn( ifthenpay_lp_mock_response( 200, 'OK' ) );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->alias( static fn( $response ) => $response['body'] );
+
+		$this->assertTrue( IfthenpayLpCallbackRegistration::register( 'GATEWAY-BARE-OK' ) );
 	}
 
 	/**

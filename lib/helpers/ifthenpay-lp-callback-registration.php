@@ -64,7 +64,7 @@ class IfthenpayLpCallbackRegistration {
 			return false;
 		}
 
-		$success = is_string( $response ) && 'OK' === trim( $response );
+		$success = self::response_indicates_success( $response );
 		self::store_status(
 			$gateway_key,
 			$success,
@@ -72,6 +72,22 @@ class IfthenpayLpCallbackRegistration {
 		);
 
 		return $success;
+	}
+
+	/**
+	 * The "plain text" answer here is actually a bare JSON string literal — `"OK"` / `"INVALID"`,
+	 * quotes included — VERIFIED live (003 T-12c), not the unquoted `OK` the contract previously
+	 * assumed. Accepts either shape, so a future change back to true plain text would not silently
+	 * break this.
+	 *
+	 * @param array<mixed>|string $response IfthenpayLpApiClient::post()'s return value.
+	 */
+	private static function response_indicates_success( $response ): bool {
+		if ( ! is_string( $response ) ) {
+			return false;
+		}
+
+		return in_array( trim( $response ), array( 'OK', '"OK"' ), true );
 	}
 
 	/**
