@@ -94,6 +94,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-data-formatter.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-method-catalog.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-gateway-dataset.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-enabled-method-gate.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
@@ -236,11 +237,23 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		public function add_enabled_payment_methods_to_payment_times( array $payment_times ): array {
-			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) ) {
+			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) && $this->is_gateway_key_usable() ) {
 				$payment_times = $this->add_all_payment_methods_to_payment_times( $payment_times );
 			}
 
 			return $payment_times;
+		}
+
+		/**
+		 * FR-13: the processor toggle alone is not enough — the saved Gateway Key must still be a
+		 * real, live one for the current Backoffice Key, checked fresh every time (no caching of
+		 * its own; IfthenpayLpGatewayDataset::get() already caches per request).
+		 */
+		private function is_gateway_key_usable(): bool {
+			return IfthenpayLpEnabledMethodGate::is_usable(
+				(string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' ),
+				(string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' )
+			);
 		}
 
 		public function add_encrypted_settings( $encrypted_settings ) {
@@ -345,10 +358,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return $payment_methods;
 		}
 
-		// Enables payment methods if the processor is turned on
+		// Enables payment methods if the processor is turned on and its Gateway Key is usable
 		public function register_enabled_payment_methods( $enabled_payment_methods ) {
-			// check if payment processor is enabled in settings
-			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) ) {
+			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) && $this->is_gateway_key_usable() ) {
 				$enabled_payment_methods = array_merge( $enabled_payment_methods, $this->get_supported_payment_methods() );
 			}
 			return $enabled_payment_methods;
