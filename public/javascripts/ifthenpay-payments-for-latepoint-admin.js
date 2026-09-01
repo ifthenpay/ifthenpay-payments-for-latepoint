@@ -100,7 +100,7 @@ class LatepointPaymentsIfthenpayAdmin {
 	}
 
 	// Unlike "Connect", this really does save immediately — it clears the Backoffice Key and
-	// everything configured under it server-side (see OsPaymentsIfthenpayController::disconnect()),
+	// everything configured under it server-side (see OsPaymentsIfthenpaySettingsController::disconnect()),
 	// not only this form's own inputs, so there is nothing stale left for a later "Connect" to
 	// silently inherit. A plain confirm() is enough for a same-page, immediately-visible action.
 	handleDisconnect(event) {

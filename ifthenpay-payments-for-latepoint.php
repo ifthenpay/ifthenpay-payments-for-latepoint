@@ -81,7 +81,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 */
 		public function includes() {
 			// CONTROLLERS
-			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-controller.php';
+			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-checkout-controller.php';
+			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 
 			// HELPERS
 			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
@@ -321,9 +322,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		public function localized_vars_for_admin( $localized_vars ) {
-			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'validate_key' );
-			$localized_vars['ifthenpay_disconnect_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'disconnect' );
-			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'activate_account_by_entity' );
+			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'validate_key' );
+			$localized_vars['ifthenpay_disconnect_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'disconnect' );
+			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'activate_account_by_entity' );
 
 			// The full {gatewayKey: {methodKey: accountKey}} map, every gateway at once — the
 			// select's own "change" handler looks up into this client-side, no AJAX
@@ -352,9 +353,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		public function localized_vars_for_front( $localized_vars ) {
 			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) ) {
 				$localized_vars['is_ifthenpay_active']                         = true;
-				$localized_vars['ifthenpay_order_payment_options_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'get_order_ifthenpay_options' );
-				$localized_vars['ifthenpay_transaction_payment_options_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'get_transaction_ifthenpay_options' );
-				$localized_vars['ifthenpay_check_status_route']                = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'update_payment_repo_by_modal_url' );
+				$localized_vars['ifthenpay_order_payment_options_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay_checkout', 'get_order_ifthenpay_options' );
+				$localized_vars['ifthenpay_transaction_payment_options_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay_checkout', 'get_transaction_ifthenpay_options' );
+				$localized_vars['ifthenpay_check_status_route']                = OsRouterHelper::build_route_name( 'payments_ifthenpay_checkout', 'update_payment_repo_by_modal_url' );
 
 				$localized_vars['ifthenpay_translations'] = array(
 					'warning' => __( '⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically.', 'ifthenpay-payments-for-latepoint' ),
