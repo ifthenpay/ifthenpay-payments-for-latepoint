@@ -123,17 +123,23 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
-	public static function render_payments_configuration( array $gateway_options, array $available_methods ) {
-		$json = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
-		$cfg  = json_decode( $json, true ) ?: array();
+	/**
+	 * @param array<string,string>               $gatewaykeys `{GatewayKey: Alias}` — IfthenpayLpGatewayDataset::get()'s own shape (003 T-05), used directly as the select's value=>label options.
+	 * @param array<string,array<string,string>> $accounts    `{GatewayKey: {methodKey: accountKey}}` — same dataset, every gateway at once (003 T-11): the JS re-reads this client-side when the gateway select changes, no per-gateway round trip.
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog (IfthenpayLpMethodCatalog::get()), position-sorted for display.
+	 */
+	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ) {
+		$json                 = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
+		$cfg                  = json_decode( $json, true ) ?: array();
+		$selected_gateway_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		?>
 		<div class="sub-section-row">
 			<div class="sub-section-label">
 				<h3><?php echo esc_html__( 'Payments Configuration', 'ifthenpay-payments-for-latepoint' ); ?></h3>
 			</div>
 			<div class="sub-section-content">
-				<?php self::render_gateway_key_select( $gateway_options ); ?>
-				<?php self::render_payment_methods( $available_methods, $cfg ); ?>
+				<?php self::render_gateway_key_select( $gatewaykeys, $selected_gateway_key ); ?>
+				<?php self::render_payment_methods( $catalog, $accounts[ $selected_gateway_key ] ?? array(), $cfg ); ?>
 				<?php self::render_default_method_select(); ?>
 				<input type="hidden"
 					id="ifthenpay_payment_methods_configuration"
@@ -144,17 +150,28 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
-	private static function render_gateway_key_select( array $options ) {
+	private static function render_gateway_key_select( array $gatewaykeys, string $selected_gateway_key ) {
 		echo OsFormHelper::select_field(
 			'settings[ifthenpay_gateway_key]',
 			esc_html__( 'Gateway Key', 'ifthenpay-payments-for-latepoint' ),
-			array_column( $options, 'Alias', 'GatewayKey' ),
-			OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
+			$gatewaykeys,
+			$selected_gateway_key,
 			array( 'class' => 'ifthenpay-gateway-select' )
 		);
 	}
 
-	private static function render_payment_methods( array $available_methods, array $cfg ) {
+	/**
+	 * One row per catalog method. A gateway record holds at most one account per method (verified
+	 * live, contracts/api.md operation #2 — not a list to choose from), so there is nothing left to
+	 * pick: the checkbox is enabled exactly when the selected gateway has an account for that
+	 * method, and its account key travels in a hidden field, not a dropdown (003 T-11).
+	 *
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
+	 * @param array<string,string>                                                       $accounts_for_gateway `{methodKey: accountKey}` for the currently selected gateway only.
+	 * @param array<string,array{checked?:bool,selected_account?:string}>                $cfg                  Saved per-method configuration.
+	 */
+	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $cfg ) {
+		uasort( $catalog, fn( $a, $b ) => ( $a['position'] ?? 0 ) <=> ( $b['position'] ?? 0 ) );
 		?>
 		<div class="os-row">
 			<div class="os-col-12">
@@ -163,22 +180,16 @@ class IfthenpayAdminFormRenderer
 				</label>
 				<div class="ifthenpay-methods-list">
 					<?php
-					uasort( $available_methods, fn( $a, $b ) => ( $a['position'] ?? 0 ) <=> ( $b['position'] ?? 0 ) );
-					foreach ( $available_methods as $slug => $props ) :
-						$method_cfg       = $cfg[ $slug ] ?? array(
-							'checked'          => false,
-							'accounts'         => array(),
-							'selected_account' => '',
-						);
-						$is_checked       = $method_cfg['checked'];
-						$accounts         = $method_cfg['accounts'];
-						$selected_account = $method_cfg['selected_account'];
+					foreach ( $catalog as $slug => $props ) :
+						$account_key = $accounts_for_gateway[ $slug ] ?? '';
+						$has_account = '' !== $account_key;
+						$is_checked  = $has_account && ! empty( $cfg[ $slug ]['checked'] );
 						?>
 						<div class="ifthenpay-method-item" data-entity="<?php echo esc_attr( $slug ); ?>">
 							<input type="checkbox"
 								class="ifthenpay-method-checkbox"
 								<?php checked( $is_checked ); ?>
-								<?php disabled( empty( $accounts ) ); ?> />
+								<?php disabled( ! $has_account ); ?> />
 							<img src="<?php echo esc_url( $props['image'] ); ?>"
 								class="ifthenpay-method-icon"
 								alt="<?php echo esc_attr( $props['label'] ); ?>" />
@@ -186,16 +197,11 @@ class IfthenpayAdminFormRenderer
 								<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
 							</span>
 							<div class="ifthenpay-method-right">
-								<?php if ( ! empty( $accounts ) ) : ?>
-									<?php
-									echo OsFormHelper::select_field(
-										"settings[ifthenpay_payment_methods_configuration][{$slug}][selected_account]",
-										'',
-										$accounts,
-										$selected_account,
-										array( 'class' => 'ifthenpay-method-dropdown' )
-									);
-									?>
+								<?php if ( $has_account ) : ?>
+									<input type="hidden"
+										class="ifthenpay-method-account"
+										name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $slug ); ?>][selected_account]"
+										value="<?php echo esc_attr( $account_key ); ?>" />
 								<?php else : ?>
 									<div class="ifthenpay-no-accounts">
 										<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>

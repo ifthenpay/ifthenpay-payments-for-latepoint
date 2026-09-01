@@ -24,113 +24,60 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 		}
 
 		/**
-		 * Validate Backoffice Key via API and update plugin settings.
+		 * Preview a Backoffice Key before it is saved: format-check, remote verification, then
+		 * render the gateway/method config exactly as it would look once saved. Saves nothing —
+		 * the real, authoritative save runs through the settings page's own save, validated by
+		 * `validate_backoffice_key_on_save()` in the main plugin file. This is why there is no
+		 * failure-path settings cleanup here: nothing was written, so there is nothing to unwind.
 		 *
 		 * @return void Sends JSON with status, message, and form HTML.
 		 */
 		public function validate_key() {
 			$key = sanitize_text_field( $this->params['backoffice_key'] ?? '' );
 
-			try {
-				// Validates the Backoffice Key and Set API client key for subsequent requests
-				IfthenpayAPIClient::set_key( $key );
-
-				// Fetch payment methods and gateway keys
-				$gateways_raw = IfthenpayAPIClient::get_gateway_keys();
-				$methods_raw  = IfthenpayAPIClient::get_available_payment_methods();
-
-				// Format API data into usable structures
-				$gateway_keys      = IfthenpayDataFormatter::format_gateway_keys( $gateways_raw );
-				$available_methods = IfthenpayDataFormatter::format_available_payment_methods( $methods_raw );
-
-				// Save settings for later use in form population
-				OsSettingsHelper::save_setting_by_name( 'ifthenpay_backoffice_key', $key );
-				OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_options', $gateway_keys );
-				OsSettingsHelper::save_setting_by_name( 'ifthenpay_available_methods', $available_methods );
-
-				// Generate HTML form output
-				ob_start();
-				IfthenpayAdminFormRenderer::render_payments_configuration( $gateway_keys, $available_methods );
-				IfthenpayAdminFormRenderer::render_others_configuration();
-				$html = ob_get_clean();
-
-				$this->send_json(
-					array(
-						'status'      => 'success',
-						'message'     => __( 'Backoffice Key Valid ✅', 'ifthenpay-payments-for-latepoint' ),
-						'html'        => $html,
-						'inline_data' => array(
-							'gateway_options'  => $gateway_keys,
-							'gateway_selected' => OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
-						),
-					)
-				);
-			} catch ( Exception $e ) {
-				// On failure, clear all plugin settings
-				$settings_to_clear = array(
-					'ifthenpay_backoffice_key',
-					'ifthenpay_gateway_options',
-					'ifthenpay_available_methods',
-					'ifthenpay_gateway_key',
-					'ifthenpay_payment_methods_configuration',
-					'ifthenpay_default_method',
-					'ifthenpay_description',
-				);
-				foreach ( $settings_to_clear as $setting_key ) {
-					OsSettingsHelper::remove_setting_by_name( $setting_key );
-				}
-
+			if ( '' === $key ) {
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,
-						'clear'   => true, // instructs frontend to remove dynamic sections
-						'message' => $e->getMessage(),
-					)
-				);
-			}
-		}
-
-		/**
-		 * Retrieve payment accounts for a given gateway.
-		 *
-		 * @return void Sends JSON with status and account data.
-		 */
-		public function get_payment_accounts_by_gateway() {
-			$gateway_key    = sanitize_text_field( $this->params['gateway_key'] ?? '' );
-			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
-
-			if ( ! $gateway_key || ! $backoffice_key ) {
-				$this->send_json(
-					array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Missing required keys.', 'ifthenpay-payments-for-latepoint' ),
+						'message' => __( 'Enter a Backoffice Key first.', 'ifthenpay-payments-for-latepoint' ),
 					)
 				);
 				return;
 			}
 
-			try {
-				// Configure the API client and fetch the raw accounts list
-				IfthenpayAPIClient::set_key( $backoffice_key );
-				$raw_accounts = IfthenpayAPIClient::get_payment_accounts_by_gateway( $gateway_key );
-
-				// Format into [ Entidade => [ Alias => Conta ] ]
-				$accounts_by_entity = IfthenpayDataFormatter::format_payment_accounts( $raw_accounts );
-
-				$this->send_json(
-					array(
-						'status' => LATEPOINT_STATUS_SUCCESS,
-						'data'   => $accounts_by_entity,
-					)
-				);
-			} catch ( Exception $e ) {
+			$rejection = IfthenpayLpBackofficeKeyValidation::check( $key );
+			if ( null !== $rejection ) {
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => $e->getMessage(),
+						'message' => $rejection,
 					)
 				);
+				return;
 			}
+
+			$dataset = IfthenpayLpGatewayDataset::get( $key );
+			$catalog = IfthenpayLpMethodCatalog::get() ?? array();
+
+			ob_start();
+			IfthenpayAdminFormRenderer::render_connection_status( $dataset );
+			IfthenpayAdminFormRenderer::render_payments_configuration(
+				$dataset['gatewaykeys'] ?? array(),
+				$dataset['accounts'] ?? array(),
+				$catalog
+			);
+			IfthenpayAdminFormRenderer::render_others_configuration();
+			$html = ob_get_clean();
+
+			$this->send_json(
+				array(
+					'status'      => LATEPOINT_STATUS_SUCCESS,
+					'html'        => $html,
+					'inline_data' => array(
+						'accounts' => $dataset['accounts'] ?? array(),
+					),
+				)
+			);
 		}
 
 		/**

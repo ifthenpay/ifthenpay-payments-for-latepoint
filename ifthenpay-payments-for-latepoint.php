@@ -277,10 +277,17 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		public function localized_vars_for_admin( $localized_vars ) {
 			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'validate_key' );
-			$localized_vars['ifthenpay_get_accounts_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'get_payment_accounts_by_gateway' );
 			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'activate_account_by_entity' );
 
-			$localized_vars['ifthenpay_gateway_options']  = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_options', array() );
+			// The full {gatewayKey: {methodKey: accountKey}} map, every gateway at once — the
+			// select's own "change" handler looks up into this client-side (003 T-11), no AJAX
+			// round trip per gateway the way the old, now-removed get_payment_accounts_by_gateway
+			// route needed.
+			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
+			$dataset        = $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
+
+			$localized_vars['ifthenpay_gateway_options']  = $dataset['gatewaykeys'] ?? array();
+			$localized_vars['ifthenpay_accounts']         = $dataset['accounts'] ?? array();
 			$localized_vars['ifthenpay_gateway_selected'] = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 
 			$localized_vars['ifthenpay_translations'] = array(
@@ -357,24 +364,19 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key );
 
 			if ( $backoffice_key ) {
-				// Re-checked on every render, not only right after "Connect" (003 T-10) — a key
+				// Re-fetched on every render, not only right after "Connect" (003 T-10) — a key
 				// can be revoked after it was stored, or gateway keys added/removed on
-				// ifthenpay's side, independently of this site.
-				IfthenpayAdminFormRenderer::render_connection_status( IfthenpayLpGatewayDataset::get( $backoffice_key ) );
-			}
+				// ifthenpay's side, independently of this site. Per-request cached (T-05), so
+				// this and render_payments_configuration()'s use below cost one HTTP call, not two.
+				$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
+				IfthenpayAdminFormRenderer::render_connection_status( $dataset );
 
-			if ( $backoffice_key ) {
-				// Load the two needed settings
-				$gateway_options   = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_options', array() );
-				$available_methods = OsSettingsHelper::get_settings_value( 'ifthenpay_available_methods', array() );
-
-				// Render payments section (internally decodes the JSON config)
 				IfthenpayAdminFormRenderer::render_payments_configuration(
-					$gateway_options,
-					$available_methods
+					$dataset['gatewaykeys'] ?? array(),
+					$dataset['accounts'] ?? array(),
+					IfthenpayLpMethodCatalog::get() ?? array()
 				);
 
-				// Other configuration section
 				IfthenpayAdminFormRenderer::render_others_configuration();
 			}
 		}

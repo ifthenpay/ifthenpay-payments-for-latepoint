@@ -7,16 +7,6 @@ class IfthenpayDataFormatter {
 
 
 	/**
-	 * Formats the list of gateway keys into a flat associative array.
-	 *
-	 * @param array $raw Raw list of gateways from the API.
-	 * @return array Associative array [ Alias => GatewayKey ].
-	 */
-	public static function format_gateway_keys( array $raw ): array {
-		return array_column( $raw, 'GatewayKey', 'Alias' );
-	}
-
-	/**
 	 * Formats the available payment methods array from the ifthenpay API.
 	 *
 	 * Each entry is indexed by the lowercase method name, and contains its
@@ -51,38 +41,6 @@ class IfthenpayDataFormatter {
 		uasort( $methods, fn( $a, $b ) => $a['position'] <=> $b['position'] );
 
 		return $methods;
-	}
-
-	/**
-	 * Turn a flat list of account records into a map of
-	 * Entidade => [ Alias => Conta ] for dropdowns.
-	 *
-	 * Numeric Entidade values become "MB".
-	 *
-	 * @param array<int,array{Alias:string,Conta:string,Entidade:string,SubEntidade:string}> $accounts
-	 * @return array<string,array<string,string>>
-	 */
-	public static function format_payment_accounts( array $accounts ): array {
-		$result = array();
-
-		foreach ( $accounts as $acct ) {
-			if ( empty( $acct['Alias'] ) || empty( $acct['Conta'] ) ) {
-				continue;
-			}
-
-			// numeric Entidade → MB
-			$ent = is_numeric( $acct['Entidade'] ) ? 'MB' : $acct['Entidade'];
-
-			// initialize bucket if first time
-			if ( ! isset( $result[ $ent ] ) ) {
-				$result[ $ent ] = array();
-			}
-
-			// map alias => conta
-			$result[ $ent ][ $acct['Alias'] ] = $acct['Conta'];
-		}
-
-		return $result;
 	}
 
 	/**
@@ -173,7 +131,11 @@ class IfthenpayDataFormatter {
 	}
 
 	/**
-	 * Serialize checked accounts into "A|B;C|D" format.
+	 * Serialize checked methods into "METHOD|account;METHOD|account" format, the shape Pay By
+	 * Link's own `accounts` field expects. `selected_account` itself only holds the bare account
+	 * key (IfthenpayLpGatewayDataset (003 T-05) already strips the "{METHOD} | " prefix off the
+	 * raw gateway record when building it), so the method code is reattached here from the
+	 * config's own key, not read back out of the stored value.
 	 */
 	private static function build_accounts_string(): string {
 		// 1. Pull the raw setting (might be JSON)
@@ -198,8 +160,7 @@ class IfthenpayDataFormatter {
 				&& ! empty( $entry['checked'] )
 				&& ! empty( $entry['selected_account'] )
 			) {
-				// Collapse whitespace around the "|" and trim
-				$parts[] = preg_replace( '/\s*\|\s*/', '|', trim( $entry['selected_account'] ) );
+				$parts[] = $method_code . '|' . trim( $entry['selected_account'] );
 			}
 		}
 

@@ -6,7 +6,7 @@ class LatepointPaymentsIfthenpayAdmin {
 		backofficeKeyInput: '.custom-backoffice-key',
 		methodItem: '.ifthenpay-method-item',
 		methodCheckbox: '.ifthenpay-method-checkbox',
-		methodDropdown: '.ifthenpay-method-dropdown',
+		methodAccount: '.ifthenpay-method-account',
 		defaultMethodSelect: '.ifthenpay-default-method',
 		methodsConfigInput: '#ifthenpay_payment_methods_configuration',
 		methodsWrapper: '.ifthenpay-method-right',
@@ -15,8 +15,6 @@ class LatepointPaymentsIfthenpayAdmin {
 
 	constructor() {
 		this.initEvents();
-		this.refreshGatewayOptions();
-		this.triggerGatewayChange();
 	}
 
 	initEvents() {
@@ -30,7 +28,7 @@ class LatepointPaymentsIfthenpayAdmin {
 			.on(
 				'change',
 				LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect,
-				(e) => this.fetchAccounts(e)
+				(e) => this.onGatewayChange(e)
 			)
 			.on(
 				'click',
@@ -40,12 +38,10 @@ class LatepointPaymentsIfthenpayAdmin {
 			.on(
 				'change',
 				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox,
-				(e) => this.toggleDropdown(e)
-			)
-			.on(
-				'change',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodDropdown,
-				() => this.updateConfig()
+				() => {
+					this.updateDefaultMethods();
+					this.updateConfig();
+				}
 			)
 			.on(
 				'change',
@@ -61,40 +57,6 @@ class LatepointPaymentsIfthenpayAdmin {
 
 	serialize(params) {
 		return new URLSearchParams(params).toString();
-	}
-
-	refreshGatewayOptions() {
-		const $select = jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect
-		);
-		const options = latepoint_helper.ifthenpay_gateway_options;
-		if (!$select.length || typeof options !== 'object') {
-			return;
-		}
-
-		const selectedKey =
-			latepoint_helper.ifthenpay_gateway_selected ||
-			$select.data('selected');
-		$select.empty();
-
-		for (const [label, key] of Object.entries(options)) {
-			$select.append(
-				jQuery('<option>', {
-					value: key,
-					text: label,
-					selected: key === selectedKey,
-				})
-			);
-		}
-	}
-
-	triggerGatewayChange() {
-		const $select = jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect
-		);
-		if ($select.val()) {
-			$select.trigger('change');
-		}
 	}
 
 	handleKeyValidation(event) {
@@ -127,13 +89,10 @@ class LatepointPaymentsIfthenpayAdmin {
 				(res) => {
 					$section.nextAll('.sub-section-row').remove();
 					if (res.status === 'success') {
-						latepoint_helper.ifthenpay_gateway_options =
-							res.inline_data.gateway_options;
-						latepoint_helper.gateway_selected =
-							res.inline_data.gateway_selected;
+						// This preview's own dataset — not necessarily what was localized at
+						// page load, since the key being previewed here has not been saved yet.
+						latepoint_helper.ifthenpay_accounts = res.inline_data.accounts;
 						$section.after(res.html);
-						this.refreshGatewayOptions();
-						this.triggerGatewayChange();
 					} else {
 						alert(res.message || 'Validation failed.');
 					}
@@ -148,52 +107,23 @@ class LatepointPaymentsIfthenpayAdmin {
 			});
 	}
 
-	fetchAccounts(event) {
+	// Every gateway's accounts are already in `latepoint_helper.ifthenpay_accounts` (localized in
+	// full, or refreshed by handleKeyValidation() above) — no AJAX round trip per gateway change.
+	onGatewayChange(event) {
 		const gatewayKey = jQuery(event.target).val();
-		if (!gatewayKey) {
-			return;
-		}
-
-		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodsWrapper).html(
-			`<select disabled class="ifthenpay-method-dropdown"><option>${latepoint_helper.ifthenpay_translations.loading}</option></select>`
-		);
-
-		const payload = {
-			action: 'latepoint_route_call',
-			route_name: latepoint_helper.ifthenpay_get_accounts_route,
-			layout: 'none',
-			return_format: 'json',
-			params: this.serialize({
-				gateway_key: gatewayKey,
-			}),
-		};
-
-		jQuery
-			.post(
-				latepoint_timestamped_ajaxurl(),
-				payload,
-				(res) => {
-					if (res.status === 'success') {
-						this.buildMethodDropdowns(res.data);
-					}
-				},
-				'json'
-			)
-			.fail(() => alert('Error loading accounts.'));
+		const accounts =
+			(latepoint_helper.ifthenpay_accounts || {})[gatewayKey] || {};
+		this.applyAccountsForGateway(accounts);
 	}
 
-	buildMethodDropdowns(accountsData) {
-		const config = JSON.parse(
-			jQuery(
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodsConfigInput
-			).val() || '{}'
-		);
-
+	// A gateway record has at most one account per method (no list to choose from), so a method
+	// is either available — its account key travels in a hidden field — or it isn't.
+	applyAccountsForGateway(accounts) {
 		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
 			function () {
 				const $item = jQuery(this);
 				const entity = $item.data('entity');
-				const accounts = accountsData[entity] || {};
+				const accountKey = accounts[entity];
 				const $wrapper = $item.find(
 					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodsWrapper
 				);
@@ -202,9 +132,9 @@ class LatepointPaymentsIfthenpayAdmin {
 				);
 
 				$wrapper.empty();
-				$checkbox.prop('disabled', !Object.keys(accounts).length);
 
-				if (!Object.keys(accounts).length) {
+				if (!accountKey) {
+					$checkbox.prop('checked', false).prop('disabled', true);
 					$wrapper.html(
 						`<div class="ifthenpay-no-accounts">
                ${latepoint_helper.ifthenpay_translations.no_accounts}
@@ -215,45 +145,21 @@ class LatepointPaymentsIfthenpayAdmin {
                </a>.
              </div>`
 					);
-					$checkbox.prop('checked', false);
 					return;
 				}
 
-				const $select = jQuery('<select>', {
-					class: 'ifthenpay-method-dropdown',
-					name: `settings[ifthenpay_payment_methods_configuration][${entity}][selected_account]`,
-				});
-
-				const selectedValue = config[entity]?.selected_account;
-				for (const [label, value] of Object.entries(accounts)) {
-					$select.append(
-						jQuery('<option>', {
-							value,
-							text: label,
-							selected: value === selectedValue,
-						})
-					);
-				}
-
-				$wrapper.append($select);
-				$select.prop('disabled', !$checkbox.is(':checked'));
+				$checkbox.prop('disabled', false);
+				$wrapper.append(
+					jQuery('<input>', {
+						type: 'hidden',
+						class: 'ifthenpay-method-account',
+						name: `settings[ifthenpay_payment_methods_configuration][${entity}][selected_account]`,
+						value: accountKey,
+					})
+				);
 			}
 		);
 
-		this.updateDefaultMethods();
-		this.updateConfig();
-	}
-
-	toggleDropdown(event) {
-		const $checkbox = jQuery(event.currentTarget);
-		const $item = $checkbox.closest(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem
-		);
-		const $select = $item.find(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.methodDropdown
-		);
-
-		$select.prop('disabled', !$checkbox.is(':checked'));
 		this.updateDefaultMethods();
 		this.updateConfig();
 	}
@@ -265,7 +171,7 @@ class LatepointPaymentsIfthenpayAdmin {
 				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
 			) ||
 			$target.closest(
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodDropdown
+				LatepointPaymentsIfthenpayAdmin.SELECTORS.activateLink
 			).length
 		) {
 			return;
@@ -340,13 +246,13 @@ class LatepointPaymentsIfthenpayAdmin {
 				const $checkbox = $item.find(
 					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
 				);
-				const $select = $item.find(
-					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodDropdown
+				const $account = $item.find(
+					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodAccount
 				);
 
 				config[entity] = {
 					checked: $checkbox.is(':checked'),
-					selected_account: $select.val() || '',
+					selected_account: $account.val() || '',
 				};
 			}
 		);
