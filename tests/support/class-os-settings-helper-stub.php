@@ -29,5 +29,14 @@ if ( ! class_exists( 'OsSettingsHelper' ) ) {
 		public static function get_settings_value( string $name, $fallback_value = null ) {
 			return self::$values[ $name ] ?? $fallback_value;
 		}
+
+		/**
+		 * Removes a seeded value, mirroring the real helper's delete surface.
+		 *
+		 * @param string $name Setting name.
+		 */
+		public static function remove_setting_by_name( string $name ): void {
+			unset( self::$values[ $name ] );
+		}
 	}
 }

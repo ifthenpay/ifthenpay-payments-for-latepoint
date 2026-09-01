@@ -99,6 +99,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
 			// VIEWS (renderers)
@@ -473,6 +474,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Cheap on every request when already current; upgrades the schema on an in-place
 			// plugin update, not only on (re)activation.
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
+
+			// Same reasoning (003 T-14): a pre-003 site's Gateway Key is stale the moment this
+			// version is active, not only after the merchant next saves settings.
+			IfthenpayLpLegacySettingsCleanup::maybe_run();
 		}
 
 		public function latepoint_init() {
@@ -491,6 +496,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				require_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 			}
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
+
+			if ( ! class_exists( 'IfthenpayLpLegacySettingsCleanup' ) ) {
+				require_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
+			}
+			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
 			// Optional: save version to maintain manual control
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
