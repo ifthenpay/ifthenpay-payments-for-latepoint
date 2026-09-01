@@ -95,6 +95,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
 			// VIEWS (renderers)
