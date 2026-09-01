@@ -233,6 +233,7 @@ class IfthenpayAdminFormRenderer
 									alt="<?php echo esc_attr( $props['label'] ); ?>" />
 								<div class="os-togglable-item-name">
 									<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
+									<span class="ifthenpay-method-code">(<?php echo esc_html( $slug ); ?>)</span>
 								</div>
 							</div>
 							<?php if ( $has_account ) : ?>

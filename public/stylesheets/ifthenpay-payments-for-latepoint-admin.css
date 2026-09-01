@@ -1,29 +1,22 @@
-#paymentProcessorToggler_ifthenpay {
-	*,
-	*::before,
-	*::after {
-		box-sizing: border-box;
-	}
-}
+/* `.sub-section-row` / `.sub-section-label` / `.sub-section-content` (Backoffice/Payments/Other
+   Configuration) already get their full two-column layout, borders and h3 styling for free —
+   `.os-form-w .sub-section-row` in LatePoint's own admin.css, and the settings page wraps every
+   processor's body in an `.os-form-w`. Nothing here re-declares any of that. */
 
-#togglePaymentSettings_ifthenpay.os-togglable-item-body {
-	padding: 0 !important;
-}
-
-#paymentProcessorToggler_ifthenpay .os-col-6 {
-	padding-block: 0.75rem;
-}
-
-#paymentProcessorToggler_ifthenpay .sub-section-label h3,
+/* Genuinely custom: a nested label ("Payment Methods") one level deeper than a sub-section-row's
+   own h3, with no native equivalent at that nesting level. */
 #paymentProcessorToggler_ifthenpay label.ifthenpay-section-label {
+	display: block;
 	margin: 1rem 0 0.5rem;
 	font-weight: 600;
 }
 
+/* The Connect button needs to align with the Backoffice Key field's height — native
+   `.os-form-group .os-form-control` sizing is the same generous size on every field, which reads
+   fine for a single input but leaves an input+button pair visually mismatched. Deliberately
+   compact, not a wholesale re-style. */
 #paymentProcessorToggler_ifthenpay input,
 #paymentProcessorToggler_ifthenpay select {
-	width: 100%;
-	padding: 0.5rem 0.75rem;
 	height: 2.25rem;
 	font-size: 0.875rem;
 }
@@ -36,10 +29,14 @@
 	width: 100%;
 }
 
-#paymentProcessorToggler_ifthenpay
-	.sub-section-content
-	> .os-row:first-child
-	.os-col-6 {
+/* .os-row already is display:flex;flex-wrap:wrap natively — only the gap and baseline alignment
+   (button next to field, not stretched to match its height) are this section's own. */
+#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row {
+	gap: 1rem;
+	align-items: flex-end;
+}
+
+#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row:first-child .os-col-6 {
 	display: flex;
 	flex-direction: column;
 }
@@ -49,24 +46,60 @@
 	width: 100% !important;
 }
 
-/* The method list itself (icon, name, toggle switch) is LatePoint's own
-   .os-togglable-item-w / os-toggler-w / os-toggler component — same one used one level up
-   for the processor list — so it needs no styling of its own. The only gap native CSS
-   doesn't cover: the toggler has no disabled state, so a method with no account for the
-   selected gateway is locked from being clicked rather than just dimmed by .is-disabled. */
+/* The method list itself (icon, name, toggle switch) is LatePoint's own .os-togglable-item-w /
+   os-toggler-w / os-toggler component — the same one used one level up for the processor list —
+   so it needs no styling of its own. The only gap native CSS doesn't cover: the toggler has no
+   disabled state, so a method with no account for the selected gateway is locked from being
+   clicked rather than just dimmed by .is-disabled. */
 #paymentProcessorToggler_ifthenpay .ifthenpay-method-item.is-disabled .os-toggler {
 	pointer-events: none;
 }
 
-#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 1rem;
-	align-items: flex-end;
+/* The method's raw ifthenpay code (MB, MBWAY, …) next to its display name — no native
+   equivalent, LatePoint's own $color-faded used for consistency with muted text elsewhere. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-code {
+	color: #788291;
+	font-weight: 400;
+	font-size: 0.85em;
 }
 
-#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row .os-col-6 {
-	flex: 1;
+/* `.os-column-status` (the connection/callback status pills) is real, but its color/shape rules
+   only exist scoped to `.os-table-w.os-table-compact .os-table tr td` in LatePoint's own CSS —
+   outside a table it's unstyled text. Reusing the class name and its state colors for
+   consistency, not duplicating a component that already works here; just the pill shape and this
+   section's two states (LatePoint's own icon glyphs aren't reproduced). */
+#paymentProcessorToggler_ifthenpay .os-column-status {
+	display: inline-block;
+	padding: 3px 5px;
+	border-radius: 5px;
+	line-height: 1;
+	border: 1px solid #d5d9de;
+	font-size: 0.8em;
+	font-weight: 600;
+}
+
+#paymentProcessorToggler_ifthenpay .os-column-status-active {
+	background-color: #c3ffd1;
+	border-color: #1ec07f;
+	color: #04724e;
+}
+
+#paymentProcessorToggler_ifthenpay .os-column-status-pending {
+	background-color: #fff0c0;
+	border-color: #cea92d;
+	color: #8c5208;
+}
+
+#paymentProcessorToggler_ifthenpay .os-column-status-error {
+	background-color: #eee;
+	border-color: #1f1f1f;
+	color: #212121;
+}
+
+#paymentProcessorToggler_ifthenpay .os-column-status-disabled {
+	background-color: #ffd3d3;
+	border-color: #dc4646;
+	color: #7e1010;
 }
 
 @media (width <= 768px) {

@@ -82,6 +82,32 @@ final class PaymentsConfigurationTest extends TestCase {
 	}
 
 	/**
+	 * The method's own ifthenpay code (MB, MBWAY, …) is visible next to its display name, not
+	 * only present as a `data-entity` attribute — a merchant reading ifthenpay's own docs or
+	 * talking to their support team needs the code, not just the display label.
+	 */
+	public function test_method_code_is_visible_next_to_the_name(): void {
+		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
+
+		ob_start();
+		IfthenpayAdminFormRenderer::render_payments_configuration(
+			array( 'GATEWAY-1' => 'GATEWAY-1' ),
+			array( 'GATEWAY-1' => array( 'MBWAY' => 'HLP-000001' ) ),
+			array(
+				'MBWAY' => array(
+					'position' => 1,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'mbway',
+				),
+			)
+		);
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<span class="ifthenpay-method-code">(MBWAY)</span>', $html );
+	}
+
+	/**
 	 * A checked, saved method renders its toggle switch already on.
 	 */
 	public function test_checked_method_renders_toggler_on(): void {
