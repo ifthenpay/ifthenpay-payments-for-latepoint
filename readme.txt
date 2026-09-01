@@ -4,7 +4,7 @@ Tags: ifthenpay, latepoint, payments, booking, invoices
 Requires at least: 6.5
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 3.0.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -102,6 +102,12 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Changelog ==
 
+= 3.0.0 =
+* Changed: Backoffice Key and Gateway Key configuration reworked — the Backoffice Key is now validated against ifthenpay directly when you save it, and the Gateway Key list and available payment methods are read live instead of cached from a separate "Connect" step.
+* Changed: The callback URL ifthenpay uses to confirm payments is now registered automatically whenever you save a Gateway Key, with the result shown on the settings page if it fails.
+* Changed: ifthenpay payment methods are no longer offered at checkout unless the saved Gateway Key is currently valid, even if the processor itself is turned on.
+* Fixed: Payment records now use one shared table instead of a single-purpose one; existing history is kept, not deleted, during the update.
+
 = 2.1.1 =
 * Changed: Payment charge reference is now the payment token instead of the ifthenpay transaction ID, so merchants can reconcile payments more easily.
 * Fixed: Increased the payment status verification timeout from 10s to 45s to give slower payment methods enough time to confirm before giving up.
@@ -132,6 +138,9 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 * Initial stable release.
 
 == Upgrade Notice ==
+
+= 3.0.0 =
+Reconfiguration required: after updating, open the ifthenpay settings in LatePoint and reconnect your Backoffice Key and Gateway Key. The previous Gateway Key is not carried over automatically, and no ifthenpay payment method will be offered at checkout until this is done.
 
 = 2.1.1 =
 Payments now reconcile by token for easier merchant bookkeeping; longer payment confirmation timeout; formatting cleanup.
