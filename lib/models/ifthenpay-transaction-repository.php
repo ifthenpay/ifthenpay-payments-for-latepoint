@@ -12,7 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * The single payment record shared by every method and both flows (realtime and deferred). One
  * table, one UNIQUE(request_id), so settlement finds a record without knowing the method first.
- * See contracts/data-model.md.
  */
 class IfthenpayLpTransactionRepository {
 

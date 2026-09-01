@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves IfthenpayLpEnabledMethodGate::is_usable() (003 T-13, FR-13): the processor's own
+ * Proves IfthenpayLpEnabledMethodGate::is_usable(): the processor's own
  * enabled/disabled toggle is not enough on its own — a saved Gateway Key must still be a real,
  * live one for the current Backoffice Key, or the method must not be offered at checkout.
  *

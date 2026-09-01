@@ -1,6 +1,6 @@
 <?php
 /**
- * The gateway dataset for a Backoffice Key (contracts/api.md operation #2): every gateway key the
+ * The gateway dataset for a Backoffice Key: every gateway key the
  * account has, and which methods each one has an account for — intersected against the method
  * catalog, so a method the catalog currently hides never reaches the caller regardless of what
  * the raw gateway record contains.
@@ -22,8 +22,8 @@ class IfthenpayLpGatewayDataset {
 	private const URL = 'https://api.ifthenpay.com/gateway/get';
 
 	/**
-	 * The one `Entity` code that doesn't match its gateway-record field name — VERIFIED live, see
-	 * contracts/api.md operation #1's trap note. Every other catalog code is used as-is.
+	 * The one `Entity` code that doesn't match its gateway-record field name — confirmed against
+	 * the live API. Every other catalog code is used as-is.
 	 */
 	private const CATALOG_TO_FIELD_NAME = array(
 		'MB' => 'Multibanco',
@@ -149,9 +149,9 @@ class IfthenpayLpGatewayDataset {
 
 	/**
 	 * A method field's raw value is `"{METHOD}|{accountKey}"` — except Multibanco can instead be
-	 * the raw `"{entidade}|{subentidade}"` form (contracts/api.md's trap note). Either way, what
+	 * the raw `"{entidade}|{subentidade}"` form. Either way, what
 	 * comes after the separator is a real, non-empty account reference; only its meaning differs,
-	 * which is a concern for the Multibanco-specific consumer (spec 001), not this intersection.
+	 * which is a concern for the Multibanco-specific consumer, not this intersection.
 	 *
 	 * @param string $raw_value One method field's raw value.
 	 */

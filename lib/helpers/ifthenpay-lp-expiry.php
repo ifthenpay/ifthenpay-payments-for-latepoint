@@ -1,7 +1,8 @@
 <?php
 /**
  * Normalises the merchant's single "expiry, in whole days" setting into the three formats
- * ifthenpay's APIs actually take. See contracts/api.md's "Three expiry formats, one setting".
+ * ifthenpay's APIs actually take: Multibanco wants whole days, Payshop wants a target date, and
+ * Pay By Link wants an expiry timestamp.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -20,7 +21,7 @@ class IfthenpayLpExpiry {
 
 	/**
 	 * Multibanco's `expiryDays` takes whole days directly. ifthenpay itself rounds an unlisted
-	 * value up to the nearest one it accepts (contracts/api.md) — this does not duplicate that.
+	 * value up to the nearest one it accepts — this does not duplicate that.
 	 *
 	 * @param int $whole_days The merchant's expiry setting, in whole days. `0` is valid: expires
 	 *                        today.

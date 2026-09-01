@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves the 003 T-09 `latepoint_model_validate` hook actually intercepts a real
+ * Proves the `latepoint_model_validate` hook actually intercepts a real
  * OsSettingsModel::save() — the wiring that BackofficeKeyValidationTest.php's pure unit tests
  * can't reach on their own. Uses only cases that never call the network (malformed format, empty,
  * an unrelated setting), so nothing here needs HTTP mocking inside a real WordPress boot.

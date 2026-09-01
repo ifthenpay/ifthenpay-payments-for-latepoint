@@ -1,9 +1,9 @@
 <?php
 /**
- * FR-13: a saved processor toggle is not enough on its own to offer the ifthenpay method at
- * checkout — the saved Gateway Key must still be a real, live one. Kept separate from the plugin
- * file's own filter callbacks (main plugin file) so this decision is unit-testable without a real
- * LatePoint boot, the same way IfthenpayLpBackofficeKeyValidation's own hook glue works.
+ * A saved processor toggle is not enough on its own to offer the ifthenpay method at checkout —
+ * the saved Gateway Key must still be a real, live one. Kept separate from the plugin file's own
+ * filter callbacks (main plugin file) so this decision is unit-testable without a real LatePoint
+ * boot, the same way IfthenpayLpBackofficeKeyValidation's own hook glue works.
  *
  * @package ifthenpay-payments-for-latepoint
  */

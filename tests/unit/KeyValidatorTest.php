@@ -1,8 +1,8 @@
 <?php
 /**
- * Proves IfthenpayLpKeyValidator (003 T-04): the local format check never reaches the network,
+ * Proves IfthenpayLpKeyValidator: the local format check never reaches the network,
  * and the remote check distinguishes an unrecognized key (403) from a recognized one — even with
- * zero entities, per the live-verified behaviour documented in contracts/api.md.
+ * zero entities, per the live-verified behaviour of the ifthenpay API.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -102,7 +102,7 @@ final class KeyValidatorTest extends TestCase {
 	/**
 	 * The documented edge case this operation exists to get right: a recognized key with zero
 	 * entities is still valid — 200 with an empty array, not a rejection. Unlike /gateway/get,
-	 * this endpoint's 200-vs-403 split is the actual validity signal (see contracts/api.md), so
+	 * this endpoint's 200-vs-403 split is the actual validity signal, so
 	 * an empty body must not be mistaken for an unrecognized key.
 	 */
 	public function test_recognized_key_with_no_entities_does_not_throw(): void {

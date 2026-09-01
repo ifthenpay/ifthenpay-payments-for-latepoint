@@ -1,8 +1,8 @@
 <?php
 /**
- * Pay By Link operation (contracts/api.md operation #3) — the realtime flow, unchanged from the
- * customer's point of view. Payload construction stays the caller's job (IfthenpayDataFormatter);
- * this class only owns the call and the response contract.
+ * Pay By Link operation — the realtime flow, unchanged from the customer's point of view. Payload
+ * construction stays the caller's job (IfthenpayDataFormatter); this class only owns the call and
+ * the response contract.
  *
  * @package ifthenpay-payments-for-latepoint
  */

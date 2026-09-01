@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves the 003 T-02c upgrade path: a still-PENDING row from the old, single-purpose
+ * Proves the upgrade path: a still-PENDING row from the old, single-purpose
  * ifthenpay_payments table settles through the new table after upgrade, and the old table is
  * renamed to _legacy — never dropped — so already-settled history stays readable.
  *

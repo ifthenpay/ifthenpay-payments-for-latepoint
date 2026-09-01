@@ -1,7 +1,7 @@
 <?php
 /**
  * Proves IfthenpayLpApiClient's transport and error model against every fixture in
- * tests/fixtures/ifthenpay/ (003 T-02/T-03): valid JSON, 401, 403, 5xx, a transport-level
+ * tests/fixtures/ifthenpay/: valid JSON, 401, 403, 5xx, a transport-level
  * failure, malformed JSON, the two plain-text callback-activation shapes, and a 200-empty-array
  * response. No WordPress booted — every wp_* call the client makes is stubbed via Brain Monkey.
  *
@@ -142,8 +142,8 @@ final class ApiClientTest extends TestCase {
 
 	/**
 	 * Callback activation answers plain text, not JSON — with $expects_json=false, the body comes
-	 * back as-is, no exception. VERIFIED live (003 T-12c): that body is actually the bare JSON
-	 * string literal `"OK"`, quotes included, not the unquoted `OK` the contract once assumed —
+	 * back as-is, no exception. Confirmed against the live API: that body is actually the bare JSON
+	 * string literal `"OK"`, quotes included, not the unquoted `OK` initially assumed —
 	 * this method's whole job is to pass it through untouched either way, not to normalise it.
 	 */
 	public function test_plain_text_ok_is_returned_as_is_when_json_not_expected(): void {

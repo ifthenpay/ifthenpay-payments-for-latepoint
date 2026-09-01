@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves IfthenpayLpCallbackRegistration (003 T-12): the assembled URL is checked against the
+ * Proves IfthenpayLpCallbackRegistration: the assembled URL is checked against the
  * 300-character limit before any request is attempted, the plain-text OK/INVALID response (not
  * JSON) decides success, and every outcome — including a transport failure — is stored rather
  * than thrown, since a registration failure must never block the settings save it runs after.
@@ -73,8 +73,8 @@ final class CallbackRegistrationTest extends TestCase {
 	}
 
 	/**
-	 * The real response — the bare JSON string literal `"OK"`, quotes included, VERIFIED live
-	 * (003 T-12c) — registers success. A naive `'OK' === trim($response)` check would miss this
+	 * The real response — the bare JSON string literal `"OK"`, quotes included, confirmed against
+	 * the live API — registers success. A naive `'OK' === trim($response)` check would miss this
 	 * shape entirely and silently record every real success as a failure; this is the regression
 	 * that live call caught.
 	 */
@@ -144,7 +144,7 @@ final class CallbackRegistrationTest extends TestCase {
 	}
 
 	/**
-	 * The 300-character limit (contracts/data-model.md) is checked before any request is
+	 * The 300-character limit is checked before any request is
 	 * attempted — a specific, named failure, not a request ifthenpay would have to reject.
 	 */
 	public function test_url_over_300_characters_fails_without_a_network_call(): void {

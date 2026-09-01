@@ -1,8 +1,8 @@
 <?php
 /**
- * Proves IfthenpayLpMethodCatalog (003 T-05): the cross-request TTL cache, and that IsVisible:
+ * Proves IfthenpayLpMethodCatalog: the cross-request TTL cache, and that IsVisible:
  * false entries never reach the formatted output — verified live against the real catalog
- * (COFIDIS and BIZUM are IsVisible: false today; see contracts/api.md).
+ * (COFIDIS and BIZUM are IsVisible: false today).
  *
  * @package ifthenpay-payments-for-latepoint
  */

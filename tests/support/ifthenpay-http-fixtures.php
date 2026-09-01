@@ -1,7 +1,7 @@
 <?php
 /**
- * Shared HTTP fixture helpers for testing IfthenpayLpApiClient and every operation built on it
- * (003 T-02). No real keys or account data — every fixture body is synthetic.
+ * Shared HTTP fixture helpers for testing IfthenpayLpApiClient and every operation built on it.
+ * No real keys or account data — every fixture body is synthetic.
  *
  * @package ifthenpay-payments-for-latepoint
  */

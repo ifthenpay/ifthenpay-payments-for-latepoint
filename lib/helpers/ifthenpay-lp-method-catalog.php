@@ -1,7 +1,6 @@
 <?php
 /**
- * The global payment-method catalog (contracts/api.md operation #1) — keyless, identical for
- * every site, cached across requests.
+ * The global payment-method catalog — keyless, identical for every site, cached across requests.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -21,7 +20,7 @@ class IfthenpayLpMethodCatalog {
 
 	/**
 	 * Cosmetic if stale — a newly added method takes up to this long to appear, which is
-	 * self-healing on the next fetch. Not worth shortening to chase that; see plan.md's Risks.
+	 * self-healing on the next fetch. Not worth shortening to chase that.
 	 */
 	private const CACHE_TTL = 12 * HOUR_IN_SECONDS;
 

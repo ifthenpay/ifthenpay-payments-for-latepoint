@@ -1,8 +1,8 @@
 <?php
 /**
- * Multibanco dynamic reference operation (contracts/api.md operation #5) — a standalone REST API,
- * not part of api.ifthenpay.com's general surface. Not exercised by the Moodle plugin; every
- * field here is VERIFIED against a real sandbox call, not inferred.
+ * Multibanco dynamic reference operation — a standalone REST API, not part of
+ * api.ifthenpay.com's general surface. Not exercised by the Moodle plugin; every field here is
+ * VERIFIED against a real sandbox call, not inferred.
  *
  * @package ifthenpay-payments-for-latepoint
  */

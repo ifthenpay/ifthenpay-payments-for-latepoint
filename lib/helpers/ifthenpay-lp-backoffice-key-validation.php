@@ -1,6 +1,6 @@
 <?php
 /**
- * The Backoffice Key save-time validation decision (003 T-09) — kept separate from the
+ * The Backoffice Key save-time validation decision — kept separate from the
  * `latepoint_model_validate` hook glue (main plugin file) so it is unit-testable without a real
  * OsSettingsModel/WordPress boot, the same way IfthenpayLpKeyValidator's own tests work.
  *
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * The three-step order from the plan, decided once here so the hook callback is pure glue: empty
+ * The three-step validation order, decided once here so the hook callback is pure glue: empty
  * is allowed (clears the field); format is checked locally, no network call, before anything
  * else; only a confirmed rejection (401/403) blocks the save — a transport failure must not,
  * since an ifthenpay outage must not lock a merchant out of their own settings page.

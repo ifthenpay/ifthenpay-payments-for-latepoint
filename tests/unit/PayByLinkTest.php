@@ -1,8 +1,8 @@
 <?php
 /**
- * Proves IfthenpayLpPayByLink (003 T-06): a complete response returns all three fields, and a
+ * Proves IfthenpayLpPayByLink: a complete response returns all three fields, and a
  * response missing any of PinCode/PinpayUrl/RedirectUrl is treated as an error, never a partial
- * success — per contracts/api.md operation #3.
+ * success.
  *
  * @package ifthenpay-payments-for-latepoint
  */

@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves IfthenpayLpBackofficeKeyValidation::check() (003 T-09) — plan.md §1's three-step order:
+ * Proves IfthenpayLpBackofficeKeyValidation::check()'s three-step order:
  * empty allowed, malformed rejected locally, and a confirmed rejection blocks the save while a
  * transport failure does not (fail open, so an ifthenpay outage never locks a merchant out of
  * their own settings page).
@@ -99,7 +99,7 @@ final class BackofficeKeyValidationTest extends TestCase {
 
 	/**
 	 * A transport failure (outage, timeout, …) does NOT block the save — this is the whole point
-	 * of failing open, and the case plan.md is explicit about.
+	 * of failing open: an ifthenpay outage must never lock a merchant out of their own settings page.
 	 */
 	public function test_transport_failure_does_not_block_the_save(): void {
 		Functions\expect( 'wp_remote_request' )->once()->andReturn( new WP_Error( 'http_request_failed', 'Connection timed out' ) );

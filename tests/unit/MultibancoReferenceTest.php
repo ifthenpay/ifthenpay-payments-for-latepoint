@@ -1,7 +1,7 @@
 <?php
 /**
- * Proves IfthenpayLpMultibancoReference (003 T-07) against the two shapes VERIFIED live in
- * contracts/api.md: a successful reference (Status "0") returns its five fields, and a rejected
+ * Proves IfthenpayLpMultibancoReference against the two shapes VERIFIED live against the real
+ * API: a successful reference (Status "0") returns its five fields, and a rejected
  * request (Status "-1", HTTP 400, blank fields) throws with the API's own Message — a case the
  * shared transport layer has no reason to treat as a failure on its own, since it's a normal 400
  * with a well-formed envelope, not a 5xx or malformed body.

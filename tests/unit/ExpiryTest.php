@@ -1,9 +1,9 @@
 <?php
 /**
- * Proves IfthenpayLpExpiry (003 T-08): Multibanco's whole-days passthrough, and Payshop/Pay By
- * Link's YYYYMMDD date computation — and that neither ever omits a value, which per
- * contracts/api.md is the one thing that must never happen for either method (omission means no
- * expiry, holding a booking slot forever).
+ * Proves IfthenpayLpExpiry: Multibanco's whole-days passthrough, and Payshop/Pay By
+ * Link's YYYYMMDD date computation — and that neither ever omits a value, which is the one thing
+ * that must never happen for either method (omission means no expiry, holding a booking slot
+ * forever).
  *
  * @package ifthenpay-payments-for-latepoint
  */

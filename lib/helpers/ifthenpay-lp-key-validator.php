@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Two independent checks, deliberately not combined into one call: a merchant should never wait
  * on the network for an obviously malformed key, and the two failure modes mean different things
- * to a caller deciding whether to save a settings field. See plan.md §1.
+ * to a caller deciding whether to save a settings field.
  */
 class IfthenpayLpKeyValidator {
 
@@ -23,7 +23,7 @@ class IfthenpayLpKeyValidator {
 	 * Entities/subentities endpoint — VERIFIED live: an unrecognized key answers 403 plain text
 	 * ("Invalid Credentials"); a recognized key answers 200 with a JSON array, empty or not. This
 	 * is deliberately not `/gateway/get`, which cannot tell "no gateway keys yet" from "unknown
-	 * key" — see contracts/api.md.
+	 * key".
 	 */
 	private const VALIDATION_URL = 'https://www.ifthenpay.com/IfmbWS/ifmbws.asmx/getEntidadeSubentidadeJsonV2';
 

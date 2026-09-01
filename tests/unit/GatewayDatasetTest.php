@@ -1,8 +1,8 @@
 <?php
 /**
- * Proves IfthenpayLpGatewayDataset (003 T-05): per-request caching, the MB/Multibanco field-name
+ * Proves IfthenpayLpGatewayDataset: per-request caching, the MB/Multibanco field-name
  * mapping, that an invisible catalog method is excluded even with real account data in the raw
- * record, and that a raw-entidade Multibanco value (contracts/api.md's trap) still yields an
+ * record, and that a raw-entidade Multibanco value still yields an
  * account rather than being silently dropped.
  *
  * Each test uses its own Backoffice Key value — IfthenpayLpGatewayDataset's per-request cache is
@@ -126,7 +126,7 @@ final class GatewayDatasetTest extends TestCase {
 	/**
 	 * COFIDIS has real account data in the fixture ("COFIDIS | ACC-000003" on MODERN-GATEWAY),
 	 * but the catalog fixture marks it `IsVisible: false` — matching the real, live-verified
-	 * catalog (see contracts/api.md). The intersection must still exclude it: real account data
+	 * catalog. The intersection must still exclude it: real account data
 	 * in the gateway record is not enough on its own to offer a method.
 	 */
 	public function test_invisible_catalog_method_is_excluded_even_with_real_account_data(): void {

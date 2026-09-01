@@ -1,6 +1,6 @@
 <?php
 /**
- * Callback URL registration (003 T-12) — one activation per gateway key covers every method it
+ * Callback URL registration — one activation per gateway key covers every method it
  * has an account for, since ifthenpay substitutes `[PAYMENT_METHOD]` itself rather than needing a
  * separate registration per method.
  *
@@ -12,9 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * The REST route this registers against (`ifthenpay/v1/callback`) has no handler yet — that is
- * spec 001's job. Registering the URL now means the URL ifthenpay has on file already matches the
- * shape 001's handler will expect, instead of both changing at once later.
+ * The REST route this registers against (`ifthenpay/v1/callback`) has no handler yet — that
+ * arrives with a future callback-handling feature. Registering the URL now means the URL
+ * ifthenpay has on file already matches the shape that handler will expect, instead of both
+ * changing at once later.
  */
 class IfthenpayLpCallbackRegistration {
 
@@ -52,7 +53,7 @@ class IfthenpayLpCallbackRegistration {
 			$response = IfthenpayLpApiClient::post(
 				self::URL,
 				array(
-					'apKey' => base64_encode( $gateway_key ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- required by ifthenpay's own callback-activation contract (contracts/api.md operation #4), not obfuscation.
+					'apKey' => base64_encode( $gateway_key ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- required by ifthenpay's own callback-activation API contract, not obfuscation.
 					'chave' => $gateway_key,
 					'urlCb' => $callback_url,
 				),
@@ -76,8 +77,8 @@ class IfthenpayLpCallbackRegistration {
 
 	/**
 	 * The "plain text" answer here is actually a bare JSON string literal — `"OK"` / `"INVALID"`,
-	 * quotes included — VERIFIED live (003 T-12c), not the unquoted `OK` the contract previously
-	 * assumed. Accepts either shape, so a future change back to true plain text would not silently
+	 * quotes included — confirmed against the live API, not the unquoted `OK` initially assumed.
+	 * Accepts either shape, so a future change back to true plain text would not silently
 	 * break this.
 	 *
 	 * @param array<mixed>|string $response IfthenpayLpApiClient::post()'s return value.

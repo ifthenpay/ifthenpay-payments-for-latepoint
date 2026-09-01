@@ -1,6 +1,6 @@
 <?php
 /**
- * IfthenpayLpTransactionRepository — the new {prefix}ifthenpay_transactions table (003 T-02b).
+ * IfthenpayLpTransactionRepository — the new {prefix}ifthenpay_transactions table.
  * The schema is created by the plugin's own `init` hook (maybe_upgrade_schema), exactly as it
  * would be on a real site, so this also proves that wiring works end to end.
  *

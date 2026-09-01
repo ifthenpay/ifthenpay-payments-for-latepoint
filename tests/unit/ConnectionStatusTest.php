@@ -3,10 +3,10 @@
  * Proves the two small status-pill renderers in IfthenpayAdminFormRenderer, both built on the
  * same render_status_pill():
  *
- * - render_connection_status() (003 T-10): the three states reachable from a saved Backoffice
- *   Key — a rejected key can never be one of them, since 003 T-09 already blocks that save;
- *   "Rejected" is the "Connect" preview's own state, not this method's.
- * - render_callback_status() (003 T-12): silent unless a callback registration attempt is on
+ * - render_connection_status(): the three states reachable from a saved Backoffice
+ *   Key — a rejected key can never be one of them, since save-time validation already blocks
+ *   that save; "Rejected" is the "Connect" preview's own state, not this method's.
+ * - render_callback_status(): silent unless a callback registration attempt is on
  *   record and failed — success and "never attempted" both render nothing.
  *
  * @package ifthenpay-payments-for-latepoint
@@ -110,7 +110,7 @@ final class ConnectionStatusTest extends TestCase {
 
 	/**
 	 * A successful registration renders nothing either — only a confirmed failure is worth
-	 * surfacing (003 T-12).
+	 * surfacing.
 	 */
 	public function test_callback_status_success_renders_nothing(): void {
 		ob_start();

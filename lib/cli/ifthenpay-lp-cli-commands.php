@@ -1,6 +1,6 @@
 <?php
 /**
- * WP-CLI commands (003 T-12b) — only ever loaded under `defined( 'WP_CLI' ) && WP_CLI` (see the
+ * WP-CLI commands — only ever loaded under `defined( 'WP_CLI' ) && WP_CLI` (see the
  * main plugin file's includes()), so WP_CLI itself is always available here.
  *
  * @package ifthenpay-payments-for-latepoint

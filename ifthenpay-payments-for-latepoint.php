@@ -256,7 +256,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		/**
-		 * FR-13: the processor toggle alone is not enough — the saved Gateway Key must still be a
+		 * The processor toggle alone is not enough — the saved Gateway Key must still be a
 		 * real, live one for the current Backoffice Key, checked fresh every time (no caching of
 		 * its own; IfthenpayLpGatewayDataset::get() already caches per request).
 		 */
@@ -325,7 +325,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'activate_account_by_entity' );
 
 			// The full {gatewayKey: {methodKey: accountKey}} map, every gateway at once — the
-			// select's own "change" handler looks up into this client-side (003 T-11), no AJAX
+			// select's own "change" handler looks up into this client-side, no AJAX
 			// round trip per gateway the way the old, now-removed get_payment_accounts_by_gateway
 			// route needed.
 			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
@@ -411,10 +411,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key );
 
 			if ( $backoffice_key ) {
-				// Re-fetched on every render, not only right after "Connect" (003 T-10) — a key
+				// Re-fetched on every render, not only right after "Connect" — a key
 				// can be revoked after it was stored, or gateway keys added/removed on
-				// ifthenpay's side, independently of this site. Per-request cached (T-05), so
-				// this and render_payments_configuration()'s use below cost one HTTP call, not two.
+				// ifthenpay's side, independently of this site. The dataset is cached per request,
+				// so this and render_payments_configuration()'s use below cost one HTTP call, not two.
 				$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
 				IfthenpayAdminFormRenderer::render_connection_status( $dataset );
 
@@ -424,7 +424,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 					IfthenpayLpMethodCatalog::get() ?? array()
 				);
 
-				// The last registration outcome for the currently saved Gateway Key (003 T-12) —
+				// The last registration outcome for the currently saved Gateway Key —
 				// stored by register_callback_on_settings_updated() after a save, surfaced here so
 				// a merchant sees a failure without re-entering the form.
 				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
@@ -473,15 +473,16 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 */
 		public function init() {
 			// Domain Path in the plugin header (see the top of this file) is not itself enough —
-			// nothing loads the compiled .mo files without this call (003 T-15).
+			// nothing loads the compiled .mo files without this call.
 			load_plugin_textdomain( 'ifthenpay-payments-for-latepoint', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
 			// Cheap on every request when already current; upgrades the schema on an in-place
 			// plugin update, not only on (re)activation.
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 
-			// Same reasoning (003 T-14): a pre-003 site's Gateway Key is stale the moment this
-			// version is active, not only after the merchant next saves settings.
+			// Same reasoning as above: a site upgrading from an older version of this plugin has a
+			// Gateway Key that's stale the moment this version is active, not only after the
+			// merchant next saves settings.
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 		}
 

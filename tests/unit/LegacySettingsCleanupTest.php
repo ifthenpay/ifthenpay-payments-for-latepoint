@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves IfthenpayLpLegacySettingsCleanup::maybe_run() (003 T-14): the obsolete settings are
+ * Proves IfthenpayLpLegacySettingsCleanup::maybe_run(): the obsolete settings are
  * deleted exactly once, a fresh install with nothing to delete still stamps the version so this
  * never has to run again, and a second call after that is a true no-op.
  *
