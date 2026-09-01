@@ -357,6 +357,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key );
 
 			if ( $backoffice_key ) {
+				// Re-checked on every render, not only right after "Connect" (003 T-10) — a key
+				// can be revoked after it was stored, or gateway keys added/removed on
+				// ifthenpay's side, independently of this site.
+				IfthenpayAdminFormRenderer::render_connection_status( IfthenpayLpGatewayDataset::get( $backoffice_key ) );
+			}
+
+			if ( $backoffice_key ) {
 				// Load the two needed settings
 				$gateway_options   = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_options', array() );
 				$available_methods = OsSettingsHelper::get_settings_value( 'ifthenpay_available_methods', array() );

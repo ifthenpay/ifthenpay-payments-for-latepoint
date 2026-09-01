@@ -61,6 +61,68 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
+	/**
+	 * Four distinct states (003 T-10), computed fresh on every render — not only right after
+	 * "Connect" — from `IfthenpayLpGatewayDataset::get()`, which already distinguishes "no
+	 * gateway keys yet" (a real, empty dataset) from "could not find out" (`null`). A rejected
+	 * key can never reach this method at all: 003 T-09's save-time validation means a saved
+	 * Backoffice Key already passed the remote check, so only these three render here — the
+	 * fourth, "Rejected", is what the "Connect" preview shows for a key that failed to save.
+	 *
+	 * Reuses LatePoint's own `.os-column-status` status-pill classes (see any bookings list)
+	 * instead of introducing new CSS.
+	 *
+	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The result of IfthenpayLpGatewayDataset::get().
+	 */
+	public static function render_connection_status( ?array $dataset ): void {
+		if ( null === $dataset ) {
+			self::render_status_pill(
+				'error',
+				esc_html__( 'Could not check the connection to ifthenpay right now. This does not affect your saved settings — try reloading in a moment.', 'ifthenpay-payments-for-latepoint' )
+			);
+			return;
+		}
+
+		if ( empty( $dataset['gatewaykeys'] ) ) {
+			self::render_status_pill(
+				'pending',
+				esc_html__( 'Connected, but no gateway keys yet for this site.', 'ifthenpay-payments-for-latepoint' )
+			);
+			?>
+			<p class="ifthenpay-onboarding-steps">
+				<?php
+				printf(
+					/* translators: %s: ifthenpay helpdesk link */
+					esc_html__( 'Ask ifthenpay to provision a gateway key for this LatePoint site — contact %s.', 'ifthenpay-payments-for-latepoint' ),
+					'<a href="https://helpdesk.ifthenpay.com" target="_blank" rel="noopener noreferrer">helpdesk.ifthenpay.com</a>' // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a fixed, literal link, not dynamic content.
+				);
+				?>
+			</p>
+			<?php
+			return;
+		}
+
+		self::render_status_pill( 'active', esc_html__( 'Connected', 'ifthenpay-payments-for-latepoint' ) );
+	}
+
+	/**
+	 * One `.os-column-status` pill, matching the state colours already used across LatePoint's
+	 * own admin (e.g. booking status columns): green for `active`, amber for `pending`, grey for
+	 * `error`, red for `disabled` (the one genuinely styled as an alert — 003 T-10).
+	 *
+	 * @param string $state   One of `active`, `pending`, `error`, `disabled`.
+	 * @param string $message Already-escaped text.
+	 */
+	private static function render_status_pill( string $state, string $message ): void {
+		?>
+		<p>
+			<span class="os-column-status os-column-status-<?php echo esc_attr( $state ); ?>">
+				<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
+			</span>
+		</p>
+		<?php
+	}
+
 	public static function render_payments_configuration( array $gateway_options, array $available_methods ) {
 		$json = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
 		$cfg  = json_decode( $json, true ) ?: array();
