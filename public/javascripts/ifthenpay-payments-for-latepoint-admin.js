@@ -5,11 +5,11 @@ class LatepointPaymentsIfthenpayAdmin {
 		validateButton: '.validate-button',
 		backofficeKeyInput: '.custom-backoffice-key',
 		methodItem: '.ifthenpay-method-item',
-		methodCheckbox: '.ifthenpay-method-checkbox',
+		methodToggler: '.ifthenpay-method-item .os-toggler',
 		methodAccount: '.ifthenpay-method-account',
+		methodBody: '.ifthenpay-method-body',
 		defaultMethodSelect: '.ifthenpay-default-method',
 		methodsConfigInput: '#ifthenpay_payment_methods_configuration',
-		methodsWrapper: '.ifthenpay-method-right',
 		activateLink: '.ifthenpay-activate',
 	};
 
@@ -30,14 +30,11 @@ class LatepointPaymentsIfthenpayAdmin {
 				LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect,
 				(e) => this.onGatewayChange(e)
 			)
+			// LatePoint's own admin.js already makes clicking a `.os-toggler` flip it — this just
+			// reacts to that, via the custom event it fires on the toggler itself either way.
 			.on(
-				'click',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem,
-				(e) => this.toggleMethod(e)
-			)
-			.on(
-				'change',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox,
+				'ostoggler:toggle',
+				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodToggler,
 				() => {
 					this.updateDefaultMethods();
 					this.updateConfig();
@@ -53,6 +50,17 @@ class LatepointPaymentsIfthenpayAdmin {
 				LatepointPaymentsIfthenpayAdmin.SELECTORS.activateLink,
 				(e) => this.handleActivate(e)
 			);
+	}
+
+	// LatePoint's own click handler only flips the `.os-toggler`'s on/off class and its paired
+	// hidden input's value — there is no API to set that state programmatically (e.g. when a
+	// gateway change client-side disables a method), so this reproduces just that part.
+	setTogglerState($toggler, isOn) {
+		$toggler.toggleClass('on', isOn).toggleClass('off', !isOn);
+		const hiddenId = $toggler.data('for');
+		if (hiddenId) {
+			jQuery('#' + hiddenId).val(isOn ? 'on' : 'off');
+		}
 	}
 
 	serialize(params) {
@@ -117,39 +125,37 @@ class LatepointPaymentsIfthenpayAdmin {
 	}
 
 	// A gateway record has at most one account per method (no list to choose from), so a method
-	// is either available — its account key travels in a hidden field — or it isn't.
+	// is either available — its account key travels in a hidden field — or it isn't. `is-disabled`
+	// is LatePoint's own class (fades the row via native CSS); the toggler itself has no native
+	// disabled state, so a method losing its account is force-switched off, not just greyed out.
 	applyAccountsForGateway(accounts) {
 		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
-			function () {
-				const $item = jQuery(this);
+			(_, el) => {
+				const $item = jQuery(el);
 				const entity = $item.data('entity');
 				const accountKey = accounts[entity];
-				const $wrapper = $item.find(
-					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodsWrapper
-				);
-				const $checkbox = $item.find(
-					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
-				);
+				const $toggler = $item.find('.os-toggler');
 
-				$wrapper.empty();
+				$item
+					.toggleClass('is-disabled', !accountKey)
+					.find(
+						`${LatepointPaymentsIfthenpayAdmin.SELECTORS.methodAccount}, ${LatepointPaymentsIfthenpayAdmin.SELECTORS.methodBody}`
+					)
+					.remove();
 
 				if (!accountKey) {
-					$checkbox.prop('checked', false).prop('disabled', true);
-					$wrapper.html(
-						`<div class="ifthenpay-no-accounts">
-               ${latepoint_helper.ifthenpay_translations.no_accounts}
-               <a href="#"
-                  class="ifthenpay-activate"
-                  data-entity="${entity}">
-                 ${latepoint_helper.ifthenpay_translations.activate}
-               </a>.
-             </div>`
+					this.setTogglerState($toggler, false);
+					$item.append(
+						jQuery('<div>', {
+							class: 'os-togglable-item-body ifthenpay-method-body',
+						}).html(
+							`${latepoint_helper.ifthenpay_translations.no_accounts} <a href="#" class="ifthenpay-activate" data-entity="${entity}">${latepoint_helper.ifthenpay_translations.activate}</a>.`
+						)
 					);
 					return;
 				}
 
-				$checkbox.prop('disabled', false);
-				$wrapper.append(
+				$item.append(
 					jQuery('<input>', {
 						type: 'hidden',
 						class: 'ifthenpay-method-account',
@@ -162,30 +168,6 @@ class LatepointPaymentsIfthenpayAdmin {
 
 		this.updateDefaultMethods();
 		this.updateConfig();
-	}
-
-	toggleMethod(event) {
-		const $target = jQuery(event.target);
-		if (
-			$target.is(
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
-			) ||
-			$target.closest(
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.activateLink
-			).length
-		) {
-			return;
-		}
-
-		const $item = jQuery(event.currentTarget);
-		const $checkbox = $item.find(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
-		);
-		if ($checkbox.prop('disabled')) {
-			return;
-		}
-
-		$checkbox.prop('checked', !$checkbox.prop('checked')).trigger('change');
 	}
 
 	updateDefaultMethods() {
@@ -201,17 +183,14 @@ class LatepointPaymentsIfthenpayAdmin {
 		$defaultSelect.empty();
 
 		const enabledEntities = [];
-		jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox +
-				':checked'
-		).each(function () {
-			const entity = jQuery(this)
-				.closest(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem)
-				.data('entity');
-			if (entity) {
-				enabledEntities.push(entity);
+		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
+			function () {
+				const $item = jQuery(this);
+				if ($item.find('.os-toggler').hasClass('on')) {
+					enabledEntities.push($item.data('entity'));
+				}
 			}
-		});
+		);
 
 		if (!enabledEntities.length) {
 			$defaultSelect.append(
@@ -243,15 +222,12 @@ class LatepointPaymentsIfthenpayAdmin {
 			function () {
 				const $item = jQuery(this);
 				const entity = $item.data('entity');
-				const $checkbox = $item.find(
-					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodCheckbox
-				);
 				const $account = $item.find(
 					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodAccount
 				);
 
 				config[entity] = {
-					checked: $checkbox.is(':checked'),
+					checked: $item.find('.os-toggler').hasClass('on'),
 					selected_account: $account.val() || '',
 				};
 			}

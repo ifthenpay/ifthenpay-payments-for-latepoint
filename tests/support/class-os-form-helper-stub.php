@@ -21,5 +21,24 @@ if ( ! class_exists( 'OsFormHelper' ) ) {
 		public static function select_field( ...$args ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- fixed placeholder; the real signature's args are LatePoint's own concern, not reproduced here.
 			return '<select></select>';
 		}
+
+		/**
+		 * Reproduces just enough of the real toggler_field() (LatePoint core,
+		 * lib/helpers/form_helper.php) for a test to see whether a row rendered on/off — a hidden
+		 * input plus a `.os-toggler` div carrying the on/off class, which is the actual state the
+		 * real component's own click handler reads and flips.
+		 *
+		 * @param string $name      Field name, used to derive the hidden input's id.
+		 * @param string $label     Unused by any current caller; kept for signature parity.
+		 * @param bool   $is_active Initial on/off state.
+		 * @param mixed  ...$args   Unused; kept for signature parity with the real method.
+		 */
+		public static function toggler_field( string $name, string $label, bool $is_active, ...$args ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found, Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- $label/$args unused by this stand-in; kept for signature parity with the real method.
+			$status = $is_active ? 'on' : 'off';
+			$id     = preg_replace( '/[^0-9a-zA-Z_]/', '_', strtolower( $name ) );
+
+			return '<input type="hidden" id="' . esc_attr( $id ) . '" value="' . esc_attr( $status ) . '" />'
+				. '<div class="os-toggler ' . esc_attr( $status ) . '" data-for="' . esc_attr( $id ) . '"></div>';
+		}
 	}
 }

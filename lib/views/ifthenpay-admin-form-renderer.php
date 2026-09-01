@@ -184,10 +184,13 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * One row per catalog method. A gateway record holds at most one account per method (verified
-	 * live, contracts/api.md operation #2 — not a list to choose from), so there is nothing left to
-	 * pick: the checkbox is enabled exactly when the selected gateway has an account for that
-	 * method, and its account key travels in a hidden field, not a dropdown (003 T-11).
+	 * One row per catalog method, built from LatePoint's own `.os-togglable-item-w` family and
+	 * `OsFormHelper::toggler_field()` — the exact component LatePoint uses for its own processor
+	 * list one level up (see $paymentProcessorToggler_ifthenpay). A gateway record holds at most
+	 * one account per method (verified live, contracts/api.md operation #2 — not a list to choose
+	 * from), so there is nothing left to pick: the toggle is enabled exactly when the selected
+	 * gateway has an account for that method, and its account key travels in a hidden field, not a
+	 * dropdown (003 T-11).
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodKey: accountKey}` for the currently selected gateway only.
@@ -201,42 +204,53 @@ class IfthenpayAdminFormRenderer
 				<label class="ifthenpay-section-label">
 					<?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?>
 				</label>
-				<div class="ifthenpay-methods-list">
+				<div class="os-togglable-items-w ifthenpay-methods-list">
 					<?php
 					foreach ( $catalog as $slug => $props ) :
 						$account_key = $accounts_for_gateway[ $slug ] ?? '';
 						$has_account = '' !== $account_key;
 						$is_checked  = $has_account && ! empty( $cfg[ $slug ]['checked'] );
 						?>
-						<div class="ifthenpay-method-item" data-entity="<?php echo esc_attr( $slug ); ?>">
-							<input type="checkbox"
-								class="ifthenpay-method-checkbox"
-								<?php checked( $is_checked ); ?>
-								<?php disabled( ! $has_account ); ?> />
-							<img src="<?php echo esc_url( $props['image'] ); ?>"
-								class="ifthenpay-method-icon"
-								alt="<?php echo esc_attr( $props['label'] ); ?>" />
-							<span class="ifthenpay-method-name">
-								<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
-							</span>
-							<div class="ifthenpay-method-right">
-								<?php if ( $has_account ) : ?>
-									<input type="hidden"
-										class="ifthenpay-method-account"
-										name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $slug ); ?>][selected_account]"
-										value="<?php echo esc_attr( $account_key ); ?>" />
-								<?php else : ?>
-									<div class="ifthenpay-no-accounts">
-										<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>
-										<a
-											href="#"
-											class="ifthenpay-activate"
-											data-entity="<?php echo esc_attr( $slug ); ?>">
-											<?php echo esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ); ?>
-										</a>.
-									</div>
-								<?php endif; ?>
+						<div class="os-togglable-item-w ifthenpay-method-item<?php echo $has_account ? '' : ' is-disabled'; ?>" data-entity="<?php echo esc_attr( $slug ); ?>">
+							<div class="os-togglable-item-head">
+								<div class="os-toggler-w">
+									<?php
+									// Same toggle switch LatePoint uses for its own processor list (see the
+									// outer $paymentProcessorToggler_ifthenpay wrapper) — an empty label skips
+									// its own wrapping group, so only clicking the switch toggles it, matching
+									// that same native convention rather than inventing a "click anywhere" one.
+									echo OsFormHelper::toggler_field(
+										'ifthenpay_method_toggle_' . $slug,
+										'',
+										$is_checked,
+										false,
+										'small'
+									);
+									?>
+								</div>
+								<img src="<?php echo esc_url( $props['image'] ); ?>"
+									class="os-togglable-item-logo-img"
+									alt="<?php echo esc_attr( $props['label'] ); ?>" />
+								<div class="os-togglable-item-name">
+									<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
+								</div>
 							</div>
+							<?php if ( $has_account ) : ?>
+								<input type="hidden"
+									class="ifthenpay-method-account"
+									name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $slug ); ?>][selected_account]"
+									value="<?php echo esc_attr( $account_key ); ?>" />
+							<?php else : ?>
+								<div class="os-togglable-item-body ifthenpay-method-body">
+									<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>
+									<a
+										href="#"
+										class="ifthenpay-activate"
+										data-entity="<?php echo esc_attr( $slug ); ?>">
+										<?php echo esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ); ?>
+									</a>.
+								</div>
+							<?php endif; ?>
 						</div>
 					<?php endforeach; ?>
 				</div>
