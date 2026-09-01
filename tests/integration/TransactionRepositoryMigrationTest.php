@@ -13,16 +13,21 @@
 class TransactionRepositoryMigrationTest extends WP_UnitTestCase {
 
 	/**
-	 * The DDL fixture below runs with wp-phpunit's temp-table rewrite disabled, so — unlike
-	 * ordinary DML — it is not rolled back by the per-test transaction. Drop it explicitly, even
-	 * on assertion failure, so a real table never leaks into the next test run.
+	 * The DDL fixture below runs with wp-phpunit's temp-table rewrite disabled, so it is real,
+	 * permanent DDL — and DDL causes an implicit commit in MySQL/InnoDB, which silently ends the
+	 * per-test wrapping transaction partway through the test. Everything after that point,
+	 * including the migration's own INSERT into the real (not per-test) ifthenpay_transactions
+	 * table, is committed for real too — not rolled back like ordinary DML. Clean up both: the
+	 * fixture tables themselves, and the row this test's migration inserts into the permanent
+	 * table, or it collides with itself on the next run.
 	 */
 	public function tearDown(): void {
 		global $wpdb;
 		$old_table = $wpdb->prefix . 'ifthenpay_payments';
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test cleanup only; $old_table has no user-controlled part.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test cleanup only; $old_table has no user-controlled part, and the token literal below is this test's own fixture value.
 		$wpdb->query( "DROP TABLE IF EXISTS `{$old_table}`" );
 		$wpdb->query( "DROP TABLE IF EXISTS `{$old_table}_legacy`" );
+		$wpdb->delete( $wpdb->prefix . 'ifthenpay_transactions', array( 'token' => 'legacy-inflight' ) );
 		// phpcs:enable
 		parent::tearDown();
 	}

@@ -90,6 +90,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-transport-exception.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-key-validator.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-backoffice-key-validation.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-data-formatter.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-method-catalog.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-gateway-dataset.php';
@@ -137,6 +138,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
 			// Encrypt sensitive fields
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
+			// Validate the Backoffice Key on every save — fires for every OsModel save, so this
+			// must filter tightly to just this one setting (see validate_backoffice_key_on_save()).
+			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
 
 			add_filter( 'latepoint_get_all_payment_times', array( $this, 'add_all_payment_methods_to_payment_times' ) );
 			add_filter( 'latepoint_get_enabled_payment_times', array( $this, 'add_enabled_payment_methods_to_payment_times' ) );
@@ -242,6 +246,33 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		public function add_encrypted_settings( $encrypted_settings ) {
 			$encrypted_settings[] = 'ifthenpay_backoffice_key';
 			return $encrypted_settings;
+		}
+
+		/**
+		 * Fires for every OsModel save (see OsModel::validate()) — filters down to the one
+		 * setting this addon cares about, decrypts it (SettingsController::update() and
+		 * OsSettingsHelper::save_setting_by_name() both encrypt before save() is ever called,
+		 * since this setting is registered via add_encrypted_settings() above), and rejects the
+		 * save only for a confirmed bad key — never for a transport failure.
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_backoffice_key_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_backoffice_key' !== $model->name ) {
+				return;
+			}
+
+			$key = OsEncryptHelper::decrypt_value( $model->value );
+			$key = false === $key ? '' : $key;
+
+			$error = IfthenpayLpBackofficeKeyValidation::check( $key );
+			if ( null !== $error ) {
+				// 'validation' is not a label — OsModel::has_validation_error() checks for that
+				// exact error code (lib/models/model.php:1046), matching every one of LatePoint's
+				// own built-in property validators. A different code stores the message but never
+				// blocks the save.
+				$model->add_error( 'validation', $error );
+			}
 		}
 
 		public function localized_vars_for_admin( $localized_vars ) {
