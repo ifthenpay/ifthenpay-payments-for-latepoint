@@ -469,7 +469,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 * Init addon when WordPress Initialises.
 		 */
 		public function init() {
-			// Set up localisation.
+			// Domain Path in the plugin header (see the top of this file) is not itself enough —
+			// nothing loads the compiled .mo files without this call (003 T-15).
+			load_plugin_textdomain( 'ifthenpay-payments-for-latepoint', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
 			// Cheap on every request when already current; upgrades the schema on an in-place
 			// plugin update, not only on (re)activation.
