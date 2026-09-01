@@ -1,24 +1,32 @@
 <?php
-class IfthenpayAdminFormRenderer
 /**
- * Plugin Reviewer Note:
- * The OsFormHelper::*_field() methods (e.g. select_field, password_field, number_field) are part of the LatePoint framework.
- * These methods internally handle proper escaping using esc_html() and esc_attr() before rendering any HTML.
+ * Renders the ifthenpay section of LatePoint's Payments settings tab.
  *
- * Due to the plugin review scanner not being able to verify custom helper internals, this may appear as unescaped output.
- * However, all calls to these methods are preceded with `echo`, as required by review guidelines,
- * and all dynamic content (labels, values, attributes) is safely escaped internally within the helper methods.
+ * Plugin Reviewer Note: the OsFormHelper::*_field() and toggler_field() methods are part of the
+ * LatePoint framework and escape their own output internally (esc_html()/esc_attr()). A review
+ * scanner that can't see inside those methods may flag calls to them as unescaped output; every
+ * call here is preceded by `echo` as required, and the escaping happens inside the helper. No
+ * wp_kses_post() is used because it is disallowed in this context.
  *
- * For example:
- * echo OsFormHelper::select_field(...); // is safe and escapes internally.
- *
- * Translations use esc_html__() or esc_attr__() as appropriate.
- * All user input retrieved from settings is escaped at the output using esc_attr().
- *
- * No wp_kses_post() is used because it is disallowed in our context.
- */ {
+ * @package ifthenpay-payments-for-latepoint
+ */
 
-	public static function render_backoffice_configuration( string $backoffice_key ) {
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Renders every field on the ifthenpay payment processor's settings section.
+ */
+class IfthenpayAdminFormRenderer {
+
+	/**
+	 * The Backoffice Key field and its "Connect" button, which previews (does not save) what
+	 * saving that key would configure.
+	 *
+	 * @param string $backoffice_key Current, already-decrypted setting value.
+	 */
+	public static function render_backoffice_configuration( string $backoffice_key ): void {
 		?>
 		<div class="sub-section-row">
 			<div class="sub-section-label">
@@ -62,21 +70,14 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * Four distinct states (003 T-10), computed fresh on every render — not only right after
-	 * "Connect" — from `IfthenpayLpGatewayDataset::get()`, which already distinguishes "no
-	 * gateway keys yet" (a real, empty dataset) from "could not find out" (`null`). A rejected
-	 * key can never reach this method at all: 003 T-09's save-time validation means a saved
-	 * Backoffice Key already passed the remote check, so only these three render here — the
-	 * fourth, "Rejected", is what the "Connect" preview shows for a key that failed to save.
+	 * Whether the saved Backoffice Key is actually usable, computed fresh on every render — not
+	 * only right after "Connect" — so a key revoked on ifthenpay's side, or gateway keys
+	 * added/removed there, shows up without the merchant touching this page. A rejected key can
+	 * never reach this method: the save itself is blocked before a bad key is ever stored, so a
+	 * saved key has already passed the remote check. "Rejected" is a state only the "Connect"
+	 * preview can show, for a key that failed to save.
 	 *
-	 * `active`/`pending` reuse Stripe/Razorpay/PayPal's own connect-status markup verbatim
-	 * (`.payment-processor-connect-status-wrapper` + `.payment-processor-status-connected` /
-	 * `-charges-disabled`) — same wrapper class, so LatePoint's existing CSS colours them with no
-	 * CSS of this plugin's own. `error` has no first-party equivalent (every native state there
-	 * assumes a definite connected/action-needed answer, not "couldn't find out"); see
-	 * render_status_pill().
-	 *
-	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The result of IfthenpayLpGatewayDataset::get().
+	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The gateway dataset for this Backoffice Key, or null if it could not be fetched.
 	 */
 	public static function render_connection_status( ?array $dataset ): void {
 		if ( null === $dataset ) {
@@ -110,40 +111,11 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * `active` → `.payment-processor-status-connected` (green), `pending` → `-charges-disabled`
-	 * (amber) — the exact classes Stripe/Razorpay/PayPal's own connect status uses, inside the
-	 * same `.payment-processor-connect-status-wrapper` their CSS scopes the colour to; nothing
-	 * about either is ifthenpay-specific. `error`/`disabled` fall back to a small local class this
-	 * plugin does own — no first-party badge exists for "couldn't find out" or "rejected" outside
-	 * a data table (`.os-column-status`, which needs one, per contracts/api.md's UI note).
+	 * The last callback-URL registration outcome for the currently saved Gateway Key. Silent on
+	 * success, and silent when nothing was ever attempted — only a confirmed failure is worth a
+	 * merchant's attention.
 	 *
-	 * @param string $state   One of `active`, `pending`, `error`, `disabled`.
-	 * @param string $message Already-escaped text.
-	 */
-	private static function render_status_pill( string $state, string $message ): void {
-		$native_class = array(
-			'active'  => 'payment-processor-status-connected',
-			'pending' => 'payment-processor-status-charges-disabled',
-		);
-		$class = $native_class[ $state ] ?? 'ifthenpay-status-' . $state;
-		?>
-		<div class="payment-processor-connect-status-wrapper">
-			<div class="<?php echo esc_attr( $class ); ?>">
-				<span>
-					<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
-				</span>
-			</div>
-		</div>
-		<?php
-	}
-
-	/**
-	 * The last callback registration outcome for the currently saved Gateway Key (003 T-12) —
-	 * silent on success or when nothing was ever attempted; only a confirmed failure is worth a
-	 * merchant's attention, matching the same "outages are neutral, only rejection is an alert"
-	 * split as render_connection_status() above.
-	 *
-	 * @param array{success:bool,message:string,registered_at:int}|null $status IfthenpayLpCallbackRegistration::get_status()'s result.
+	 * @param array{success:bool,message:string,registered_at:int}|null $status The stored registration outcome, or null if none was ever recorded.
 	 */
 	public static function render_callback_status( ?array $status ): void {
 		if ( null === $status || $status['success'] ) {
@@ -161,13 +133,43 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * @param array<string,string>               $gatewaykeys `{GatewayKey: Alias}` — IfthenpayLpGatewayDataset::get()'s own shape (003 T-05), used directly as the select's value=>label options.
-	 * @param array<string,array<string,string>> $accounts    `{GatewayKey: {methodKey: accountKey}}` — same dataset, every gateway at once (003 T-11): the JS re-reads this client-side when the gateway select changes, no per-gateway round trip.
-	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog (IfthenpayLpMethodCatalog::get()), position-sorted for display.
+	 * `active` and `pending` render with the exact status classes LatePoint's own Stripe/Razorpay/
+	 * PayPal connect flows use (`.payment-processor-connect-status-wrapper` +
+	 * `.payment-processor-status-connected` / `-charges-disabled`) — the same markup, colored
+	 * entirely by LatePoint's own CSS. `error` has no first-party equivalent, since every native
+	 * state there assumes a definite connected/action-needed answer rather than "couldn't find
+	 * out" — it falls back to a small class this plugin owns (see the stylesheet).
+	 *
+	 * @param string $state   One of `active`, `pending`, `error`.
+	 * @param string $message Already-escaped text.
 	 */
-	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ) {
-		$json                 = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
-		$cfg                  = json_decode( $json, true ) ?: array();
+	private static function render_status_pill( string $state, string $message ): void {
+		$native_class = array(
+			'active'  => 'payment-processor-status-connected',
+			'pending' => 'payment-processor-status-charges-disabled',
+		);
+		$class        = $native_class[ $state ] ?? 'ifthenpay-status-' . $state;
+		?>
+		<div class="payment-processor-connect-status-wrapper">
+			<div class="<?php echo esc_attr( $class ); ?>">
+				<span>
+					<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
+				</span>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * The Gateway Key picker and its available payment methods, both driven by the live gateway
+	 * dataset rather than anything hand-typed or cached in a setting.
+	 *
+	 * @param array<string,string>                                                       $gatewaykeys `{GatewayKey: Alias}`, used directly as the select's options.
+	 * @param array<string,array<string,string>>                                         $accounts    `{GatewayKey: {methodCode: accountKey}}` for every gateway key at once — the admin script re-reads this client-side when the selected gateway changes, no extra request needed.
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog The full method catalog, position-sorted for display.
+	 */
+	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ): void {
+		$cfg                  = self::get_saved_method_config();
 		$selected_gateway_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		?>
 		<div class="sub-section-row">
@@ -177,7 +179,7 @@ class IfthenpayAdminFormRenderer
 			<div class="sub-section-content">
 				<?php self::render_gateway_key_select( $gatewaykeys, $selected_gateway_key ); ?>
 				<?php self::render_payment_methods( $catalog, $accounts[ $selected_gateway_key ] ?? array(), $cfg ); ?>
-				<?php self::render_default_method_select(); ?>
+				<?php self::render_default_method_select( $cfg ); ?>
 				<input type="hidden"
 					id="ifthenpay_payment_methods_configuration"
 					name="settings[ifthenpay_payment_methods_configuration]"
@@ -187,7 +189,25 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
-	private static function render_gateway_key_select( array $gatewaykeys, string $selected_gateway_key ) {
+	/**
+	 * The saved per-method configuration, decoded from its stored JSON string.
+	 *
+	 * @return array<string,array{checked?:bool,selected_account?:string}>
+	 */
+	private static function get_saved_method_config(): array {
+		$json = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
+		$cfg  = json_decode( $json, true );
+
+		return is_array( $cfg ) ? $cfg : array();
+	}
+
+	/**
+	 * The Gateway Key `<select>`.
+	 *
+	 * @param array<string,string> $gatewaykeys          `{GatewayKey: Alias}`.
+	 * @param string               $selected_gateway_key Currently saved gateway key, or ''.
+	 */
+	private static function render_gateway_key_select( array $gatewaykeys, string $selected_gateway_key ): void {
 		echo OsFormHelper::select_field(
 			'settings[ifthenpay_gateway_key]',
 			esc_html__( 'Gateway Key', 'ifthenpay-payments-for-latepoint' ),
@@ -198,19 +218,20 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * One row per catalog method, built from LatePoint's own `.os-togglable-item-w` family and
-	 * `OsFormHelper::toggler_field()` — the exact component LatePoint uses for its own processor
-	 * list one level up (see $paymentProcessorToggler_ifthenpay). A gateway record holds at most
-	 * one account per method (verified live, contracts/api.md operation #2 — not a list to choose
-	 * from), so there is nothing left to pick: the toggle is enabled exactly when the selected
-	 * gateway has an account for that method, and its account key travels in a hidden field, not a
-	 * dropdown (003 T-11).
+	 * One row per catalog method, built from LatePoint's own togglable-item family
+	 * (`.os-togglable-item-w` / `OsFormHelper::toggler_field()`) — the same component LatePoint
+	 * uses one level up for the processor list itself. A gateway record carries at most one
+	 * account per method, verified against ifthenpay's own API response, so there is nothing to
+	 * pick between: the toggle is enabled exactly when the selected gateway has an account for
+	 * that method, and the account key travels in a hidden field. The toggle switch has no native
+	 * disabled state, so a method with no account is locked from being clicked via CSS
+	 * (`.is-disabled .os-toggler { pointer-events: none }`), not just visually faded.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
-	 * @param array<string,string>                                                       $accounts_for_gateway `{methodKey: accountKey}` for the currently selected gateway only.
+	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
 	 * @param array<string,array{checked?:bool,selected_account?:string}>                $cfg                  Saved per-method configuration.
 	 */
-	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $cfg ) {
+	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $cfg ): void {
 		uasort( $catalog, fn( $a, $b ) => ( $a['position'] ?? 0 ) <=> ( $b['position'] ?? 0 ) );
 		?>
 		<div class="os-row">
@@ -219,54 +240,8 @@ class IfthenpayAdminFormRenderer
 					<?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?>
 				</label>
 				<div class="os-togglable-items-w ifthenpay-methods-list">
-					<?php
-					foreach ( $catalog as $slug => $props ) :
-						$account_key = $accounts_for_gateway[ $slug ] ?? '';
-						$has_account = '' !== $account_key;
-						$is_checked  = $has_account && ! empty( $cfg[ $slug ]['checked'] );
-						?>
-						<div class="os-togglable-item-w ifthenpay-method-item<?php echo $has_account ? '' : ' is-disabled'; ?>" data-entity="<?php echo esc_attr( $slug ); ?>">
-							<div class="os-togglable-item-head">
-								<div class="os-toggler-w">
-									<?php
-									// Same toggle switch LatePoint uses for its own processor list (see the
-									// outer $paymentProcessorToggler_ifthenpay wrapper) — an empty label skips
-									// its own wrapping group, so only clicking the switch toggles it, matching
-									// that same native convention rather than inventing a "click anywhere" one.
-									echo OsFormHelper::toggler_field(
-										'ifthenpay_method_toggle_' . $slug,
-										'',
-										$is_checked,
-										false,
-										'small'
-									);
-									?>
-								</div>
-								<img src="<?php echo esc_url( $props['image'] ); ?>"
-									class="os-togglable-item-logo-img"
-									alt="<?php echo esc_attr( $props['label'] ); ?>" />
-								<div class="os-togglable-item-name">
-									<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
-									<span class="ifthenpay-method-code">(<?php echo esc_html( $slug ); ?>)</span>
-								</div>
-							</div>
-							<?php if ( $has_account ) : ?>
-								<input type="hidden"
-									class="ifthenpay-method-account"
-									name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $slug ); ?>][selected_account]"
-									value="<?php echo esc_attr( $account_key ); ?>" />
-							<?php else : ?>
-								<div class="os-togglable-item-body ifthenpay-method-body">
-									<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>
-									<a
-										href="#"
-										class="ifthenpay-activate"
-										data-entity="<?php echo esc_attr( $slug ); ?>">
-										<?php echo esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ); ?>
-									</a>.
-								</div>
-							<?php endif; ?>
-						</div>
+					<?php foreach ( $catalog as $code => $props ) : ?>
+						<?php self::render_payment_method_row( $code, $props, $accounts_for_gateway[ $code ] ?? '', ! empty( $cfg[ $code ]['checked'] ) ); ?>
 					<?php endforeach; ?>
 				</div>
 			</div>
@@ -274,12 +249,67 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
-	private static function render_default_method_select() {
-		$json = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
-		$cfg  = json_decode( $json, true ) ?: array();
+	/**
+	 * One toggle-switch row for a single payment method.
+	 *
+	 * @param string                                                       $code        The method's own ifthenpay code (MB, MBWAY, …).
+	 * @param array{position:int,image:string,tooltip:string,label:string} $props       Catalog metadata for this method.
+	 * @param string                                                       $account_key The selected gateway's account key for this method, or '' if it has none.
+	 * @param bool                                                         $saved_as_on Whether this method was saved as checked.
+	 */
+	private static function render_payment_method_row( string $code, array $props, string $account_key, bool $saved_as_on ): void {
+		$has_account = '' !== $account_key;
+		$is_checked  = $has_account && $saved_as_on;
+		?>
+		<div class="os-togglable-item-w ifthenpay-method-item<?php echo $has_account ? '' : ' is-disabled'; ?>" data-entity="<?php echo esc_attr( $code ); ?>">
+			<div class="os-togglable-item-head">
+				<div class="os-toggler-w">
+					<?php
+					// An empty label skips toggler_field()'s own wrapping group, so only clicking
+					// the switch toggles it — matching the same convention as LatePoint's own
+					// processor list, which also passes no label to its equivalent toggle.
+					echo OsFormHelper::toggler_field(
+						'ifthenpay_method_toggle_' . $code,
+						'',
+						$is_checked,
+						false,
+						'small'
+					);
+					?>
+				</div>
+				<img src="<?php echo esc_url( $props['image'] ); ?>"
+					class="os-togglable-item-logo-img"
+					alt="<?php echo esc_attr( $props['label'] ); ?>" />
+				<div class="os-togglable-item-name">
+					<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
+					<span class="ifthenpay-method-code">(<?php echo esc_html( $code ); ?>)</span>
+				</div>
+			</div>
+			<?php if ( $has_account ) : ?>
+				<input type="hidden"
+					class="ifthenpay-method-account"
+					name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $code ); ?>][selected_account]"
+					value="<?php echo esc_attr( $account_key ); ?>" />
+			<?php else : ?>
+				<div class="os-togglable-item-body ifthenpay-method-body">
+					<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>
+					<a href="#" class="ifthenpay-activate" data-entity="<?php echo esc_attr( $code ); ?>">
+						<?php echo esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ); ?>
+					</a>.
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
 
-		$selected_methods = array_keys( array_filter( $cfg, fn( $m ) => ! empty( $m['checked'] ) ) );
-		$options          = array( '' => '' ) + array_combine( $selected_methods, array_map( 'strtoupper', $selected_methods ) );
+	/**
+	 * The Default Method `<select>`, offering only the methods currently checked.
+	 *
+	 * @param array<string,array{checked?:bool,selected_account?:string}> $cfg Saved per-method configuration.
+	 */
+	private static function render_default_method_select( array $cfg ): void {
+		$checked_methods = array_keys( array_filter( $cfg, fn( $method ) => ! empty( $method['checked'] ) ) );
+		$options         = array( '' => '' ) + array_combine( $checked_methods, array_map( 'strtoupper', $checked_methods ) );
 		?>
 		<div class="os-row-12">
 			<?php
@@ -295,7 +325,10 @@ class IfthenpayAdminFormRenderer
 		<?php
 	}
 
-	public static function render_others_configuration() {
+	/**
+	 * The plain description field shown at the bottom of the section.
+	 */
+	public static function render_others_configuration(): void {
 		?>
 		<div class="sub-section-row">
 			<div class="sub-section-label">
@@ -311,6 +344,7 @@ class IfthenpayAdminFormRenderer
 					</div>
 				</div>
 			</div>
+		</div>
 		<?php
 	}
 }

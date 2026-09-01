@@ -1,5 +1,4 @@
 class LatepointPaymentsIfthenpayAdmin {
-	// Selectors
 	static SELECTORS = {
 		gatewaySelect: '.ifthenpay-gateway-select',
 		validateButton: '.validate-button',
@@ -18,43 +17,131 @@ class LatepointPaymentsIfthenpayAdmin {
 	}
 
 	initEvents() {
-		const doc = jQuery(document);
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 
-		doc.on(
-			'click',
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.validateButton,
-			(e) => this.handleKeyValidation(e)
-		)
-			.on(
-				'change',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect,
-				(e) => this.onGatewayChange(e)
-			)
-			// LatePoint's own admin.js already makes clicking a `.os-toggler` flip it — this just
-			// reacts to that, via the custom event it fires on the toggler itself either way.
-			.on(
-				'ostoggler:toggle',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.methodToggler,
-				() => {
-					this.updateDefaultMethods();
-					this.updateConfig();
-				}
-			)
-			.on(
-				'change',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.defaultMethodSelect,
-				() => this.updateConfig()
-			)
-			.on(
-				'click',
-				LatepointPaymentsIfthenpayAdmin.SELECTORS.activateLink,
-				(e) => this.handleActivate(e)
-			);
+		jQuery(document)
+			.on('click', S.validateButton, (e) => this.handleKeyValidation(e))
+			.on('change', S.gatewaySelect, (e) => this.onGatewayChange(e))
+			// LatePoint's own admin script already makes clicking a `.os-toggler` flip its
+			// on/off class and fire this event — this just reacts to that.
+			.on('ostoggler:toggle', S.methodToggler, () => {
+				this.updateDefaultMethodOptions();
+				this.updateMethodsConfig();
+			})
+			.on('change', S.defaultMethodSelect, () => this.updateMethodsConfig())
+			.on('click', S.activateLink, (e) => this.handleActivate(e));
 	}
 
-	// LatePoint's own click handler only flips the `.os-toggler`'s on/off class and its paired
-	// hidden input's value — there is no API to set that state programmatically (e.g. when a
-	// gateway change client-side disables a method), so this reproduces just that part.
+	serialize(params) {
+		return new URLSearchParams(params).toString();
+	}
+
+	// LatePoint's own toast notification system, used everywhere else in its admin — replaces a
+	// plain alert() with the same `.os-notifications` UI a merchant already sees for every other
+	// action on this page.
+	notify(message, type = 'success') {
+		latepoint_add_notification(message, type);
+	}
+
+	postRoute(routeName, params) {
+		return jQuery.post(latepoint_timestamped_ajaxurl(), {
+			action: 'latepoint_route_call',
+			route_name: routeName,
+			layout: 'none',
+			return_format: 'json',
+			params: this.serialize(params),
+		});
+	}
+
+	// Previews a Backoffice Key without saving it: format-checks and verifies it against
+	// ifthenpay, then replaces everything after the Backoffice Key row with the gateway/method
+	// configuration that key would produce. The actual save happens through LatePoint's own
+	// settings save, triggered separately by the merchant.
+	handleKeyValidation(event) {
+		event.preventDefault();
+
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
+		const $button = jQuery(event.currentTarget).prop('disabled', true);
+		const $keyInput = jQuery(S.backofficeKeyInput);
+		const $section = $keyInput.closest('.sub-section-row');
+
+		$button.find('.label-connect').hide();
+		$button.find('.label-connecting').show();
+
+		this.postRoute(latepoint_helper.ifthenpay_validate_key_route, {
+			backoffice_key: $keyInput.val().trim(),
+		})
+			.done((res) => {
+				$section.nextAll('.sub-section-row').remove();
+
+				if (res.status !== 'success') {
+					this.notify(res.message || latepoint_helper.ifthenpay_translations.validation_failed, 'error');
+					return;
+				}
+
+				// This preview's own dataset, not necessarily what was localized at page
+				// load — the key being previewed here hasn't been saved yet.
+				latepoint_helper.ifthenpay_accounts = res.inline_data.accounts;
+				$section.after(res.html);
+			})
+			.fail(() => this.notify(latepoint_helper.ifthenpay_translations.server_error, 'error'))
+			.always(() => {
+				$button.prop('disabled', false);
+				$button.find('.label-connecting').hide();
+				$button.find('.label-connect').show();
+			});
+	}
+
+	// Every gateway key's accounts are already available in `latepoint_helper.ifthenpay_accounts`
+	// (localized on page load, or refreshed by handleKeyValidation() above), so switching the
+	// selected gateway needs no request of its own.
+	onGatewayChange(event) {
+		const gatewayKey = jQuery(event.target).val();
+		const accounts = (latepoint_helper.ifthenpay_accounts || {})[gatewayKey] || {};
+		this.applyAccountsToMethodRows(accounts);
+	}
+
+	// A gateway key carries at most one account per method, so each row is either usable — its
+	// account key travels in a hidden field — or it isn't. The toggle switch has no native
+	// disabled state, so a method losing its account is force-switched off, not just faded by
+	// the `is-disabled` class LatePoint's own CSS already dims.
+	applyAccountsToMethodRows(accounts) {
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
+
+		jQuery(S.methodItem).each((_, row) => {
+			const $row = jQuery(row);
+			const entity = $row.data('entity');
+			const accountKey = accounts[entity];
+
+			$row.toggleClass('is-disabled', !accountKey).find(`${S.methodAccount}, ${S.methodBody}`).remove();
+
+			if (!accountKey) {
+				this.setTogglerState($row.find('.os-toggler'), false);
+				$row.append(
+					jQuery('<div>', { class: 'os-togglable-item-body ifthenpay-method-body' }).html(
+						`${latepoint_helper.ifthenpay_translations.no_accounts} <a href="#" class="ifthenpay-activate" data-entity="${entity}">${latepoint_helper.ifthenpay_translations.activate}</a>.`
+					)
+				);
+				return;
+			}
+
+			$row.append(
+				jQuery('<input>', {
+					type: 'hidden',
+					class: 'ifthenpay-method-account',
+					name: `settings[ifthenpay_payment_methods_configuration][${entity}][selected_account]`,
+					value: accountKey,
+				})
+			);
+		});
+
+		this.updateDefaultMethodOptions();
+		this.updateMethodsConfig();
+	}
+
+	// LatePoint's own click handler only flips a toggler's on/off class and its paired hidden
+	// input's value on click — there's no API to set that state programmatically, which is
+	// needed here when a gateway change disables a method client-side.
 	setTogglerState($toggler, isOn) {
 		$toggler.toggleClass('on', isOn).toggleClass('off', !isOn);
 		const hiddenId = $toggler.data('for');
@@ -63,222 +150,77 @@ class LatepointPaymentsIfthenpayAdmin {
 		}
 	}
 
-	serialize(params) {
-		return new URLSearchParams(params).toString();
-	}
-
-	handleKeyValidation(event) {
-		event.preventDefault();
-
-		const $btn = jQuery(event.currentTarget).prop('disabled', true);
-		const $keyInput = jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.backofficeKeyInput
-		);
-		const backofficeKey = $keyInput.val().trim();
-		const $section = $keyInput.closest('.sub-section-row');
-
-		$btn.find('.label-connect').hide();
-		$btn.find('.label-connecting').show();
-
-		const payload = {
-			action: 'latepoint_route_call',
-			route_name: latepoint_helper.ifthenpay_validate_key_route,
-			layout: 'none',
-			return_format: 'json',
-			params: this.serialize({
-				backoffice_key: backofficeKey,
-			}),
-		};
-
-		jQuery
-			.post(
-				latepoint_timestamped_ajaxurl(),
-				payload,
-				(res) => {
-					$section.nextAll('.sub-section-row').remove();
-					if (res.status === 'success') {
-						// This preview's own dataset — not necessarily what was localized at
-						// page load, since the key being previewed here has not been saved yet.
-						latepoint_helper.ifthenpay_accounts = res.inline_data.accounts;
-						$section.after(res.html);
-					} else {
-						alert(res.message || 'Validation failed.');
-					}
-				},
-				'json'
-			)
-			.fail(() => alert('Server error.'))
-			.always(() => {
-				$btn.prop('disabled', false);
-				$btn.find('.label-connecting').hide();
-				$btn.find('.label-connect').show();
-			});
-	}
-
-	// Every gateway's accounts are already in `latepoint_helper.ifthenpay_accounts` (localized in
-	// full, or refreshed by handleKeyValidation() above) — no AJAX round trip per gateway change.
-	onGatewayChange(event) {
-		const gatewayKey = jQuery(event.target).val();
-		const accounts =
-			(latepoint_helper.ifthenpay_accounts || {})[gatewayKey] || {};
-		this.applyAccountsForGateway(accounts);
-	}
-
-	// A gateway record has at most one account per method (no list to choose from), so a method
-	// is either available — its account key travels in a hidden field — or it isn't. `is-disabled`
-	// is LatePoint's own class (fades the row via native CSS); the toggler itself has no native
-	// disabled state, so a method losing its account is force-switched off, not just greyed out.
-	applyAccountsForGateway(accounts) {
-		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
-			(_, el) => {
-				const $item = jQuery(el);
-				const entity = $item.data('entity');
-				const accountKey = accounts[entity];
-				const $toggler = $item.find('.os-toggler');
-
-				$item
-					.toggleClass('is-disabled', !accountKey)
-					.find(
-						`${LatepointPaymentsIfthenpayAdmin.SELECTORS.methodAccount}, ${LatepointPaymentsIfthenpayAdmin.SELECTORS.methodBody}`
-					)
-					.remove();
-
-				if (!accountKey) {
-					this.setTogglerState($toggler, false);
-					$item.append(
-						jQuery('<div>', {
-							class: 'os-togglable-item-body ifthenpay-method-body',
-						}).html(
-							`${latepoint_helper.ifthenpay_translations.no_accounts} <a href="#" class="ifthenpay-activate" data-entity="${entity}">${latepoint_helper.ifthenpay_translations.activate}</a>.`
-						)
-					);
-					return;
-				}
-
-				$item.append(
-					jQuery('<input>', {
-						type: 'hidden',
-						class: 'ifthenpay-method-account',
-						name: `settings[ifthenpay_payment_methods_configuration][${entity}][selected_account]`,
-						value: accountKey,
-					})
-				);
-			}
-		);
-
-		this.updateDefaultMethods();
-		this.updateConfig();
-	}
-
-	updateDefaultMethods() {
-		const $defaultSelect = jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.defaultMethodSelect
-		);
-		if (!$defaultSelect.length) {
+	// The Default Method dropdown can only offer methods that are actually switched on.
+	updateDefaultMethodOptions() {
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
+		const $select = jQuery(S.defaultMethodSelect);
+		if (!$select.length) {
 			return;
 		}
 
-		const selectedDefault =
-			$defaultSelect.data('selected') || $defaultSelect.val();
-		$defaultSelect.empty();
+		const previouslySelected = $select.data('selected') || $select.val();
+		const enabledEntities = jQuery(S.methodItem)
+			.filter((_, row) => jQuery(row).find('.os-toggler').hasClass('on'))
+			.map((_, row) => jQuery(row).data('entity'))
+			.get();
 
-		const enabledEntities = [];
-		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
-			function () {
-				const $item = jQuery(this);
-				if ($item.find('.os-toggler').hasClass('on')) {
-					enabledEntities.push($item.data('entity'));
-				}
-			}
-		);
+		$select.empty();
 
 		if (!enabledEntities.length) {
-			$defaultSelect.append(
+			$select.append(
 				jQuery('<option>', {
 					value: '',
-					text: latepoint_helper.ifthenpay_translations
-						.warning_default_method,
+					text: latepoint_helper.ifthenpay_translations.warning_default_method,
 					disabled: true,
 					selected: true,
 				})
 			);
-		} else {
-			enabledEntities.forEach((entity) => {
-				$defaultSelect.append(
-					jQuery('<option>', {
-						value: entity,
-						text: entity,
-						selected: entity === selectedDefault,
-					})
-				);
-			});
+			return;
 		}
+
+		enabledEntities.forEach((entity) => {
+			$select.append(
+				jQuery('<option>', {
+					value: entity,
+					text: entity,
+					selected: entity === previouslySelected,
+				})
+			);
+		});
 	}
 
-	updateConfig() {
+	// Serializes every method row's current state into the one hidden field LatePoint's settings
+	// save actually reads.
+	updateMethodsConfig() {
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 		const config = {};
 
-		jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.methodItem).each(
-			function () {
-				const $item = jQuery(this);
-				const entity = $item.data('entity');
-				const $account = $item.find(
-					LatepointPaymentsIfthenpayAdmin.SELECTORS.methodAccount
-				);
+		jQuery(S.methodItem).each((_, row) => {
+			const $row = jQuery(row);
+			config[$row.data('entity')] = {
+				checked: $row.find('.os-toggler').hasClass('on'),
+				selected_account: $row.find(S.methodAccount).val() || '',
+			};
+		});
 
-				config[entity] = {
-					checked: $item.find('.os-toggler').hasClass('on'),
-					selected_account: $account.val() || '',
-				};
-			}
-		);
-
-		jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.methodsConfigInput
-		).val(JSON.stringify(config));
+		jQuery(S.methodsConfigInput).val(JSON.stringify(config));
 	}
 
+	// Emails ifthenpay support asking them to activate a method for the currently selected
+	// gateway key — this doesn't change anything locally, so nothing here needs to update the
+	// method row itself.
 	handleActivate(event) {
 		event.preventDefault();
-		const $link = jQuery(event.currentTarget);
-		const entity = $link.data('entity');
-		const gatewayKey = jQuery(
-			LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect
-		).val();
+		const entity = jQuery(event.currentTarget).data('entity');
+		const gatewayKey = jQuery(LatepointPaymentsIfthenpayAdmin.SELECTORS.gatewaySelect).val();
 
-		// build your AJAX-mail payload
-		const payload = {
-			action: 'latepoint_route_call',
-			route_name: latepoint_helper.ifthenpay_activate_account_route,
-			layout: 'none',
-			return_format: 'json',
-			params: this.serialize({
-				gateway_key: gatewayKey,
-				entity,
-			}),
-		};
-
-		jQuery
-			.post(
-				latepoint_timestamped_ajaxurl(),
-				payload,
-				(res) => {
-					if (res.status === 'success') {
-						alert(
-							res.message ||
-								'Your activation request has been sent to support.'
-						);
-					} else {
-						alert(
-							res.message || 'Failed to send activation request.'
-						);
-					}
-				},
-				'json'
-			)
-			.fail(() => {
-				alert('Server error sending activation request.');
-			});
+		this.postRoute(latepoint_helper.ifthenpay_activate_account_route, { gateway_key: gatewayKey, entity })
+			.done((res) => {
+				const isSuccess = res.status === 'success';
+				const fallback = isSuccess ? latepoint_helper.ifthenpay_translations.activation_sent : latepoint_helper.ifthenpay_translations.activation_failed;
+				this.notify(res.message || fallback, isSuccess ? 'success' : 'error');
+			})
+			.fail(() => this.notify(latepoint_helper.ifthenpay_translations.server_error, 'error'));
 	}
 }
 
