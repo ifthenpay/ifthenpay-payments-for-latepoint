@@ -63,42 +63,28 @@
 	font-size: 0.85em;
 }
 
-/* `.os-column-status` (the connection/callback status pills) is real, but its color/shape rules
-   only exist scoped to `.os-table-w.os-table-compact .os-table tr td` in LatePoint's own CSS —
-   outside a table it's unstyled text. Reusing the class name and its state colors for
-   consistency, not duplicating a component that already works here; just the pill shape and this
-   section's two states (LatePoint's own icon glyphs aren't reproduced). */
-#paymentProcessorToggler_ifthenpay .os-column-status {
-	display: inline-block;
-	padding: 3px 5px;
-	border-radius: 5px;
-	line-height: 1;
-	border: 1px solid #d5d9de;
-	font-size: 0.8em;
-	font-weight: 600;
+/* "Connected" and "pending" use the exact status classes Stripe/Razorpay/PayPal's own connect
+   flow uses (.payment-processor-connect-status-wrapper .payment-processor-status-connected /
+   -charges-disabled, in LatePoint's own admin.css) — same wrapper, same class names, no CSS of
+   this plugin's own for either. Only the two states with no first-party equivalent — "couldn't
+   check" and "rejected" — get a shape+colour of this plugin's own, matching the wrapper's own
+   metrics (padding, radius, gap) and LatePoint's own grey/red palette for consistency. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-status-error,
+#paymentProcessorToggler_ifthenpay .ifthenpay-status-disabled {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 10px 5px 5px;
+	border-radius: 12px;
 }
 
-#paymentProcessorToggler_ifthenpay .os-column-status-active {
-	background-color: #c3ffd1;
-	border-color: #1ec07f;
-	color: #04724e;
-}
-
-#paymentProcessorToggler_ifthenpay .os-column-status-pending {
-	background-color: #fff0c0;
-	border-color: #cea92d;
-	color: #8c5208;
-}
-
-#paymentProcessorToggler_ifthenpay .os-column-status-error {
+#paymentProcessorToggler_ifthenpay .ifthenpay-status-error {
 	background-color: #eee;
-	border-color: #1f1f1f;
 	color: #212121;
 }
 
-#paymentProcessorToggler_ifthenpay .os-column-status-disabled {
+#paymentProcessorToggler_ifthenpay .ifthenpay-status-disabled {
 	background-color: #ffd3d3;
-	border-color: #dc4646;
 	color: #7e1010;
 }
 

@@ -69,8 +69,12 @@ class IfthenpayAdminFormRenderer
 	 * Backoffice Key already passed the remote check, so only these three render here — the
 	 * fourth, "Rejected", is what the "Connect" preview shows for a key that failed to save.
 	 *
-	 * Reuses LatePoint's own `.os-column-status` status-pill classes (see any bookings list)
-	 * instead of introducing new CSS.
+	 * `active`/`pending` reuse Stripe/Razorpay/PayPal's own connect-status markup verbatim
+	 * (`.payment-processor-connect-status-wrapper` + `.payment-processor-status-connected` /
+	 * `-charges-disabled`) — same wrapper class, so LatePoint's existing CSS colours them with no
+	 * CSS of this plugin's own. `error` has no first-party equivalent (every native state there
+	 * assumes a definite connected/action-needed answer, not "couldn't find out"); see
+	 * render_status_pill().
 	 *
 	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The result of IfthenpayLpGatewayDataset::get().
 	 */
@@ -106,20 +110,30 @@ class IfthenpayAdminFormRenderer
 	}
 
 	/**
-	 * One `.os-column-status` pill, matching the state colours already used across LatePoint's
-	 * own admin (e.g. booking status columns): green for `active`, amber for `pending`, grey for
-	 * `error`, red for `disabled` (the one genuinely styled as an alert — 003 T-10).
+	 * `active` → `.payment-processor-status-connected` (green), `pending` → `-charges-disabled`
+	 * (amber) — the exact classes Stripe/Razorpay/PayPal's own connect status uses, inside the
+	 * same `.payment-processor-connect-status-wrapper` their CSS scopes the colour to; nothing
+	 * about either is ifthenpay-specific. `error`/`disabled` fall back to a small local class this
+	 * plugin does own — no first-party badge exists for "couldn't find out" or "rejected" outside
+	 * a data table (`.os-column-status`, which needs one, per contracts/api.md's UI note).
 	 *
 	 * @param string $state   One of `active`, `pending`, `error`, `disabled`.
 	 * @param string $message Already-escaped text.
 	 */
 	private static function render_status_pill( string $state, string $message ): void {
+		$native_class = array(
+			'active'  => 'payment-processor-status-connected',
+			'pending' => 'payment-processor-status-charges-disabled',
+		);
+		$class = $native_class[ $state ] ?? 'ifthenpay-status-' . $state;
 		?>
-		<p>
-			<span class="os-column-status os-column-status-<?php echo esc_attr( $state ); ?>">
-				<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
-			</span>
-		</p>
+		<div class="payment-processor-connect-status-wrapper">
+			<div class="<?php echo esc_attr( $class ); ?>">
+				<span>
+					<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
+				</span>
+			</div>
+		</div>
 		<?php
 	}
 

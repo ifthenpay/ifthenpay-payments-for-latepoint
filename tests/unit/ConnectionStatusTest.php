@@ -56,8 +56,8 @@ final class ConnectionStatusTest extends TestCase {
 		IfthenpayAdminFormRenderer::render_connection_status( null );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'os-column-status-error', $html );
-		$this->assertStringNotContainsString( 'os-column-status-disabled', $html );
+		$this->assertStringContainsString( 'ifthenpay-status-error', $html );
+		$this->assertStringNotContainsString( 'ifthenpay-status-disabled', $html );
 	}
 
 	/**
@@ -74,7 +74,7 @@ final class ConnectionStatusTest extends TestCase {
 		);
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'os-column-status-pending', $html );
+		$this->assertStringContainsString( 'payment-processor-status-charges-disabled', $html );
 		$this->assertStringContainsString( 'ifthenpay-onboarding-steps', $html );
 	}
 
@@ -92,7 +92,7 @@ final class ConnectionStatusTest extends TestCase {
 		);
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'os-column-status-active', $html );
+		$this->assertStringContainsString( 'payment-processor-status-connected', $html );
 		$this->assertStringNotContainsString( 'ifthenpay-onboarding-steps', $html );
 	}
 
@@ -141,7 +141,7 @@ final class ConnectionStatusTest extends TestCase {
 		);
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'os-column-status-error', $html );
+		$this->assertStringContainsString( 'ifthenpay-status-error', $html );
 		$this->assertStringContainsString( 'ifthenpay did not accept this callback URL.', $html );
 	}
 }
