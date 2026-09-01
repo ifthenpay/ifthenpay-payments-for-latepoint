@@ -47,15 +47,25 @@ All settings are made in LatePoint. The plugin is built so store owners can mana
 
 == Frequently Asked Questions ==
 
-= What do I need to get started? =  
-* A valid ifthenpay account (register at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/))  
-* LatePoint plugin active  
+= What do I need to get started? =
+* A valid ifthenpay account (register at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/))
+* LatePoint plugin active
 * WordPress 6.5+ and PHP 7.4+
 
-= How do I configure it? =  
-1. Go to **LatePoint → Settings → Payments**.  
-2. Enable the ifthenpay gateway, enter your Backoffice Key & Gateway Key, click **Sync**.  
-3. Select the payment methods (including invoices) you want to offer.
+= How do I get my Backoffice Key? =
+Your Backoffice Key is issued by ifthenpay once you sign up and your contract is validated at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/) — it's the same key used by ifthenpay's other website and app integrations. If you've already signed up but don't have it to hand, [ifthenpay support](https://helpdesk.ifthenpay.com) can resend it.
+
+= How do I get a Gateway Key for LatePoint? =
+A Gateway Key must be provisioned specifically for the **LatePoint** context before this plugin can use it — a Gateway Key created for a different platform (e.g. a generic website or another CMS) will not appear here, even with a valid Backoffice Key. Ask [ifthenpay support](https://helpdesk.ifthenpay.com) to provision a Gateway Key for LatePoint on your account, then pick which payment methods (Multibanco, MB WAY, Payshop, cards, …) should be enabled on it — they'll guide you through activation for each. Once that's done, the plugin's settings page picks it up automatically; there is nothing to enter by hand beyond the Backoffice Key itself.
+
+= How do I configure it? =
+1. Go to **LatePoint → Settings → Payments**.
+2. Enter your Backoffice Key and click **Connect** — this checks it against ifthenpay and shows your available Gateway Key(s).
+3. Pick a Gateway Key, select the payment methods (including invoices) you want to offer, then save.
+4. Save again any time you change the Gateway Key — this also re-registers the payment notification (callback) URL ifthenpay uses to confirm a payment automatically; see below.
+
+= Does ifthenpay need access back into my site? =
+Yes — after a Gateway Key is saved, the plugin registers a payment notification URL with ifthenpay (`https://yoursite.com/wp-json/ifthenpay/v1/callback`) so a payment can be confirmed automatically once it's completed. This happens automatically; there's nothing to copy or paste. If your server sits behind a firewall, WAF, or security plugin that blocks unfamiliar inbound requests, allow POST requests to that URL path through — otherwise a completed payment may not be confirmed automatically. If registration itself fails (for example, your site isn't reachable from the internet yet), the settings page shows which Gateway Key failed and why, without needing to re-enter anything.
 
 = How does the payment process work? =  
 Payments are processed securely through ifthenpay's pay-by-link system. Customers select a payment method during booking, and a secure payment page opens for completion. Once paid, the status is verified and the booking is confirmed automatically.
