@@ -81,6 +81,34 @@ if ( ! class_exists( 'OsPaymentsIfthenpayController' ) ) :
 		}
 
 		/**
+		 * Clears every setting derived from the Backoffice Key — the key itself, the selected
+		 * Gateway Key, the enabled payment methods, and the Default Method — so "Disconnect"
+		 * actually starts the merchant over instead of leaving the previous configuration sitting
+		 * in the database, invisible until the next key happens to reuse the same method codes.
+		 *
+		 * @return void Sends JSON with status and message.
+		 */
+		public function disconnect() {
+			foreach (
+				array(
+					'ifthenpay_backoffice_key',
+					'ifthenpay_gateway_key',
+					'ifthenpay_payment_methods_configuration',
+					'ifthenpay_default_method',
+				) as $setting_name
+			) {
+				OsSettingsHelper::remove_setting_by_name( $setting_name );
+			}
+
+			$this->send_json(
+				array(
+					'status'  => LATEPOINT_STATUS_SUCCESS,
+					'message' => __( 'Disconnected. The Backoffice Key and everything configured under it have been cleared.', 'ifthenpay-payments-for-latepoint' ),
+				)
+			);
+		}
+
+		/**
 		 * Public endpoint for “ORDER” checkout.
 		 */
 		public function get_order_ifthenpay_options() {

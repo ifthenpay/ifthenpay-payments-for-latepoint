@@ -28,6 +28,13 @@
 	flex-direction: column;
 }
 
+/* The Connect/Disconnect button is one control, not two — only the label matching its current
+   `data-mode` shows. */
+#paymentProcessorToggler_ifthenpay .validate-button.mode-connect .label-disconnect,
+#paymentProcessorToggler_ifthenpay .validate-button.mode-disconnect .label-connect {
+	display: none;
+}
+
 /* A method row's label holds an icon plus two lines of text (name+code, and — only while
    disabled — a "No accounts" note) with no native layout for that combination; `flex-wrap` lets
    the note drop to its own line on a narrow screen instead of forcing horizontal scroll. The icon
@@ -61,27 +68,19 @@
 	display: inline;
 }
 
-/* "Connected" and "pending" use the exact status classes Stripe/Razorpay/PayPal's own connect
-   flow uses (.payment-processor-connect-status-wrapper .payment-processor-status-connected /
-   -charges-disabled, in LatePoint's own admin.css) — same wrapper, same class names, no CSS of
-   this plugin's own for either. Only the two states with no first-party equivalent — "couldn't
-   check" and "rejected" — get a shape+colour of this plugin's own, matching the wrapper's own
-   metrics (padding, radius, gap) and LatePoint's own grey/red palette for consistency. */
-#paymentProcessorToggler_ifthenpay .ifthenpay-status-error,
-#paymentProcessorToggler_ifthenpay .ifthenpay-status-disabled {
+/* "pending" uses the exact status class Stripe/Razorpay/PayPal's own connect flow uses for
+   "connected, action still needed" (.payment-processor-connect-status-wrapper
+   .payment-processor-status-charges-disabled, in LatePoint's own admin.css) — same wrapper, same
+   class name, no CSS of this plugin's own. Only "couldn't check" has no first-party equivalent —
+   every native state there assumes a definite answer — so it gets a shape+colour of this plugin's
+   own, matching the wrapper's own metrics (padding, radius, gap) and LatePoint's own grey palette
+   for consistency. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-status-error {
 	display: flex;
 	align-items: center;
 	gap: 5px;
 	padding: 5px 10px 5px 5px;
 	border-radius: 12px;
-}
-
-#paymentProcessorToggler_ifthenpay .ifthenpay-status-error {
 	background-color: #eee;
 	color: #212121;
-}
-
-#paymentProcessorToggler_ifthenpay .ifthenpay-status-disabled {
-	background-color: #ffd3d3;
-	color: #7e1010;
 }

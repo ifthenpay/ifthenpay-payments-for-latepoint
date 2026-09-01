@@ -27,6 +27,11 @@ class IfthenpayAdminFormRenderer {
 	 * @param string $backoffice_key Current, already-decrypted setting value.
 	 */
 	public static function render_backoffice_configuration( string $backoffice_key ): void {
+		// A saved key already says "connected" as plainly as a button can — no separate status
+		// pill needed for that state (see render_connection_status()). The button doubles as the
+		// disconnect action so there is one control for the whole relationship, not a button plus
+		// a status message that both say the same thing.
+		$mode = '' === $backoffice_key ? 'connect' : 'disconnect';
 		?>
 		<div class="sub-section-row">
 			<div class="sub-section-label">
@@ -53,9 +58,13 @@ class IfthenpayAdminFormRenderer {
 							<button
 								type="button"
 								id="validate_button"
-								class="button validate-button os-form-control">
+								class="button validate-button os-form-control mode-<?php echo esc_attr( $mode ); ?>"
+								data-mode="<?php echo esc_attr( $mode ); ?>">
 								<span class="label-connect">
 									<?php echo esc_html__( 'Connect', 'ifthenpay-payments-for-latepoint' ); ?>
+								</span>
+								<span class="label-disconnect">
+									<?php echo esc_html__( 'Disconnect', 'ifthenpay-payments-for-latepoint' ); ?>
 								</span>
 								<span class="label-connecting" style="display: none;">
 									<?php echo esc_html__( 'Connecting...', 'ifthenpay-payments-for-latepoint' ); ?>
@@ -74,8 +83,9 @@ class IfthenpayAdminFormRenderer {
 	 * only right after "Connect" — so a key revoked on ifthenpay's side, or gateway keys
 	 * added/removed there, shows up without the merchant touching this page. A rejected key can
 	 * never reach this method: the save itself is blocked before a bad key is ever stored, so a
-	 * saved key has already passed the remote check. "Rejected" is a state only the "Connect"
-	 * preview can show, for a key that failed to save.
+	 * saved key has already passed the remote check. Silent when the key is fully usable — the
+	 * "Disconnect" button already says that plainly; this is only for the two states it can't say
+	 * on its own, "we don't know" and "connected but nothing to configure yet".
 	 *
 	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The gateway dataset for this Backoffice Key, or null if it could not be fetched.
 	 */
@@ -104,10 +114,7 @@ class IfthenpayAdminFormRenderer {
 				?>
 			</p>
 			<?php
-			return;
 		}
-
-		self::render_status_pill( 'active', esc_html__( 'Connected', 'ifthenpay-payments-for-latepoint' ) );
 	}
 
 	/**
@@ -133,19 +140,20 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * `active` and `pending` render with the exact status classes LatePoint's own Stripe/Razorpay/
-	 * PayPal connect flows use (`.payment-processor-connect-status-wrapper` +
-	 * `.payment-processor-status-connected` / `-charges-disabled`) — the same markup, colored
-	 * entirely by LatePoint's own CSS. `error` has no first-party equivalent, since every native
-	 * state there assumes a definite connected/action-needed answer rather than "couldn't find
-	 * out" — it falls back to a small class this plugin owns (see the stylesheet).
+	 * `pending` renders with the exact status class LatePoint's own Stripe/Razorpay/PayPal connect
+	 * flows use for "connected, action still needed" (`.payment-processor-connect-status-wrapper` +
+	 * `.payment-processor-status-charges-disabled`) — the same markup, colored entirely by
+	 * LatePoint's own CSS. `error` has no first-party equivalent, since every native state there
+	 * assumes a definite connected/action-needed answer rather than "couldn't find out" — it falls
+	 * back to a small class this plugin owns (see the stylesheet). There is no `active` state here:
+	 * a fully usable key is already said plainly by the "Disconnect" button, so nothing needs to
+	 * say it again.
 	 *
-	 * @param string $state   One of `active`, `pending`, `error`.
+	 * @param string $state   One of `pending`, `error`.
 	 * @param string $message Already-escaped text.
 	 */
 	private static function render_status_pill( string $state, string $message ): void {
 		$native_class = array(
-			'active'  => 'payment-processor-status-connected',
 			'pending' => 'payment-processor-status-charges-disabled',
 		);
 		$class        = $native_class[ $state ] ?? 'ifthenpay-status-' . $state;

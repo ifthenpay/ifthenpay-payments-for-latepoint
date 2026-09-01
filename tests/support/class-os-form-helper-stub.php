@@ -33,6 +33,16 @@ if ( ! class_exists( 'OsFormHelper' ) ) {
 		}
 
 		/**
+		 * A fixed placeholder — the real field markup is LatePoint's own concern.
+		 *
+		 * @param mixed ...$args Unused; kept only so call sites don't need special-casing.
+		 * @phpstan-ignore missingType.parameter (deliberately untyped variadic stand-in for a LatePoint core signature this plugin doesn't own)
+		 */
+		public static function password_field( ...$args ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- fixed placeholder; the real signature's args are LatePoint's own concern, not reproduced here.
+			return '<input type="password" />';
+		}
+
+		/**
 		 * Reproduces just enough of the real checkbox_field() (LatePoint core,
 		 * lib/helpers/form_helper.php) for a test to see the value, checked state, disabled
 		 * state, and label HTML a renderer built — the label is passed through as-is, matching

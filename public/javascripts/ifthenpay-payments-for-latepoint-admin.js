@@ -17,7 +17,7 @@ class LatepointPaymentsIfthenpayAdmin {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 
 		jQuery(document)
-			.on('click', S.validateButton, (e) => this.handleKeyValidation(e))
+			.on('click', S.validateButton, (e) => this.handleConnectButtonClick(e))
 			.on('change', S.gatewaySelect, (e) => this.onGatewayChange(e))
 			.on('change', S.methodCheckbox, (e) => this.onMethodCheckboxChange(e))
 			.on('click', S.activateLink, (e) => this.handleActivate(e));
@@ -44,6 +44,17 @@ class LatepointPaymentsIfthenpayAdmin {
 		});
 	}
 
+	// The button is one control for the whole relationship: "Connect" while nothing is saved yet,
+	// "Disconnect" once a Backoffice Key is — its own data-mode (set server-side, flipped
+	// client-side by a successful disconnect) says which action a click means right now.
+	handleConnectButtonClick(event) {
+		if (jQuery(event.currentTarget).data('mode') === 'disconnect') {
+			this.handleDisconnect(event);
+		} else {
+			this.handleKeyValidation(event);
+		}
+	}
+
 	// Previews a Backoffice Key without saving it: format-checks and verifies it against
 	// ifthenpay, then replaces everything after the Backoffice Key row with the gateway/method
 	// configuration that key would produce. The actual save happens through LatePoint's own
@@ -63,7 +74,12 @@ class LatepointPaymentsIfthenpayAdmin {
 			backoffice_key: $keyInput.val().trim(),
 		})
 			.done((res) => {
-				$section.nextAll('.sub-section-row').remove();
+				// Everything the previous preview (or the page's own initial render) put after
+				// the Backoffice Key row, not only its `.sub-section-row`s — the connection
+				// status pill and "no gateway keys yet" note are both plain siblings of their
+				// own, and `res.html` on success rebuilds all of it fresh; left in place, each
+				// "Connect" click would stack another status pill on top of the last one.
+				$section.nextAll().remove();
 
 				if (res.status !== 'success') {
 					this.notify(res.message || latepoint_helper.ifthenpay_translations.validation_failed, 'error');
@@ -81,6 +97,37 @@ class LatepointPaymentsIfthenpayAdmin {
 				$button.find('.label-connecting').hide();
 				$button.find('.label-connect').show();
 			});
+	}
+
+	// Unlike "Connect", this really does save immediately — it clears the Backoffice Key and
+	// everything configured under it server-side (see OsPaymentsIfthenpayController::disconnect()),
+	// not only this form's own inputs, so there is nothing stale left for a later "Connect" to
+	// silently inherit. A plain confirm() is enough for a same-page, immediately-visible action.
+	handleDisconnect(event) {
+		event.preventDefault();
+
+		if (!window.confirm(latepoint_helper.ifthenpay_translations.confirm_disconnect)) {
+			return;
+		}
+
+		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
+		const $button = jQuery(event.currentTarget).prop('disabled', true);
+		const $section = jQuery(S.backofficeKeyInput).closest('.sub-section-row');
+
+		this.postRoute(latepoint_helper.ifthenpay_disconnect_route, {})
+			.done((res) => {
+				if (res.status !== 'success') {
+					this.notify(res.message || latepoint_helper.ifthenpay_translations.server_error, 'error');
+					return;
+				}
+
+				jQuery(S.backofficeKeyInput).val('');
+				$section.nextAll().remove();
+				$button.data('mode', 'connect').removeClass('mode-disconnect').addClass('mode-connect');
+				this.notify(res.message, 'success');
+			})
+			.fail(() => this.notify(latepoint_helper.ifthenpay_translations.server_error, 'error'))
+			.always(() => $button.prop('disabled', false));
 	}
 
 	// Every gateway key's accounts are already available in `latepoint_helper.ifthenpay_accounts`

@@ -322,6 +322,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		public function localized_vars_for_admin( $localized_vars ) {
 			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'validate_key' );
+			$localized_vars['ifthenpay_disconnect_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'disconnect' );
 			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay', 'activate_account_by_entity' );
 
 			// The full {gatewayKey: {methodKey: accountKey}} map, every gateway at once — the
@@ -336,13 +337,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_gateway_selected'] = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 
 			$localized_vars['ifthenpay_translations'] = array(
-				'no_accounts'       => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
-				'activate'          => __( 'Activate', 'ifthenpay-payments-for-latepoint' ),
-				'account_key'       => __( 'Account key', 'ifthenpay-payments-for-latepoint' ),
-				'validation_failed' => __( 'Validation failed.', 'ifthenpay-payments-for-latepoint' ),
-				'server_error'      => __( 'Server error. Please try again.', 'ifthenpay-payments-for-latepoint' ),
-				'activation_sent'   => __( 'Your activation request has been sent to support.', 'ifthenpay-payments-for-latepoint' ),
-				'activation_failed' => __( 'Failed to send activation request.', 'ifthenpay-payments-for-latepoint' ),
+				'no_accounts'        => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
+				'activate'           => __( 'Activate', 'ifthenpay-payments-for-latepoint' ),
+				'validation_failed'  => __( 'Validation failed.', 'ifthenpay-payments-for-latepoint' ),
+				'server_error'       => __( 'Server error. Please try again.', 'ifthenpay-payments-for-latepoint' ),
+				'activation_sent'    => __( 'Your activation request has been sent to support.', 'ifthenpay-payments-for-latepoint' ),
+				'activation_failed'  => __( 'Failed to send activation request.', 'ifthenpay-payments-for-latepoint' ),
+				'confirm_disconnect' => __( 'Disconnect this Backoffice Key? This clears the Gateway Key and Payment Methods configured under it right away.', 'ifthenpay-payments-for-latepoint' ),
 			);
 
 			return $localized_vars;
