@@ -1,36 +1,23 @@
 /* `.sub-section-row` / `.sub-section-label` / `.sub-section-content` (Backoffice/Payments/Other
-   Configuration) already get their full two-column layout, borders and h3 styling for free —
-   `.os-form-w .sub-section-row` in LatePoint's own admin.css, and the settings page wraps every
-   processor's body in an `.os-form-w`. Nothing here re-declares any of that. */
+   Configuration), the `.os-row`/`.os-col-N` grid, and every field below are all native LatePoint
+   components — `.os-form-w .sub-section-row` and `.os-form-group .os-form-control` in LatePoint's
+   own admin.css, and the settings page wraps every processor's body in an `.os-form-w`. Payment
+   methods are `OsFormHelper::checkbox_field()`, LatePoint's own real checkbox component: its
+   wrapper already renders as a bordered, rounded, hover-highlighted row and already spaces
+   consecutive rows apart (the base `.os-form-group` bottom margin) — nothing here re-declares any
+   of that. What follows is only the handful of things with no native equivalent at all. */
 
-/* Genuinely custom: a nested label ("Payment Methods") one level deeper than a sub-section-row's
-   own h3, with no native equivalent at that nesting level. */
+/* A label ("Payment Methods") one nesting level deeper than a sub-section-row's own h3. */
 #paymentProcessorToggler_ifthenpay label.ifthenpay-section-label {
 	display: block;
 	margin: 1rem 0 0.5rem;
 	font-weight: 600;
 }
 
-/* The Connect button needs to align with the Backoffice Key field's height — native
-   `.os-form-group .os-form-control` sizing is the same generous size on every field, which reads
-   fine for a single input but leaves an input+button pair visually mismatched. Deliberately
-   compact, not a wholesale re-style. */
-#paymentProcessorToggler_ifthenpay input,
-#paymentProcessorToggler_ifthenpay select {
-	height: 2.25rem;
-	font-size: 0.875rem;
-}
-
-#paymentProcessorToggler_ifthenpay .validate-button {
-	padding: 0.45rem 1rem;
-	height: 2.25rem;
-	font-size: 0.875rem;
-	line-height: 1;
-	width: 100%;
-}
-
-/* .os-row already is display:flex;flex-wrap:wrap natively — only the gap and baseline alignment
-   (button next to field, not stretched to match its height) are this section's own. */
+/* `.os-col-N` carries no gutter of its own — the negative margin on `.os-row` exists only to
+   offset the section's own padding, not to space columns apart — so the Backoffice Key field and
+   its Connect button need their own gap. Both stack label-then-control in a column so the two
+   controls' bottom edges line up regardless of label length. */
 #paymentProcessorToggler_ifthenpay .sub-section-content > .os-row {
 	gap: 1rem;
 	align-items: flex-end;
@@ -41,26 +28,37 @@
 	flex-direction: column;
 }
 
-#paymentProcessorToggler_ifthenpay select.ifthenpay-gateway-select {
-	margin-top: 0;
-	width: 100% !important;
+/* A method row's label holds an icon plus two lines of text (name+code, and — only while
+   disabled — a "No accounts" note) with no native layout for that combination; `flex-wrap` lets
+   the note drop to its own line on a narrow screen instead of forcing horizontal scroll. The icon
+   has no native size on its own, and the code/note are secondary text that should read quieter
+   than the method's own name. The note is always in the markup, shown only while `.is-disabled`
+   is set (server-render, or the admin script on a gateway change), so nothing has to insert or
+   remove it. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-content {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.5rem;
 }
 
-/* The method list itself (icon, name, toggle switch) is LatePoint's own .os-togglable-item-w /
-   os-toggler-w / os-toggler component — the same one used one level up for the processor list —
-   so it needs no styling of its own. The only gap native CSS doesn't cover: the toggler has no
-   disabled state, so a method with no account for the selected gateway is locked from being
-   clicked rather than just dimmed by .is-disabled. */
-#paymentProcessorToggler_ifthenpay .ifthenpay-method-item.is-disabled .os-toggler {
-	pointer-events: none;
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-icon {
+	height: 1.25rem;
+	width: auto;
 }
 
-/* The method's raw ifthenpay code (MB, MBWAY, …) next to its display name — no native
-   equivalent, LatePoint's own $color-faded used for consistency with muted text elsewhere. */
-#paymentProcessorToggler_ifthenpay .ifthenpay-method-code {
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-code,
+#paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
 	color: #788291;
-	font-weight: 400;
 	font-size: 0.85em;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
+	display: none;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-item.is-disabled .ifthenpay-no-accounts {
+	display: inline;
 }
 
 /* "Connected" and "pending" use the exact status classes Stripe/Razorpay/PayPal's own connect
@@ -86,11 +84,4 @@
 #paymentProcessorToggler_ifthenpay .ifthenpay-status-disabled {
 	background-color: #ffd3d3;
 	color: #7e1010;
-}
-
-@media (width <= 768px) {
-	#paymentProcessorToggler_ifthenpay .ifthenpay-default-method {
-		width: 100% !important;
-		min-width: 0;
-	}
 }

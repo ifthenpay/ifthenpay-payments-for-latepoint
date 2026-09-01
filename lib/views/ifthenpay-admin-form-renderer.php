@@ -169,7 +169,7 @@ class IfthenpayAdminFormRenderer {
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog The full method catalog, position-sorted for display.
 	 */
 	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ): void {
-		$cfg                  = self::get_saved_method_config();
+		$enabled_methods      = self::get_saved_enabled_methods();
 		$selected_gateway_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		?>
 		<div class="sub-section-row">
@@ -177,28 +177,43 @@ class IfthenpayAdminFormRenderer {
 				<h3><?php echo esc_html__( 'Payments Configuration', 'ifthenpay-payments-for-latepoint' ); ?></h3>
 			</div>
 			<div class="sub-section-content">
-				<?php self::render_gateway_key_select( $gatewaykeys, $selected_gateway_key ); ?>
-				<?php self::render_payment_methods( $catalog, $accounts[ $selected_gateway_key ] ?? array(), $cfg ); ?>
-				<?php self::render_default_method_select( $cfg ); ?>
-				<input type="hidden"
-					id="ifthenpay_payment_methods_configuration"
-					name="settings[ifthenpay_payment_methods_configuration]"
-					value="<?php echo esc_attr( wp_json_encode( $cfg ) ); ?>" />
+				<div class="os-row">
+					<div class="os-col-6">
+						<?php self::render_gateway_key_select( $gatewaykeys, $selected_gateway_key ); ?>
+					</div>
+				</div>
+				<?php self::render_payment_methods( $catalog, $accounts[ $selected_gateway_key ] ?? array(), $enabled_methods ); ?>
+				<div class="os-row">
+					<div class="os-col-6">
+						<?php self::render_default_method_select( $enabled_methods ); ?>
+					</div>
+				</div>
 			</div>
 		</div>
 		<?php
 	}
 
 	/**
-	 * The saved per-method configuration, decoded from its stored JSON string.
+	 * The method codes currently enabled. Nothing but this list is stored — which account each
+	 * one uses is looked up live from the gateway dataset at checkout time
+	 * (`IfthenpayDataFormatter::build_accounts_string()`), the same way this page itself looks it
+	 * up for display, so there is no separate per-method value to keep in sync with it.
+	 * `OsSettingsHelper` serializes/unserializes array settings transparently, so the browser's
+	 * own `settings[ifthenpay_payment_methods_configuration][]` checkbox array needs no encoding
+	 * of its own either.
 	 *
-	 * @return array<string,array{checked?:bool,selected_account?:string}>
+	 * @return string[]
 	 */
-	private static function get_saved_method_config(): array {
-		$json = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', '{}' );
-		$cfg  = json_decode( $json, true );
+	private static function get_saved_enabled_methods(): array {
+		$enabled = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
+		if ( ! is_array( $enabled ) ) {
+			return array();
+		}
 
-		return is_array( $cfg ) ? $cfg : array();
+		// A site saved under this setting's old, nested `{code: {checked, selected_account}}`
+		// shape before this flat-array format existed — filter those entries out rather than
+		// fatal on them; the merchant simply sees nothing enabled until they re-save this page.
+		return array_values( array_filter( $enabled, 'is_string' ) );
 	}
 
 	/**
@@ -218,31 +233,32 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * One row per catalog method, built from LatePoint's own togglable-item family
-	 * (`.os-togglable-item-w` / `OsFormHelper::toggler_field()`) — the same component LatePoint
-	 * uses one level up for the processor list itself. A gateway record carries at most one
-	 * account per method, verified against ifthenpay's own API response, so there is nothing to
-	 * pick between: the toggle is enabled exactly when the selected gateway has an account for
-	 * that method, and the account key travels in a hidden field. The toggle switch has no native
-	 * disabled state, so a method with no account is locked from being clicked via CSS
-	 * (`.is-disabled .os-toggler { pointer-events: none }`), not just visually faded.
+	 * One real `OsFormHelper::checkbox_field()` per catalog method — not a card, not a toggle
+	 * switch built by hand. A gateway record carries at most one account per method, verified
+	 * against ifthenpay's own API response, so there is nothing to configure beyond on/off: a
+	 * method with no account for the selected gateway is a plain, natively-`disabled` checkbox —
+	 * browsers already exclude a disabled field from submission, so an unavailable method can
+	 * never be saved as enabled without this plugin doing anything else about it.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
-	 * @param array<string,array{checked?:bool,selected_account?:string}>                $cfg                  Saved per-method configuration.
+	 * @param string[]                                                                   $enabled_methods      Saved enabled method codes.
 	 */
-	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $cfg ): void {
-		uasort( $catalog, fn( $a, $b ) => ( $a['position'] ?? 0 ) <=> ( $b['position'] ?? 0 ) );
+	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $enabled_methods ): void {
+		uasort( $catalog, fn( $a, $b ) => $a['position'] <=> $b['position'] );
 		?>
 		<div class="os-row">
 			<div class="os-col-12">
 				<label class="ifthenpay-section-label">
 					<?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?>
 				</label>
-				<div class="os-togglable-items-w ifthenpay-methods-list">
-					<?php foreach ( $catalog as $code => $props ) : ?>
-						<?php self::render_payment_method_row( $code, $props, $accounts_for_gateway[ $code ] ?? '', ! empty( $cfg[ $code ]['checked'] ) ); ?>
-					<?php endforeach; ?>
+				<div class="ifthenpay-methods-list">
+					<?php
+					foreach ( $catalog as $code => $props ) :
+						$has_account = isset( $accounts_for_gateway[ $code ] );
+						self::render_payment_method_checkbox( $code, $props, $has_account, $has_account && in_array( $code, $enabled_methods, true ) );
+					endforeach;
+					?>
 				</div>
 			</div>
 		</div>
@@ -250,79 +266,57 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * One toggle-switch row for a single payment method.
+	 * One method's own checkbox row.
 	 *
 	 * @param string                                                       $code        The method's own ifthenpay code (MB, MBWAY, …).
 	 * @param array{position:int,image:string,tooltip:string,label:string} $props       Catalog metadata for this method.
-	 * @param string                                                       $account_key The selected gateway's account key for this method, or '' if it has none.
-	 * @param bool                                                         $saved_as_on Whether this method was saved as checked.
+	 * @param bool                                                         $has_account Whether the selected gateway has an account for this method.
+	 * @param bool                                                         $is_checked  Whether this method is currently enabled.
 	 */
-	private static function render_payment_method_row( string $code, array $props, string $account_key, bool $saved_as_on ): void {
-		$has_account = '' !== $account_key;
-		$is_checked  = $has_account && $saved_as_on;
-		?>
-		<div class="os-togglable-item-w ifthenpay-method-item<?php echo $has_account ? '' : ' is-disabled'; ?>" data-entity="<?php echo esc_attr( $code ); ?>">
-			<div class="os-togglable-item-head">
-				<div class="os-toggler-w">
-					<?php
-					// An empty label skips toggler_field()'s own wrapping group, so only clicking
-					// the switch toggles it — matching the same convention as LatePoint's own
-					// processor list, which also passes no label to its equivalent toggle.
-					echo OsFormHelper::toggler_field(
-						'ifthenpay_method_toggle_' . $code,
-						'',
-						$is_checked,
-						false,
-						'small'
-					);
-					?>
-				</div>
-				<img src="<?php echo esc_url( $props['image'] ); ?>"
-					class="os-togglable-item-logo-img"
-					alt="<?php echo esc_attr( $props['label'] ); ?>" />
-				<div class="os-togglable-item-name">
-					<?php echo esc_html( strtoupper( $props['label'] ) ); ?>
-					<span class="ifthenpay-method-code">(<?php echo esc_html( $code ); ?>)</span>
-				</div>
-			</div>
-			<?php if ( $has_account ) : ?>
-				<input type="hidden"
-					class="ifthenpay-method-account"
-					name="settings[ifthenpay_payment_methods_configuration][<?php echo esc_attr( $code ); ?>][selected_account]"
-					value="<?php echo esc_attr( $account_key ); ?>" />
-			<?php else : ?>
-				<div class="os-togglable-item-body ifthenpay-method-body">
-					<?php echo esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' ); ?>
-					<a href="#" class="ifthenpay-activate" data-entity="<?php echo esc_attr( $code ); ?>">
-						<?php echo esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ); ?>
-					</a>.
-				</div>
-			<?php endif; ?>
-		</div>
-		<?php
+	private static function render_payment_method_checkbox( string $code, array $props, bool $has_account, bool $is_checked ): void {
+		$label = '<span class="ifthenpay-method-content">'
+			. '<img src="' . esc_url( $props['image'] ) . '" class="ifthenpay-method-icon" alt="" />'
+			. '<span class="ifthenpay-method-name">' . esc_html( strtoupper( $props['label'] ) ) . ' <span class="ifthenpay-method-code">(' . esc_html( $code ) . ')</span></span>'
+			. '<span class="ifthenpay-no-accounts">' . esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' )
+			. ' <a href="#" class="ifthenpay-activate" data-entity="' . esc_attr( $code ) . '">' . esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ) . '</a>.</span>'
+			. '</span>';
+
+		$atts = array( 'id' => 'ifthenpay_method_' . strtolower( $code ) );
+		if ( ! $has_account ) {
+			// LatePoint's own OsFormHelper::atts_string_from_array() renders any key present in
+			// $atts, even a null value — the key must be entirely absent to leave the checkbox
+			// enabled, not merely set to a falsy value.
+			$atts['disabled'] = 'disabled';
+		}
+
+		echo OsFormHelper::checkbox_field(
+			'settings[ifthenpay_payment_methods_configuration][]',
+			$label,
+			$code,
+			$is_checked,
+			$atts,
+			array(
+				'class'       => 'ifthenpay-method-item' . ( $has_account ? '' : ' is-disabled' ),
+				'data-entity' => $code,
+			),
+			false // No "off" fallback value — an unchecked box simply isn't in the submitted array, same as any other checkbox list.
+		);
 	}
 
 	/**
-	 * The Default Method `<select>`, offering only the methods currently checked.
+	 * The Default Method `<select>`, offering only the methods currently enabled.
 	 *
-	 * @param array<string,array{checked?:bool,selected_account?:string}> $cfg Saved per-method configuration.
+	 * @param string[] $enabled_methods Saved enabled method codes.
 	 */
-	private static function render_default_method_select( array $cfg ): void {
-		$checked_methods = array_keys( array_filter( $cfg, fn( $method ) => ! empty( $method['checked'] ) ) );
-		$options         = array( '' => '' ) + array_combine( $checked_methods, array_map( 'strtoupper', $checked_methods ) );
-		?>
-		<div class="os-row-12">
-			<?php
-			echo OsFormHelper::select_field(
-				'settings[ifthenpay_default_method]',
-				esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
-				$options,
-				OsSettingsHelper::get_settings_value( 'ifthenpay_default_method' ),
-				array( 'class' => 'ifthenpay-default-method' )
-			);
-			?>
-		</div>
-		<?php
+	private static function render_default_method_select( array $enabled_methods ): void {
+		$options = array( '' => '' ) + array_combine( $enabled_methods, array_map( 'strtoupper', $enabled_methods ) );
+		echo OsFormHelper::select_field(
+			'settings[ifthenpay_default_method]',
+			esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
+			$options,
+			OsSettingsHelper::get_settings_value( 'ifthenpay_default_method' ),
+			array( 'class' => 'ifthenpay-default-method' )
+		);
 	}
 
 	/**
@@ -336,11 +330,14 @@ class IfthenpayAdminFormRenderer {
 			</div>
 			<div class="sub-section-content">
 				<div class="os-row">
-					<div class="os-col">
-						<label><?php echo esc_html__( 'Description', 'ifthenpay-payments-for-latepoint' ); ?></label>
-						<input type="text"
-							name="settings[ifthenpay_description]"
-							value="<?php echo esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_description' ) ); ?>" />
+					<div class="os-col-12">
+						<?php
+						echo OsFormHelper::text_field(
+							'settings[ifthenpay_description]',
+							esc_html__( 'Description', 'ifthenpay-payments-for-latepoint' ),
+							esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_description' ) )
+						);
+						?>
 					</div>
 				</div>
 			</div>

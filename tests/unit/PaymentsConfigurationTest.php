@@ -1,11 +1,10 @@
 <?php
 /**
- * Proves IfthenpayAdminFormRenderer::render_payments_configuration() (003 T-11, native-component
- * cleanup pass): a gateway record carries at most one account per method — verified live,
- * contracts/api.md operation #2 — so a method's toggle switch (LatePoint's own
- * OsFormHelper::toggler_field(), not a hand-rolled checkbox) is on exactly when the selected
- * gateway has an account for it, with the account key traveling in a hidden field rather than a
- * dropdown of choices that no longer exist.
+ * Proves IfthenpayAdminFormRenderer::render_payments_configuration(): a gateway record carries at
+ * most one account per method — verified live against ifthenpay's own API — so a method's
+ * checkbox (LatePoint's own OsFormHelper::checkbox_field()) is natively `disabled` exactly when
+ * the selected gateway has no account for it. Nothing beyond the enabled method codes is stored;
+ * IfthenpayDataFormatter looks the account key up live at checkout time instead.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -40,8 +39,6 @@ final class PaymentsConfigurationTest extends TestCase {
 				'esc_url'    => static fn( $text ) => $text,
 			)
 		);
-
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 	}
 
 	/**
@@ -53,11 +50,9 @@ final class PaymentsConfigurationTest extends TestCase {
 	}
 
 	/**
-	 * A method with an account for the selected gateway: the row is not marked disabled, its
-	 * toggle switch is off by default (nothing saved yet) but clickable, and its account key
-	 * travels in a hidden field — not a dropdown, since there is nothing left to choose between.
+	 * A method with an account for the selected gateway: its checkbox is not disabled.
 	 */
-	public function test_method_with_account_renders_enabled_row_and_hidden_account_field(): void {
+	public function test_method_with_account_renders_enabled_checkbox(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
@@ -76,9 +71,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringNotContainsString( 'is-disabled', $html );
-		$this->assertStringContainsString( 'class="ifthenpay-method-account"', $html );
-		$this->assertStringContainsString( 'value="HLP-000001"', $html );
-		$this->assertStringNotContainsString( 'ifthenpay-method-body', $html );
+		$this->assertStringNotContainsString( 'disabled', $html );
 	}
 
 	/**
@@ -108,11 +101,11 @@ final class PaymentsConfigurationTest extends TestCase {
 	}
 
 	/**
-	 * A checked, saved method renders its toggle switch already on.
+	 * A saved, enabled method renders its checkbox already checked.
 	 */
-	public function test_checked_method_renders_toggler_on(): void {
+	public function test_enabled_method_renders_checkbox_checked(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key']                   = 'GATEWAY-1';
-		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = '{"MBWAY":{"checked":true}}';
+		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MBWAY' );
 
 		ob_start();
 		IfthenpayAdminFormRenderer::render_payments_configuration(
@@ -129,16 +122,15 @@ final class PaymentsConfigurationTest extends TestCase {
 		);
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'os-toggler on', $html );
-		$this->assertStringNotContainsString( 'os-toggler off', $html );
+		$this->assertStringContainsString( 'checked', $html );
 	}
 
 	/**
-	 * A method with no account for the selected gateway: the row is marked disabled (locks the
-	 * toggle via CSS — the native toggler has no disabled state of its own), and shows "No
-	 * accounts" plus the Activate link instead of a hidden field.
+	 * A method with no account for the selected gateway: its checkbox is natively `disabled` —
+	 * browsers already exclude a disabled field from submission, so it cannot be saved as enabled
+	 * without this plugin doing anything else about it — and the "No accounts" note is present.
 	 */
-	public function test_method_without_account_renders_disabled_row_and_no_accounts_message(): void {
+	public function test_method_without_account_renders_disabled_checkbox_and_no_accounts_message(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
@@ -157,8 +149,35 @@ final class PaymentsConfigurationTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'is-disabled', $html );
-		$this->assertStringContainsString( 'ifthenpay-method-body', $html );
+		$this->assertStringContainsString( ' disabled', $html );
+		$this->assertStringContainsString( 'ifthenpay-no-accounts', $html );
 		$this->assertStringContainsString( 'No accounts.', $html );
-		$this->assertStringNotContainsString( 'class="ifthenpay-method-account"', $html );
+	}
+
+	/**
+	 * A method with no account for the selected gateway is never checked, even if it was saved as
+	 * enabled while a different gateway had an account for it — a stale "enabled" state must not
+	 * look selected for a gateway it doesn't apply to.
+	 */
+	public function test_stale_enabled_state_does_not_check_a_now_unavailable_method(): void {
+		OsSettingsHelper::$values['ifthenpay_gateway_key']                   = 'GATEWAY-1';
+		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MBWAY' );
+
+		ob_start();
+		IfthenpayAdminFormRenderer::render_payments_configuration(
+			array( 'GATEWAY-1' => 'GATEWAY-1' ),
+			array(), // No accounts at all for GATEWAY-1.
+			array(
+				'MBWAY' => array(
+					'position' => 1,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'mbway',
+				),
+			)
+		);
+		$html = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'checked', $html );
 	}
 }

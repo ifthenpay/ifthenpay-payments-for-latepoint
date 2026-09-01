@@ -4,11 +4,8 @@ class LatepointPaymentsIfthenpayAdmin {
 		validateButton: '.validate-button',
 		backofficeKeyInput: '.custom-backoffice-key',
 		methodItem: '.ifthenpay-method-item',
-		methodToggler: '.ifthenpay-method-item .os-toggler',
-		methodAccount: '.ifthenpay-method-account',
-		methodBody: '.ifthenpay-method-body',
+		methodCheckbox: '.ifthenpay-method-item input[type="checkbox"]',
 		defaultMethodSelect: '.ifthenpay-default-method',
-		methodsConfigInput: '#ifthenpay_payment_methods_configuration',
 		activateLink: '.ifthenpay-activate',
 	};
 
@@ -22,13 +19,7 @@ class LatepointPaymentsIfthenpayAdmin {
 		jQuery(document)
 			.on('click', S.validateButton, (e) => this.handleKeyValidation(e))
 			.on('change', S.gatewaySelect, (e) => this.onGatewayChange(e))
-			// LatePoint's own admin script already makes clicking a `.os-toggler` flip its
-			// on/off class and fire this event — this just reacts to that.
-			.on('ostoggler:toggle', S.methodToggler, () => {
-				this.updateDefaultMethodOptions();
-				this.updateMethodsConfig();
-			})
-			.on('change', S.defaultMethodSelect, () => this.updateMethodsConfig())
+			.on('change', S.methodCheckbox, (e) => this.onMethodCheckboxChange(e))
 			.on('click', S.activateLink, (e) => this.handleActivate(e));
 	}
 
@@ -101,56 +92,43 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.applyAccountsToMethodRows(accounts);
 	}
 
-	// A gateway key carries at most one account per method, so each row is either usable — its
-	// account key travels in a hidden field — or it isn't. The toggle switch has no native
-	// disabled state, so a method losing its account is force-switched off, not just faded by
-	// the `is-disabled` class LatePoint's own CSS already dims.
+	// A gateway key carries at most one account per method, so each row's checkbox is either
+	// usable or it isn't — a plain, natively `disabled` checkbox, same as the initial render.
+	// The "No accounts." note is always in the markup; CSS shows it only while `is-disabled` is
+	// set, so there is no DOM to build here, only its disabled/checked state and the class LatePoint
+	// itself uses to highlight a checked row.
 	applyAccountsToMethodRows(accounts) {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 
 		jQuery(S.methodItem).each((_, row) => {
 			const $row = jQuery(row);
-			const entity = $row.data('entity');
-			const accountKey = accounts[entity];
+			const hasAccount = !!accounts[$row.data('entity')];
+			const checkbox = $row.find('input[type="checkbox"]').prop('disabled', !hasAccount).get(0);
 
-			$row.toggleClass('is-disabled', !accountKey).find(`${S.methodAccount}, ${S.methodBody}`).remove();
-
-			if (!accountKey) {
-				this.setTogglerState($row.find('.os-toggler'), false);
-				$row.append(
-					jQuery('<div>', { class: 'os-togglable-item-body ifthenpay-method-body' }).html(
-						`${latepoint_helper.ifthenpay_translations.no_accounts} <a href="#" class="ifthenpay-activate" data-entity="${entity}">${latepoint_helper.ifthenpay_translations.activate}</a>.`
-					)
-				);
-				return;
+			if (!hasAccount) {
+				checkbox.checked = false;
 			}
 
-			$row.append(
-				jQuery('<input>', {
-					type: 'hidden',
-					class: 'ifthenpay-method-account',
-					name: `settings[ifthenpay_payment_methods_configuration][${entity}][selected_account]`,
-					value: accountKey,
-				})
-			);
+			$row.toggleClass('is-disabled', !hasAccount);
+			this.syncCheckedClass(checkbox);
 		});
 
 		this.updateDefaultMethodOptions();
-		this.updateMethodsConfig();
 	}
 
-	// LatePoint's own click handler only flips a toggler's on/off class and its paired hidden
-	// input's value on click — there's no API to set that state programmatically, which is
-	// needed here when a gateway change disables a method client-side.
-	setTogglerState($toggler, isOn) {
-		$toggler.toggleClass('on', isOn).toggleClass('off', !isOn);
-		const hiddenId = $toggler.data('for');
-		if (hiddenId) {
-			jQuery('#' + hiddenId).val(isOn ? 'on' : 'off');
-		}
+	// LatePoint's own checkbox component only paints its `is-checked` (bordered, highlighted)
+	// state at render time — unlike its toggler switches, a plain `<input type="checkbox">` gets
+	// no click handler of its own to keep that in sync, so checking or unchecking one needs this.
+	syncCheckedClass(checkbox) {
+		jQuery(checkbox).closest('.os-form-checkbox-group').toggleClass('is-checked', checkbox.checked);
 	}
 
-	// The Default Method dropdown can only offer methods that are actually switched on.
+	onMethodCheckboxChange(event) {
+		this.syncCheckedClass(event.target);
+		this.updateDefaultMethodOptions();
+	}
+
+	// The Default Method dropdown can only offer methods that are actually checked.
 	updateDefaultMethodOptions() {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 		const $select = jQuery(S.defaultMethodSelect);
@@ -159,22 +137,15 @@ class LatepointPaymentsIfthenpayAdmin {
 		}
 
 		const previouslySelected = $select.data('selected') || $select.val();
-		const enabledEntities = jQuery(S.methodItem)
-			.filter((_, row) => jQuery(row).find('.os-toggler').hasClass('on'))
-			.map((_, row) => jQuery(row).data('entity'))
+		const enabledEntities = jQuery(S.methodCheckbox)
+			.filter(':checked')
+			.map((_, checkbox) => jQuery(checkbox).closest(S.methodItem).data('entity'))
 			.get();
 
 		$select.empty();
 
 		if (!enabledEntities.length) {
-			$select.append(
-				jQuery('<option>', {
-					value: '',
-					text: latepoint_helper.ifthenpay_translations.warning_default_method,
-					disabled: true,
-					selected: true,
-				})
-			);
+			$select.append(jQuery('<option>', { value: '' }));
 			return;
 		}
 
@@ -187,23 +158,6 @@ class LatepointPaymentsIfthenpayAdmin {
 				})
 			);
 		});
-	}
-
-	// Serializes every method row's current state into the one hidden field LatePoint's settings
-	// save actually reads.
-	updateMethodsConfig() {
-		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
-		const config = {};
-
-		jQuery(S.methodItem).each((_, row) => {
-			const $row = jQuery(row);
-			config[$row.data('entity')] = {
-				checked: $row.find('.os-toggler').hasClass('on'),
-				selected_account: $row.find(S.methodAccount).val() || '',
-			};
-		});
-
-		jQuery(S.methodsConfigInput).val(JSON.stringify(config));
 	}
 
 	// Emails ifthenpay support asking them to activate a method for the currently selected

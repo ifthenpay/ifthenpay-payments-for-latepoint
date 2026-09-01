@@ -120,53 +120,46 @@ class IfthenpayDataFormatter {
 	}
 
 	/**
-	 * Serialize checked methods into "METHOD|account;METHOD|account" format, the shape Pay By
-	 * Link's own `accounts` field expects. `selected_account` itself only holds the bare account
-	 * key (IfthenpayLpGatewayDataset (003 T-05) already strips the "{METHOD} | " prefix off the
-	 * raw gateway record when building it), so the method code is reattached here from the
-	 * config's own key, not read back out of the stored value.
+	 * Serialize enabled methods into "METHOD|account;METHOD|account" format, the shape Pay By
+	 * Link's own `accounts` field expects. The settings page stores only which methods are
+	 * enabled, not their account keys — those come from the same live gateway dataset the
+	 * settings page itself reads, matched here against the saved Gateway Key.
 	 */
 	private static function build_accounts_string(): string {
-		// 1. Pull the raw setting (might be JSON)
-		$raw = OsSettingsHelper::get_settings_value(
-			'ifthenpay_payment_methods_configuration',
-			array()
-		);
+		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
+		$enabled_methods = array_values( array_filter( $saved, 'is_string' ) );
+		$gateway_key     = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		$backoffice_key  = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 
-		// 2. Decode if it’s a JSON string
-		if ( is_string( $raw ) ) {
-			$decoded = json_decode( $raw, true );
-			$config  = is_array( $decoded ) ? $decoded : array();
-		} else {
-			$config = (array) $raw;
+		if ( array() === $enabled_methods || '' === $gateway_key || '' === $backoffice_key ) {
+			return '';
 		}
 
-		// 3. Filter only checked + non‐empty accounts
+		$dataset              = IfthenpayLpGatewayDataset::get( $backoffice_key );
+		$accounts_for_gateway = null === $dataset ? array() : ( $dataset['accounts'][ $gateway_key ] ?? array() );
+
 		$parts = array();
-		foreach ( $config as $method_code => $entry ) {
-			if (
-				is_array( $entry )
-				&& ! empty( $entry['checked'] )
-				&& ! empty( $entry['selected_account'] )
-			) {
-				$parts[] = $method_code . '|' . trim( $entry['selected_account'] );
+		foreach ( $enabled_methods as $method_code ) {
+			if ( isset( $accounts_for_gateway[ $method_code ] ) ) {
+				$parts[] = $method_code . '|' . $accounts_for_gateway[ $method_code ];
 			}
 		}
 
-		// 4. Join with semicolons
 		return implode( ';', $parts );
 	}
 
 	/**
-	 * Determine selected method position from default and available methods.
+	 * The saved default method's position in the live method catalog, the shape Pay By Link's
+	 * own `selected_method` field expects.
 	 */
 	private static function get_selected_method(): string {
-		$default   = OsSettingsHelper::get_settings_value( 'ifthenpay_default_method', '' );
-		$raw       = OsSettingsHelper::get_settings_value( 'ifthenpay_available_methods', array() );
-		$available = is_string( $raw ) ? maybe_unserialize( $raw ) : (array) $raw;
-		if ( isset( $available[ $default ]['position'] ) ) {
-			return (string) $available[ $default ]['position'];
+		$default = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_default_method', '' );
+		if ( '' === $default ) {
+			return '';
 		}
-		return '';
+
+		$catalog = IfthenpayLpMethodCatalog::get();
+
+		return isset( $catalog[ $default ]['position'] ) ? (string) $catalog[ $default ]['position'] : '';
 	}
 }

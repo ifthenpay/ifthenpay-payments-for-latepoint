@@ -336,13 +336,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_gateway_selected'] = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 
 			$localized_vars['ifthenpay_translations'] = array(
-				'no_accounts'            => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
-				'activate'               => __( 'Activate', 'ifthenpay-payments-for-latepoint' ),
-				'warning_default_method' => __( '⚠️ Select at least one Payment Method', 'ifthenpay-payments-for-latepoint' ),
-				'validation_failed'      => __( 'Validation failed.', 'ifthenpay-payments-for-latepoint' ),
-				'server_error'           => __( 'Server error. Please try again.', 'ifthenpay-payments-for-latepoint' ),
-				'activation_sent'        => __( 'Your activation request has been sent to support.', 'ifthenpay-payments-for-latepoint' ),
-				'activation_failed'      => __( 'Failed to send activation request.', 'ifthenpay-payments-for-latepoint' ),
+				'no_accounts'       => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
+				'activate'          => __( 'Activate', 'ifthenpay-payments-for-latepoint' ),
+				'account_key'       => __( 'Account key', 'ifthenpay-payments-for-latepoint' ),
+				'validation_failed' => __( 'Validation failed.', 'ifthenpay-payments-for-latepoint' ),
+				'server_error'      => __( 'Server error. Please try again.', 'ifthenpay-payments-for-latepoint' ),
+				'activation_sent'   => __( 'Your activation request has been sent to support.', 'ifthenpay-payments-for-latepoint' ),
+				'activation_failed' => __( 'Failed to send activation request.', 'ifthenpay-payments-for-latepoint' ),
 			);
 
 			return $localized_vars;
