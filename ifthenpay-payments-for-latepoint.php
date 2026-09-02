@@ -83,6 +83,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-params.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
