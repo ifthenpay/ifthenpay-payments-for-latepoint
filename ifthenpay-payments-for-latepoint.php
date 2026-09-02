@@ -82,6 +82,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-key-validator.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-backoffice-key-validation.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-validity-validation.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-data-formatter.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-method-catalog.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-gateway-dataset.php';
@@ -132,6 +133,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
 			// Fires for every OsModel save — see validate_backoffice_key_on_save()'s own docblock.
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_validity_on_save' ), 10, 3 );
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
 
@@ -419,6 +421,25 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				// exact error code (lib/models/model.php:1046), matching every one of LatePoint's
 				// own built-in property validators. A different code stores the message but never
 				// blocks the save.
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
+		 * Same hook, same shape as validate_backoffice_key_on_save() — a separate method rather
+		 * than one big branch, since this setting isn't encrypted and needs no decrypt step.
+		 * Rejects the save only for a value outside the accepted range (T-14, spec 001): "Invalid
+		 * validity is rejected at save, not at payment time."
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_multibanco_validity_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_multibanco_validity_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpMultibancoValidityValidation::check( (string) $model->value );
+			if ( null !== $error ) {
 				$model->add_error( 'validation', $error );
 			}
 		}
