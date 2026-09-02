@@ -4,7 +4,8 @@
  * polling fallback's own decision logic, invoked directly via Reflection (no real HTTP/AJAX round
  * trip needed; only IfthenpayAPIClient's own outbound call is mocked). One test per FR-13
  * guarantee: a PAID row is never downgraded, and ifthenpay's own verification — never the
- * browser's self-reported $type — decides whether to settle.
+ * browser's self-reported $type — decides whether to mark the row paid; plus the 'pending' signal
+ * that tells the browser (front.js) to keep polling instead of giving up.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -34,7 +35,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * @param string $type  As OsPaymentsIfthenpayCheckoutController::resolve_payment_status_from_modal_url().
 	 * @param string $txid  As above.
 	 * @param string $token As above.
-	 * @return array{status:string,message:string}
+	 * @return array{status:string,message:string,pending:bool}
 	 */
 	private function resolve( string $type, string $txid, string $token ): array {
 		$method = new ReflectionMethod( OsPaymentsIfthenpayCheckoutController::class, 'resolve_payment_status_from_modal_url' );
@@ -108,25 +109,50 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$result = $this->resolve( 'cancel', '', 'tok-already-paid' );
 
 		$this->assertSame( LATEPOINT_STATUS_SUCCESS, $result['status'] );
+		$this->assertFalse( $result['pending'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-already-paid' );
 		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**
-	 * Verification settles the payment even though the browser itself reported 'cancel' — the
+	 * Verification marks the row PAID even though the browser itself reported 'cancel' — the
 	 * exact scenario research.md warns about: a customer who closes the modal right after paying
-	 * must not have their own successful payment marked failed/cancelled.
+	 * must not have their own successful payment marked failed/cancelled. Not routed through
+	 * settle_payment() here: the order does not exist yet at this point in the realtime flow (the
+	 * browser only submits the booking form after seeing this response), so settle_payment() would
+	 * always fail with "order not ready". request_id is still linked and settled_at still stamped
+	 * (mark_settled(), not a bare status update) so that a real async callback arriving later for
+	 * this same payment — now possible, since gateway_key is stored — recognises it as already
+	 * settled instead of trying to settle it a second time.
 	 */
-	public function test_verified_payment_settles_regardless_of_reported_type(): void {
+	public function test_verified_payment_is_marked_paid_regardless_of_reported_type(): void {
 		$this->mock_transaction_status( true );
 		$this->seed_pending_realtime_row( 'tok-verified-despite-cancel' );
 
 		$result = $this->resolve( 'cancel', 'TXID-REAL-001', 'tok-verified-despite-cancel' );
 
 		$this->assertSame( LATEPOINT_STATUS_SUCCESS, $result['status'] );
+		$this->assertFalse( $result['pending'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-verified-despite-cancel' );
 		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
 		$this->assertSame( 'TXID-REAL-001', $record->request_id ); // @phpstan-ignore-line property.notFound
+		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The redirect says 'success' but ifthenpay doesn't confirm it yet (a real propagation delay —
+	 * MBWAY via SIBS in particular can be slow) — the response says pending, not failed, so the
+	 * browser (front.js's pollPaymentStatus()) asks again instead of giving up.
+	 */
+	public function test_unconfirmed_success_is_reported_as_pending_not_failed(): void {
+		$this->mock_transaction_status( false );
+		$this->seed_pending_realtime_row( 'tok-still-processing' );
+
+		$result = $this->resolve( 'success', 'TXID-NOT-YET-CONFIRMED', 'tok-still-processing' );
+
+		$this->assertTrue( $result['pending'] );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-still-processing' );
+		$this->assertSame( 'PENDING', $record->status ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**
@@ -139,6 +165,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$result = $this->resolve( 'cancel', 'TXID-NOT-PAID', 'tok-real-cancel' );
 
 		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
+		$this->assertFalse( $result['pending'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-real-cancel' );
 		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
 	}
