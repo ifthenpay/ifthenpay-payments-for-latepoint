@@ -44,7 +44,7 @@ All settings are made in LatePoint. The plugin is built so store owners can mana
 ## Requirements
 
 - An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
-- A Dynamic Gateway Key (request this from ifthenpay support/helpdesk).
+- A Static Gateway Key provisioned for the **LatePoint** context specifically (request this from ifthenpay support/helpdesk — a Gateway Key issued for a different integration will not show up here).
 - The payment methods you want enabled on that Gateway Key (our helpdesk team will guide you).
 - WordPress 6.5+ and PHP 7.4+, and LatePoint installed and activated.
 - HTTPS (SSL) enabled on your site.
@@ -117,6 +117,7 @@ This plugin integrates with the ifthenpay payment platform to process payments f
 - **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:
     - [api.ifthenpay.com](https://api.ifthenpay.com)
     - [ifthenpay.com](https://ifthenpay.com)
+- **Inbound callback URL**: ifthenpay itself calls back to `https://your-site.com/wp-json/ifthenpay/v1/callback` to confirm a payment. A site behind its own WAF, security plugin, or reverse proxy must allow POST requests to that path from ifthenpay's servers, or payment confirmations will not arrive.
 
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 

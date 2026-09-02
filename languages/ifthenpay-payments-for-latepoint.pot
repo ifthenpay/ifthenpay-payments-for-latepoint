@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-01T14:42:33+00:00\n"
+"POT-Creation-Date: 2026-09-02T12:25:00+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: ifthenpay-payments-for-latepoint\n"
@@ -31,7 +31,7 @@ msgstr ""
 
 #. Author of the plugin
 #: ifthenpay-payments-for-latepoint.php
-#: ifthenpay-payments-for-latepoint.php:381
+#: ifthenpay-payments-for-latepoint.php:343
 msgid "ifthenpay"
 msgstr ""
 
@@ -40,41 +40,54 @@ msgstr ""
 msgid "https://ifthenpay.com/"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:200
+#: ifthenpay-payments-for-latepoint.php:163
 msgid "Missing payment token"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:211
+#: ifthenpay-payments-for-latepoint.php:173
 msgid "Payment record not found"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:231
+#: ifthenpay-payments-for-latepoint.php:191
 msgid "Payment was cancelled"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:232
+#: ifthenpay-payments-for-latepoint.php:192
 msgid "Payment failed"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:339
-msgid "⏳ Loading…"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:340
-#: lib/views/ifthenpay-admin-form-renderer.php:230
+#: ifthenpay-payments-for-latepoint.php:300
+#: lib/views/ifthenpay-admin-form-renderer.php:368
 msgid "No accounts."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:341
-#: lib/views/ifthenpay-admin-form-renderer.php:235
+#: ifthenpay-payments-for-latepoint.php:301
+#: lib/views/ifthenpay-admin-form-renderer.php:369
 msgid "Activate"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:342
-msgid "⚠️ Select at least one Payment Method"
+#: ifthenpay-payments-for-latepoint.php:302
+msgid "Validation failed."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:356
+#: ifthenpay-payments-for-latepoint.php:303
+msgid "Server error. Please try again."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:304
+#: lib/controllers/payments-ifthenpay-settings-controller.php:139
+msgid "Your activation request has been sent to support."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:305
+msgid "Failed to send activation request."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:306
+msgid "Disconnect this Backoffice Key? This clears the Gateway Key and Payment Methods configured under it right away."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:320
 msgid "⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically."
 msgstr ""
 
@@ -94,48 +107,44 @@ msgstr ""
 msgid "Registration failed for gateway key %1$s: %2$s"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:42
-msgid "Enter a Backoffice Key first."
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:46
+msgid "Invalid invoice ID"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:140
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:71
 msgid "Nothing to pay"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:208
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:132
 msgid "Payment completed"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:218
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:140
 msgid "Payment cancelled"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:229
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:149
 msgid "Payment failed due to payment verification error"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:290
-msgid "Your activation request has been sent to support."
+#: lib/controllers/payments-ifthenpay-settings-controller.php:33
+msgid "Enter a Backoffice Key first."
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-controller.php:297
+#: lib/controllers/payments-ifthenpay-settings-controller.php:108
+msgid "Disconnected. The Backoffice Key and everything configured under it have been cleared."
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-settings-controller.php:146
 msgid "Failed to send the activation email. Please try again later."
 msgstr ""
 
-#: lib/helpers/ifthenpay-api-client.php:34
-msgid "Invalid response from ifthenpay Pay-by-Link API."
-msgstr ""
-
-#: lib/helpers/ifthenpay-api-client.php:75
+#: lib/helpers/ifthenpay-api-client.php:53
 msgid "Invalid response (GET) from ifthenpay API."
 msgstr ""
 
-#: lib/helpers/ifthenpay-api-client.php:102
-msgid "Invalid JSON from ifthenpay API."
-msgstr ""
-
 #. translators: %1$s: order id, %2$s: admin description
-#: lib/helpers/ifthenpay-data-formatter.php:111
+#: lib/helpers/ifthenpay-data-formatter.php:103
 #, php-format
 msgid "Order #%1$s - %2$s"
 msgstr ""
@@ -166,11 +175,11 @@ msgstr ""
 msgid "ifthenpay did not recognize this Backoffice Key."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-callback-registration.php:46
+#: lib/helpers/ifthenpay-lp-callback-registration.php:47
 msgid "The callback URL is too long (over 300 characters) — likely a long domain with a subdirectory install."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-callback-registration.php:71
+#: lib/helpers/ifthenpay-lp-callback-registration.php:72
 msgid "ifthenpay did not accept this callback URL."
 msgstr ""
 
@@ -182,66 +191,79 @@ msgstr ""
 msgid "ifthenpay returned an incomplete Pay By Link response."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:25
+#: lib/views/ifthenpay-admin-form-renderer.php:39
 msgid "Backoffice Configuration"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:33
+#: lib/views/ifthenpay-admin-form-renderer.php:47
 msgid "Backoffice Key"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:50
+#: lib/views/ifthenpay-admin-form-renderer.php:65
 msgid "Connect"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:53
+#: lib/views/ifthenpay-admin-form-renderer.php:68
+msgid "Disconnect"
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:71
 msgid "Connecting..."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:81
+#: lib/views/ifthenpay-admin-form-renderer.php:145
 msgid "Could not check the connection to ifthenpay right now. This does not affect your saved settings — try reloading in a moment."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:89
-msgid "Connected, but no gateway keys yet for this site."
-msgstr ""
-
 #. translators: %s: ifthenpay helpdesk link
-#: lib/views/ifthenpay-admin-form-renderer.php:96
+#: lib/views/ifthenpay-admin-form-renderer.php:154
 #, php-format
-msgid "Ask ifthenpay to provision a gateway key for this LatePoint site — contact %s."
-msgstr ""
-
-#: lib/views/ifthenpay-admin-form-renderer.php:105
-msgid "Connected"
+msgid "Connected, but no gateway keys yet for LatePoint context. Ask ifthenpay to provision one — contact %s."
 msgstr ""
 
 #. translators: %s: reason the callback registration failed
-#: lib/views/ifthenpay-admin-form-renderer.php:143
+#: lib/views/ifthenpay-admin-form-renderer.php:180
 #, php-format
 msgid "The payment notification URL could not be registered with ifthenpay: %s"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:161
-msgid "Payments Configuration"
+#: lib/views/ifthenpay-admin-form-renderer.php:224
+msgid "Pay Now Configuration"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:179
-msgid "Gateway Key"
-msgstr ""
-
-#: lib/views/ifthenpay-admin-form-renderer.php:202
+#: lib/views/ifthenpay-admin-form-renderer.php:241
+#: lib/views/ifthenpay-admin-form-renderer.php:280
 msgid "Payment Methods"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:259
+#: lib/views/ifthenpay-admin-form-renderer.php:242
+msgid "Enable at least one to accept payments."
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:276
+msgid "Pay Later Configuration"
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:281
+msgid "Not yet functional — checking a method here has no effect at checkout for now."
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:323
+msgid "Gateway Key"
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:407
+msgid "Select Method"
+msgstr ""
+
+#: lib/views/ifthenpay-admin-form-renderer.php:428
 msgid "Default Method"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:273
-msgid "Other Configuration"
+#: lib/views/ifthenpay-admin-form-renderer.php:438
+msgid "Google Pay and Apple Pay can’t be set as default."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:278
+#: lib/views/ifthenpay-admin-form-renderer.php:456
 msgid "Description"
 msgstr ""

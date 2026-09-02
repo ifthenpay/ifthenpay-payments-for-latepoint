@@ -34,7 +34,7 @@ All settings are made in LatePoint. The plugin is built so store owners can mana
 
 == Requirements ==
 * An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
-* A Dynamic Gateway Key (request this from ifthenpay support/helpdesk).
+* A Static Gateway Key provisioned for the LatePoint context (request this from ifthenpay support/helpdesk).
 * The payment methods you want enabled on that Gateway Key (our helpdesk team will guide you).
 * WordPress 6.5+ and PHP 7.4+, and LatePoint installed and activated.
 * HTTPS (SSL) enabled on your site.
