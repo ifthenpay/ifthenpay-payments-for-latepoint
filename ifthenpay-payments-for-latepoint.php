@@ -82,6 +82,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link-method-eligibility.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-payment-times.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-params.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
@@ -200,12 +201,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		public function add_all_payment_methods_to_payment_times( array $payment_times ): array {
-			$payment_methods = $this->get_supported_payment_methods();
-			foreach ( $payment_methods as $payment_method_code => $payment_method_info ) {
-				$payment_times[ LATEPOINT_PAYMENT_TIME_NOW ][ $payment_method_code ][ $this->processor_code ] = $payment_method_info;
-			}
-
-			return $payment_times;
+			return IfthenpayLpPaymentTimes::add_methods( $payment_times, $this->get_supported_payment_methods(), $this->processor_code );
 		}
 
 		public function add_enabled_payment_methods_to_payment_times( array $payment_times ): array {
@@ -329,11 +325,21 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		public function get_supported_payment_methods() {
 			return array(
-				'ifthenpay_gateway' => array(
+				// Pay By Link, paid during checkout — 'now' is correct here; see
+				// IfthenpayLpPaymentTimes for why this value has to be right, not just present.
+				'ifthenpay_gateway'    => array(
 					'name'      => 'ifthenpay Gateway',
 					'label'     => 'ifthenpay Gateway',
 					'image_url' => $this->images_url() . 'ifthenpay_simbolo.png',
 					'code'      => 'ifthenpay_checkout',
+					'time_type' => 'now',
+				),
+				'ifthenpay_multibanco' => array(
+					'name'      => __( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
+					'label'     => __( 'Multibanco reference', 'ifthenpay-payments-for-latepoint' ),
+					// No dedicated Multibanco asset shipped yet; reuses the processor's own symbol.
+					'image_url' => $this->images_url() . 'ifthenpay_simbolo.png',
+					'code'      => 'ifthenpay_multibanco',
 					'time_type' => 'later',
 				),
 			);
