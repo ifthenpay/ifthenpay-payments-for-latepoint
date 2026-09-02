@@ -317,7 +317,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				$localized_vars['ifthenpay_check_status_route']                = OsRouterHelper::build_route_name( 'payments_ifthenpay_checkout', 'update_payment_repo_by_modal_url' );
 
 				$localized_vars['ifthenpay_translations'] = array(
-					'warning' => __( '⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically.', 'ifthenpay-payments-for-latepoint' ),
+					'warning'        => __( '⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically.', 'ifthenpay-payments-for-latepoint' ),
+					'request_failed' => __( 'Request failed.', 'ifthenpay-payments-for-latepoint' ),
 				);
 			} else {
 				$localized_vars['is_ifthenpay_active'] = false;

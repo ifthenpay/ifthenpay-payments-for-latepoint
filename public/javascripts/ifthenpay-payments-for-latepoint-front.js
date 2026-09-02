@@ -57,7 +57,7 @@ class LatepointPaymentsIfthenpayFront {
 				'json'
 			);
 		} catch {
-			return { status: 'error', message: 'Request failed.' };
+			return { status: 'error', message: latepoint_helper.ifthenpay_translations.request_failed };
 		}
 	}
 

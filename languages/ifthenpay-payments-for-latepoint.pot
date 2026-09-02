@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-02T12:25:00+00:00\n"
+"POT-Creation-Date: 2026-09-02T12:30:43+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: ifthenpay-payments-for-latepoint\n"
@@ -31,7 +31,7 @@ msgstr ""
 
 #. Author of the plugin
 #: ifthenpay-payments-for-latepoint.php
-#: ifthenpay-payments-for-latepoint.php:343
+#: ifthenpay-payments-for-latepoint.php:344
 msgid "ifthenpay"
 msgstr ""
 
@@ -89,6 +89,10 @@ msgstr ""
 
 #: ifthenpay-payments-for-latepoint.php:320
 msgid "⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:321
+msgid "Request failed."
 msgstr ""
 
 #: lib/cli/ifthenpay-lp-cli-commands.php:36
