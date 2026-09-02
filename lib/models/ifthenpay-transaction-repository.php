@@ -189,7 +189,9 @@ class IfthenpayLpTransactionRepository {
 
 		if ( $updated ) {
 			wp_cache_delete( "token_{$token}", self::CACHE_GROUP );
-			if ( $before && $before->request_id ) {
+			// Not a truthy check: a real request_id of "0" (seen in production — research.md) is
+			// falsy in PHP but must still have its cache entry cleared.
+			if ( $before && null !== $before->request_id && '' !== $before->request_id ) {
 				wp_cache_delete( "request_id_{$before->request_id}", self::CACHE_GROUP );
 			}
 		}
