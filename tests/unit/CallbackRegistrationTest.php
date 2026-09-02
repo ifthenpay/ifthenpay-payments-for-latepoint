@@ -148,7 +148,7 @@ final class CallbackRegistrationTest extends TestCase {
 	 * attempted — a specific, named failure, not a request ifthenpay would have to reject.
 	 */
 	public function test_url_over_300_characters_fails_without_a_network_call(): void {
-		Functions\when( 'rest_url' )->justReturn( 'https://' . str_repeat( 'a', 300 ) . '.example.test/wp-json/ifthenpay/v1/callback' );
+		Functions\when( 'rest_url' )->justReturn( 'https://' . str_repeat( 'a', 300 ) . '.example.test/wp-json/ifthenpay-lp/v1/callback' );
 		Functions\expect( 'wp_remote_request' )->never();
 
 		$this->assertFalse( IfthenpayLpCallbackRegistration::register( 'GATEWAY-4' ) );

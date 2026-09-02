@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * The REST route this registers against (`ifthenpay/v1/callback`) has no handler yet — that
+ * The REST route this registers against (`ifthenpay-lp/v1/callback`) has no handler yet — that
  * arrives with a future callback-handling feature. Registering the URL now means the URL
  * ifthenpay has on file already matches the shape that handler will expect, instead of both
  * changing at once later.
@@ -111,7 +111,7 @@ class IfthenpayLpCallbackRegistration {
 	 * substitution engine expects verbatim.
 	 */
 	private static function build_callback_url(): string {
-		$base      = rest_url( 'ifthenpay/v1/callback' );
+		$base      = rest_url( 'ifthenpay-lp/v1/callback' );
 		$separator = ( false === strpos( $base, '?' ) ) ? '?' : '&';
 
 		return $base . $separator

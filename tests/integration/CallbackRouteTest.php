@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves the `GET /wp-json/ifthenpay/v1/callback` route end to end, dispatched through WordPress's
+ * Proves the `GET /wp-json/ifthenpay-lp/v1/callback` route end to end, dispatched through WordPress's
  * own REST server (not calling the handler directly) — against the real saved fixtures under
  * tests/fixtures/callbacks/, so a change to those fixtures is caught here too. One test per outcome
  * in contracts/callback.md's own response table.
@@ -36,7 +36,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	private function dispatch( string $fixture_name ): WP_REST_Response {
 		global $wp_rest_server;
 
-		$request = new WP_REST_Request( 'GET', '/ifthenpay/v1/callback' );
+		$request = new WP_REST_Request( 'GET', '/ifthenpay-lp/v1/callback' );
 		$request->set_query_params( ifthenpay_lp_callback_fixture_params( $fixture_name ) );
 
 		return $wp_rest_server->dispatch( $request );
