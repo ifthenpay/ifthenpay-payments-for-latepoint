@@ -1,6 +1,7 @@
 class LatepointPaymentsIfthenpayAdmin {
 	static SELECTORS = {
 		gatewaySelect: '.ifthenpay-gateway-select',
+		gatewayKeyRow: '#ifthenpay_gateway_key_row',
 		validateButton: '.validate-button',
 		backofficeKeyInput: '.custom-backoffice-key',
 		methodItem: '.ifthenpay-method-item',
@@ -38,9 +39,7 @@ class LatepointPaymentsIfthenpayAdmin {
 		return new URLSearchParams(params).toString();
 	}
 
-	// LatePoint's own toast notification system, used everywhere else in its admin — replaces a
-	// plain alert() with the same `.os-notifications` UI a merchant already sees for every other
-	// action on this page.
+	// LatePoint's own toast notification system, used everywhere else in its admin.
 	notify(message, type = 'success') {
 		latepoint_add_notification(message, type);
 	}
@@ -67,9 +66,10 @@ class LatepointPaymentsIfthenpayAdmin {
 	}
 
 	// Previews a Backoffice Key without saving it: format-checks and verifies it against
-	// ifthenpay, then replaces everything after the Backoffice Key row with the gateway/method
-	// configuration that key would produce. The actual save happens through LatePoint's own
-	// settings save, triggered separately by the merchant.
+	// ifthenpay, then refreshes the Gateway Key row in place and replaces everything after the
+	// Backoffice Configuration section with the method configuration that key would produce. The
+	// actual save happens through LatePoint's own settings save, triggered separately by the
+	// merchant.
 	handleKeyValidation(event) {
 		event.preventDefault();
 
@@ -86,9 +86,12 @@ class LatepointPaymentsIfthenpayAdmin {
 		})
 			.done((res) => {
 				// Everything the previous preview (or the page's own initial render) put after
-				// the Backoffice Key row — `res.html` on success rebuilds it fresh (or rebuilds
-				// nothing at all, if this key has no gateway keys of its own).
+				// Backoffice Configuration — `res.html` on success rebuilds it fresh (or rebuilds
+				// nothing at all, if this key has no gateway keys of its own). The Gateway Key row
+				// lives inside Backoffice Configuration itself, so it's replaced separately rather
+				// than swept up by `nextAll()`.
 				$section.nextAll().remove();
+				jQuery(S.gatewayKeyRow).html(res.gateway_key_html || '');
 
 				if (res.status !== 'success') {
 					this.notify(res.message || latepoint_helper.ifthenpay_translations.validation_failed, 'error');
@@ -138,6 +141,7 @@ class LatepointPaymentsIfthenpayAdmin {
 				}
 
 				jQuery(S.backofficeKeyInput).val('');
+				jQuery(S.gatewayKeyRow).empty();
 				$section.nextAll().remove();
 				$button.data('mode', 'connect').removeClass('mode-disconnect').addClass('mode-connect');
 				this.notify(res.message, 'success');
@@ -155,11 +159,8 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.applyAccountsToMethodRows(accounts);
 	}
 
-	// A gateway key carries at most one account per method, so each row's checkbox is either
-	// usable or it isn't — a plain, natively `disabled` checkbox, same as the initial render.
 	// The "No accounts." note is always in the markup; CSS shows it only while `is-disabled` is
-	// set, so there is no DOM to build here, only its disabled/checked state and the class LatePoint
-	// itself uses to highlight a checked row.
+	// set, so there is no DOM to build here — only each row's disabled/checked state.
 	applyAccountsToMethodRows(accounts) {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 
@@ -181,14 +182,11 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.updateDefaultMethodOptions();
 	}
 
-	// The account key shown next to a method's name is baked into the label
-	// IfthenpayAdminFormRenderer rendered for whichever gateway was selected at page load —
-	// switching gateways client-side needs to update it too, or a merchant would keep seeing a
-	// different gateway's account key (or a stale one for a method that no longer has an account
-	// at all).
+	// Switching gateways client-side needs to update the account key shown next to each method's
+	// name too, or a merchant would keep seeing a different gateway's key.
 	updateAccountKeyDisplay($row, accountKey) {
-		const $name = $row.find('.ifthenpay-method-name');
-		let $key = $name.find('.ifthenpay-method-account-key');
+		const $content = $row.find('.ifthenpay-method-content');
+		let $key = $content.find('.ifthenpay-method-account-key');
 
 		if (!accountKey) {
 			$key.remove();
@@ -196,9 +194,9 @@ class LatepointPaymentsIfthenpayAdmin {
 		}
 
 		if (!$key.length) {
-			$key = jQuery('<span>', { class: 'ifthenpay-method-account-key' }).appendTo($name);
+			$key = jQuery('<span>', { class: 'ifthenpay-method-account-key' }).appendTo($content);
 		}
-		$key.text(`(${accountKey})`);
+		$key.text(accountKey);
 	}
 
 	// LatePoint's own checkbox component only paints its `is-checked` (bordered, highlighted)
@@ -213,12 +211,9 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.updateDefaultMethodOptions();
 	}
 
-	// The Default Method dropdown always lists every method PBL can be told to pre-select
-	// (IfthenpayAdminFormRenderer::render_default_method_select() renders the full fixed set up
-	// front) — a method's own <option> is only enabled while its checkbox above is checked, never
-	// added or removed, so checking/unchecking a box just flips the one option that already
-	// exists for it. A method with no <option> at all here (Multibanco, Payshop, Google Pay, Apple
-	// Pay) was never eligible in the first place, so there is nothing for this to do for it.
+	// Every eligible method already has its <option> rendered server-side (see
+	// render_default_method_select()); checking/unchecking a box just flips that option's
+	// `disabled` state, never adds or removes one.
 	updateDefaultMethodOptions() {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 		const $select = jQuery(S.defaultMethodSelect);
@@ -244,8 +239,7 @@ class LatepointPaymentsIfthenpayAdmin {
 	}
 
 	// Emails ifthenpay support asking them to activate a method for the currently selected
-	// gateway key — this doesn't change anything locally, so nothing here needs to update the
-	// method row itself.
+	// gateway key — nothing changes locally, so no row needs updating here.
 	handleActivate(event) {
 		event.preventDefault();
 		const entity = jQuery(event.currentTarget).data('entity');

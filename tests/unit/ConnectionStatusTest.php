@@ -10,6 +10,10 @@
  *   render and the "Connect" preview) surface the result as a toast, not inline markup.
  * - render_callback_status(): silent unless a callback registration attempt is on
  *   record and failed — success and "never attempted" both render nothing.
+ * - render_backoffice_configuration(): the Connect/Disconnect button's mode follows whether a key
+ *   is saved, and the Gateway Key row renders alongside it once there are gateway keys to pick
+ *   from (see GatewayKeyRowTest for resolve_selected_gateway_key() and render_gateway_key_row()
+ *   on their own).
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -19,6 +23,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-admin-form-renderer.php';
+require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
 
 /**
@@ -32,6 +37,8 @@ final class ConnectionStatusTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+
+		OsSettingsHelper::$values = array();
 
 		Functions\stubs(
 			array(
@@ -117,6 +124,24 @@ final class ConnectionStatusTest extends TestCase {
 
 		$this->assertStringContainsString( 'mode-disconnect', $html );
 		$this->assertStringContainsString( 'data-mode="disconnect"', $html );
+	}
+
+	/**
+	 * A saved key with gateway keys of its own renders the Gateway Key row inside the same
+	 * section — not only the Backoffice Key field and its button — since resolve_selected_gateway_key()
+	 * and render_gateway_key_row() together are what let a merchant reload the page and immediately
+	 * see (and change) which gateway this site charges through.
+	 */
+	public function test_saved_backoffice_key_with_gatewaykeys_renders_gateway_key_row(): void {
+		ob_start();
+		IfthenpayAdminFormRenderer::render_backoffice_configuration(
+			'1234-5678-9012-3456',
+			array( 'GATEWAY-1' => 'GATEWAY-1' ),
+			'GATEWAY-1'
+		);
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<select name="settings[ifthenpay_gateway_key]">', $html );
 	}
 
 	/**

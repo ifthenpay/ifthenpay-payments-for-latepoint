@@ -24,11 +24,9 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * Public endpoint for “ORDER” checkout.
 		 */
 		public function get_order_ifthenpay_options() {
-			// 1) Bootstrap cart/booking
 			OsStepsHelper::set_required_objects( $this->params );
 			$amount = OsStepsHelper::$cart_object->specs_calculate_amount_to_charge();
 
-			// 2) Create or update the intent
 			$booking_url  = $this->params['booking_form_page_url'] ?? wp_get_original_referer();
 			$order_intent = OsOrderIntentHelper::create_or_update_order_intent(
 				OsStepsHelper::$cart_object,
@@ -37,32 +35,26 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				$booking_url
 			);
 
-			// 3) Delegate the rest
 			$this->send_ifthenpay_options( $order_intent, $amount );
 		}
-
 
 		/**
 		 * Public endpoint for “TRANSACTION” checkout.
 		 */
 		public function get_transaction_ifthenpay_options() {
-			// 1) Validate & load invoice
 			if ( ! filter_var( $this->params['invoice_id'], FILTER_VALIDATE_INT ) ) {
-				wp_send_json_error( 'Invalid invoice ID' );
+				wp_send_json_error( __( 'Invalid invoice ID', 'ifthenpay-payments-for-latepoint' ) );
 			}
 			$invoice = new OsInvoiceModel( $this->params['invoice_id'] );
 
-			// 2) Create or update the intent
 			$transaction_intent = OsTransactionIntentHelper::create_or_update_transaction_intent(
 				$invoice,
 				$this->params
 			);
 			$amount             = $transaction_intent->specs_charge_amount;
 
-			// 3) Delegate the rest
 			$this->send_ifthenpay_options( $transaction_intent, $amount );
 		}
-
 
 		/**
 		 * Shared core: skip on zero, consume ifthenpay API, persist & respond.
@@ -71,7 +63,6 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * @param  float  $amount  How much to charge.
 		 */
 		private function send_ifthenpay_options( $intent_model, $amount ) {
-			// Skip‐payment if free
 			if ( $amount <= 0 ) {
 				$this->send_json(
 					array(
@@ -84,17 +75,13 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 			}
 
 			try {
-				// 1) Server Side Token
-				$token = $intent_model->intent_key;
-
-				// 2) Build Payload & Generate Pay-by-Link
+				$token      = $intent_model->intent_key;
 				$payload    = IfthenpayDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
 				$api_result = IfthenpayLpPayByLink::create(
 					OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
 					$payload
 				);
 
-				// 3) Persist as PENDING
 				IfthenpayLpTransactionRepository::insert(
 					array(
 						'token'         => $token,
@@ -105,7 +92,6 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					)
 				);
 
-				// 4) Success JSON
 				$this->send_json(
 					array(
 						'status'        => LATEPOINT_STATUS_SUCCESS,
@@ -132,13 +118,11 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * @return void Sends JSON with status and message.
 		 */
 		public function update_payment_repo_by_modal_url() {
-			// Pull callback params
 			$type  = $this->params['ifthenpay_return'];
 			$txid  = $this->params['txid'];
 			$token = $this->params['payment_token'];
 
 			try {
-				// Success path: verify then mark PAID
 				if ( $type === 'success' && $this->verifyPaymentWithRetry( $txid ) ) {
 					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 					IfthenpayLpTransactionRepository::update_status( $token, 'PAID' );
@@ -148,9 +132,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 							'message' => __( 'Payment completed', 'ifthenpay-payments-for-latepoint' ),
 						)
 					);
-				}
-				// Cancelled by user: mark CANCELLED and return error
-				elseif ( $type === 'cancel' ) {
+				} elseif ( $type === 'cancel' ) {
 					IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
 					$this->send_json(
 						array(
@@ -158,9 +140,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 							'message' => __( 'Payment cancelled', 'ifthenpay-payments-for-latepoint' ),
 						)
 					);
-				}
-				// All other cases (error or failed payment verification): mark FAILED and return error
-				else {
+				} else {
 					IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
 					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 					$this->send_json(
@@ -171,7 +151,6 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					);
 				}
 			} catch ( Exception $e ) {
-				// Exception fallback
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,

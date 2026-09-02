@@ -1,40 +1,43 @@
-/* `.sub-section-row` / `.sub-section-label` / `.sub-section-content` (Backoffice/Payments/Other
-   Configuration), the `.os-row`/`.os-col-N` grid, and every field below are all native LatePoint
-   components — `.os-form-w .sub-section-row` and `.os-form-group .os-form-control` in LatePoint's
-   own admin.css, and the settings page wraps every processor's body in an `.os-form-w`. Payment
-   methods are `OsFormHelper::checkbox_field()`, LatePoint's own real checkbox component: its
-   wrapper already renders as a bordered, rounded, hover-highlighted row and already spaces
-   consecutive rows apart (the base `.os-form-group` bottom margin) — nothing here re-declares any
-   of that. What follows is only the handful of things with no native equivalent at all. */
+/* `.sub-section-row` / `.sub-section-label` / `.sub-section-content`, the `.os-row`/`.os-col-N`
+   grid, `.label-with-description`, and payment method rows (`OsFormHelper::checkbox_field()`) are
+   all native LatePoint components with their own styling already. What follows is only the
+   handful of things with no native equivalent. */
 
-/* `.os-col-N` carries no gutter of its own — the negative margin on `.os-row` exists only to
-   offset the section's own padding, not to space columns apart — so the Backoffice Key field and
-   its Connect button need their own gap. Both stack label-then-control in a column so the two
-   controls' bottom edges line up regardless of label length. */
+/* `.os-col-6` is `flex: 0 0 50%` with flex-shrink 0 — a `gap` on top of its own native gutter
+   (padding + the row's own negative margin) leaves no room to shrink into, so columns wrap onto
+   separate lines instead of sitting side by side. `align-items: flex-end` lines up both controls'
+   bottom edges regardless of label length. */
 #paymentProcessorToggler_ifthenpay .sub-section-content > .os-row {
-	gap: 1rem;
 	align-items: flex-end;
 }
 
-#paymentProcessorToggler_ifthenpay .sub-section-content > .os-row:first-child .os-col-6 {
-	display: flex;
-	flex-direction: column;
-}
-
-/* The Connect/Disconnect button is one control, not two — only the label matching its current
-   `data-mode` shows. */
+/* The Connect/Disconnect button is one control — only the label matching its current `data-mode`
+   shows. */
 #paymentProcessorToggler_ifthenpay .validate-button.mode-connect .label-disconnect,
 #paymentProcessorToggler_ifthenpay .validate-button.mode-disconnect .label-connect {
 	display: none;
 }
 
-/* A method row's label holds an icon plus two lines of text (name+code, and — only while
-   disabled — a "No accounts" note) with no native layout for that combination; `flex-wrap` lets
-   the note drop to its own line on a narrow screen instead of forcing horizontal scroll. The icon
-   has no native size on its own, and the code/note are secondary text that should read quieter
-   than the method's own name. The note is always in the markup, shown only while `.is-disabled`
-   is set (server-render, or the admin script on a gateway change), so nothing has to insert or
-   remove it. */
+/* Full-width rows, one per method, stacked with their own gap (native `.os-form-group` bottom
+   margin is zeroed out globally). Scales better than a wrapped card grid as ifthenpay adds
+   methods over time — consistent row height regardless of count, no ragged last row. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-methods-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+/* checkbox_field()'s own unclassed wrapper div around the label content isn't a flex item by
+   default, so it hugs its content's width — stretching it is what lets
+   `.ifthenpay-method-content` push the status text to the row's far right. */
+#paymentProcessorToggler_ifthenpay .os-form-checkbox-group label > div {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Icon and name stay grouped on the left; the account key or "No accounts. Activate." — exactly
+   one of the two ever present — is pushed to the far edge via its own margin, not
+   `justify-content: space-between` on the row (which would separate the icon from the name too). */
 #paymentProcessorToggler_ifthenpay .ifthenpay-method-content {
 	display: flex;
 	align-items: center;
@@ -47,19 +50,11 @@
 	width: auto;
 }
 
-/* Name and account key are gap-spaced flex children, not a literal space character between them
-   — the admin script adds/updates/removes the account key span on a gateway change, and a real
-   gap survives that without any text-node bookkeeping on its part. */
-#paymentProcessorToggler_ifthenpay .ifthenpay-method-name {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
-}
-
 #paymentProcessorToggler_ifthenpay .ifthenpay-method-account-key,
 #paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
 	color: #788291;
 	font-size: 0.85em;
+	margin-left: auto;
 }
 
 #paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
@@ -70,23 +65,19 @@
 	display: inline;
 }
 
-/* Matches the colour/size of LatePoint's own `.label-with-description .label-desc` (used for the
-   two method-group captions above), reused here for a single-line note under a select — that
-   native class is scoped to sit only under a `.label-with-description` heading, which a lone
-   select doesn't have of its own. */
+/* The Default Method note's own muted caption — matches `.label-with-description .label-desc`'s
+   colour/size, but that native class only applies under its own heading, which this note doesn't
+   have. */
 #paymentProcessorToggler_ifthenpay .ifthenpay-field-note {
 	color: #b0b0b0;
 	font-size: 13px;
 	margin-top: 4px;
 }
 
-/* "pending" uses the exact status class Stripe/Razorpay/PayPal's own connect flow uses for
-   "connected, action still needed" (.payment-processor-connect-status-wrapper
-   .payment-processor-status-charges-disabled, in LatePoint's own admin.css) — same wrapper, same
-   class name, no CSS of this plugin's own. Only "couldn't check" has no first-party equivalent —
-   every native state there assumes a definite answer — so it gets a shape+colour of this plugin's
-   own, matching the wrapper's own metrics (padding, radius, gap) and LatePoint's own grey palette
-   for consistency. */
+/* Reuses the exact status class Stripe/Razorpay/PayPal's own connect flow uses for "connected,
+   action still needed" (`.payment-processor-connect-status-wrapper .payment-processor-status-charges-disabled`
+   in LatePoint's own admin.css). Only "couldn't check" has no first-party equivalent, so it gets
+   this plugin's own shape/colour, matching that wrapper's own metrics. */
 #paymentProcessorToggler_ifthenpay .ifthenpay-status-error {
 	display: flex;
 	align-items: center;

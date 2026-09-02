@@ -11,9 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Shared transport. Operation-specific methods (key validation, gateway dataset, Pay By Link,
- * Multibanco/Payshop references, callback activation) are added on top of this in later work —
- * this class only owns the HTTP call and the error model, not any endpoint's shape.
+ * Shared transport, used by every operation-specific class (key validation, gateway dataset, Pay
+ * By Link, Multibanco/Payshop references, callback activation) — this class only owns the HTTP
+ * call and the error model, not any endpoint's shape.
  */
 class IfthenpayLpApiClient {
 

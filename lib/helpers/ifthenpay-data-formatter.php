@@ -5,7 +5,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class IfthenpayDataFormatter {
 
-
 	/**
 	 * Formats the available payment methods array from the ifthenpay API.
 	 *
@@ -24,7 +23,6 @@ class IfthenpayDataFormatter {
 				continue;
 			}
 
-			// Filter out invisible methods
 			if ( ! ( $entry['IsVisible'] ?? true ) ) {
 				continue;
 			}
@@ -37,7 +35,6 @@ class IfthenpayDataFormatter {
 			);
 		}
 
-		// Sort by position ascending
 		uasort( $methods, fn( $a, $b ) => $a['position'] <=> $b['position'] );
 
 		return $methods;
@@ -51,7 +48,6 @@ class IfthenpayDataFormatter {
 	 * @return array
 	 */
 	public static function build_pay_by_link_payload( $intent, $token, $amount ) {
-		// Basic fields
 		$payload = array(
 			'id'              => $token,
 			'amount'          => self::format_amount( $amount ),
@@ -61,7 +57,6 @@ class IfthenpayDataFormatter {
 			'selected_method' => self::get_selected_method(),
 		);
 
-		// Return URLs embedding token
 		$base                   = home_url( '/' );
 		$payload['success_url'] = add_query_arg(
 			array(
@@ -128,8 +123,11 @@ class IfthenpayDataFormatter {
 	 * and a merchant can enable them today for a future deferred flow this plugin doesn't have yet.
 	 */
 	private static function build_accounts_string(): string {
+		// Drops the settings page's always-present hidden fallback entry (an empty string — see
+		// IfthenpayAdminFormRenderer::render_payments_configuration()), the same as that page's own
+		// read of this setting does.
 		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
-		$enabled_methods = array_values( array_filter( $saved, 'is_string' ) );
+		$enabled_methods = array_values( array_filter( $saved, static fn( $value ) => is_string( $value ) && '' !== $value ) );
 		$gateway_key     = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		$backoffice_key  = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 

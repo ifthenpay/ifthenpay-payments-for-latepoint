@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-// If no LatePoint class exists - exit, because LatePoint plugin is required for this addon
+// Guards against a fatal redeclaration if this file is ever loaded twice.
 if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 	/**
@@ -29,27 +29,17 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 	 */
 	class IfthenpayPaymentsForLatepoint {
 
-
-		/**
-		 * Addon version.
-		 */
 		public $version    = '3.0.0';
 		public $db_version = '2.0.0';
 		public $addon_name = 'ifthenpay-payments-for-latepoint';
 
 		public $processor_code = 'ifthenpay';
 
-		/**
-		 * LatePoint Constructor.
-		 */
 		public function __construct() {
 			$this->define_constants();
 			$this->init_hooks();
 		}
 
-		/**
-		 * Define LatePoint Constants.
-		 */
 		public function define_constants() {
 			$this->define( 'IFTHENPAY_PLUGIN_VERSION', $this->version );
 			$this->define( 'IFTHENPAY_TABLE_VERSION', $this->db_version );
@@ -67,24 +57,16 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return plugin_dir_url( __FILE__ ) . 'public/images/';
 		}
 
-		/**
-		 * Define constant if not already set.
-		 */
 		public function define( $name, $value ) {
 			if ( ! defined( $name ) ) {
 				define( $name, $value );
 			}
 		}
 
-		/**
-		 * Include required core files used in admin and on the frontend.
-		 */
 		public function includes() {
-			// CONTROLLERS
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-checkout-controller.php';
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 
-			// HELPERS
 			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-exception.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-credential-exception.php';
@@ -104,56 +86,37 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
-			// VIEWS (renderers)
 			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
 
-			// MODELS
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 
-			// CLI.
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/cli/ifthenpay-lp-cli-commands.php';
 			}
 		}
 
 		public function init_hooks() {
-			// Hook into the latepoint initialization action and initialize this addon
 			add_action( 'latepoint_init', array( $this, 'latepoint_init' ) );
-
-			// Include additional helpers and controllers
 			add_action( 'latepoint_includes', array( $this, 'includes' ) );
-
-			// Modify a list of installed add-ons
 			add_filter( 'latepoint_installed_addons', array( $this, 'register_addon' ) );
 
-			// Include JS and CSS for the admin panel
 			add_action( 'latepoint_admin_enqueue_scripts', array( $this, 'load_admin_scripts_and_styles' ) );
 			add_filter( 'latepoint_localized_vars_admin', array( $this, 'localized_vars_for_admin' ) );
 
-			// Include JS and CSS for the frontend site
 			add_action( 'latepoint_wp_enqueue_scripts', array( $this, 'load_front_scripts_and_styles' ) );
 			add_filter( 'latepoint_localized_vars_front', array( $this, 'localized_vars_for_front' ) );
 
-			// Add the scripts to the clean layout
 			add_filter( 'latepoint_clean_layout_js_files', array( $this, 'add_scripts_to_clean_layout' ), 10 );
 			add_filter( 'latepoint_clean_layout_css_files', array( $this, 'add_styles_to_clean_layout' ), 10 );
 
-			// Register ifthenpay as a payment processor
 			add_filter( 'latepoint_payment_processors', array( $this, 'register_payment_processor' ), 10, 2 );
-			// Register ifthenpay available payment methods
 			add_filter( 'latepoint_all_payment_methods', array( $this, 'register_payment_methods' ) );
-			// Add payment methods to a list of enabled methods for the front-end, if processor is turned on in settings
 			add_filter( 'latepoint_enabled_payment_methods', array( $this, 'register_enabled_payment_methods' ) );
-			// Add settings fields for the payment processor
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
-			// Encrypt sensitive fields
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
-			// Validate the Backoffice Key on every save — fires for every OsModel save, so this
-			// must filter tightly to just this one setting (see validate_backoffice_key_on_save()).
+			// Fires for every OsModel save — see validate_backoffice_key_on_save()'s own docblock.
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
-			// Register the callback URL after a save that included a Gateway Key — post-save and
-			// non-blocking, unlike the Backoffice Key check above: a registration failure must not
-			// stop the settings themselves from saving (see register_callback_on_settings_updated()).
+			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
 
 			add_filter( 'latepoint_get_all_payment_times', array( $this, 'add_all_payment_methods_to_payment_times' ) );
@@ -162,7 +125,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_process_payment_for_order_intent', array( $this, 'process_payments_for_order_intent' ), 10, 2 );
 			add_filter( 'latepoint_process_payment_for_transaction_intent', array( $this, 'process_payment_for_transaction_intent' ), 10, 2 );
 
-			// init the addon
 			add_action( 'init', array( $this, 'init' ), 0 );
 
 			register_activation_hook( __FILE__, array( $this, 'on_activate' ) );
@@ -196,7 +158,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 * @return array
 		 */
 		private function process_payment_by_intent( $intent_model ): array {
-			// 1) Token must exist
 			$token = $intent_model->get_payment_data_value( 'token' );
 			if ( ! $token ) {
 				$msg = __( 'Missing payment token', 'ifthenpay-payments-for-latepoint' );
@@ -207,7 +168,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				);
 			}
 
-			// 2) Record must exist
 			$payment = IfthenpayLpTransactionRepository::find_by_token( $token );
 			if ( ! $payment ) {
 				$msg = __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' );
@@ -218,7 +178,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				);
 			}
 
-			// 3) Handle statuses
 			if ( $payment->status === 'PAID' ) {
 				return array(
 					'status'    => LATEPOINT_STATUS_SUCCESS,
@@ -228,7 +187,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				);
 			}
 
-			// CANCELLED or FAILED
 			$msg = $payment->status === 'CANCELLED'
 				? __( 'Payment was cancelled', 'ifthenpay-payments-for-latepoint' )
 				: __( 'Payment failed', 'ifthenpay-payments-for-latepoint' );
@@ -328,9 +286,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_activate_account_route'] = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'activate_account_by_entity' );
 
 			// The full {gatewayKey: {methodKey: accountKey}} map, every gateway at once — the
-			// select's own "change" handler looks up into this client-side, no AJAX
-			// round trip per gateway the way the old, now-removed get_payment_accounts_by_gateway
-			// route needed.
+			// select's own "change" handler looks up into this client-side, no AJAX round trip
+			// per gateway.
 			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
 			$dataset        = $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
 
@@ -368,7 +325,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return $localized_vars;
 		}
 
-		// Payment method for the processor
 		public function get_supported_payment_methods() {
 			return array(
 				'ifthenpay_gateway' => array(
@@ -381,7 +337,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			);
 		}
 
-		// Register payment processor
 		public function register_payment_processor( $payment_processors ) {
 			$payment_processors[ $this->processor_code ] = array(
 				'code'      => $this->processor_code,
@@ -391,13 +346,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return $payment_processors;
 		}
 
-		// Adds payment method to payment settings
 		public function register_payment_methods( $payment_methods ) {
 			$payment_methods = array_merge( $payment_methods, $this->get_supported_payment_methods() );
 			return $payment_methods;
 		}
 
-		// Enables payment methods if the processor is turned on and its Gateway Key is usable
 		public function register_enabled_payment_methods( $enabled_payment_methods ) {
 			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) && $this->is_gateway_key_usable() ) {
 				$enabled_payment_methods = array_merge( $enabled_payment_methods, $this->get_supported_payment_methods() );
@@ -410,76 +363,59 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				return;
 			}
 
-			// Always render Backoffice
-			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
-			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key );
+			// Re-fetched on every render, not only right after "Connect" — a key can be revoked
+			// after it was stored, or gateway keys added/removed on ifthenpay's side, independently
+			// of this site. The dataset is cached per request, so this and
+			// localized_vars_for_admin()'s use of the same key cost one HTTP call, not two.
+			$backoffice_key       = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
+			$dataset              = $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
+			$gatewaykeys          = $dataset['gatewaykeys'] ?? array();
+			$selected_gateway_key = IfthenpayAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
 
-			if ( $backoffice_key ) {
-				// Re-fetched on every render, not only right after "Connect" — a key
-				// can be revoked after it was stored, or gateway keys added/removed on
-				// ifthenpay's side, independently of this site. The dataset is cached per request,
-				// so this and localized_vars_for_admin()'s use of the same key cost one HTTP call,
-				// not two. Nothing here below a missing gateway key: an empty Gateway Key select and
-				// a Payment Methods list that can only ever say "No accounts" has nothing a merchant
-				// can act on — the connection notice (localized_vars_for_admin(), surfaced as a
-				// toast) already says why.
-				$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
+			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key, $gatewaykeys, $selected_gateway_key );
 
-				if ( ! empty( $dataset['gatewaykeys'] ) ) {
-					IfthenpayAdminFormRenderer::render_payments_configuration(
-						$dataset['gatewaykeys'],
-						$dataset['accounts'] ?? array(),
-						IfthenpayLpMethodCatalog::get() ?? array()
-					);
+			// Nothing here below a missing gateway key: a Payment Methods list that can only ever
+			// say "No accounts" has nothing a merchant can act on — the connection notice
+			// (localized_vars_for_admin(), surfaced as a toast) already says why.
+			if ( array() !== $gatewaykeys ) {
+				IfthenpayAdminFormRenderer::render_payments_configuration(
+					$selected_gateway_key,
+					$dataset['accounts'] ?? array(),
+					IfthenpayLpMethodCatalog::get() ?? array()
+				);
 
-					// The last registration outcome for the currently saved Gateway Key —
-					// stored by register_callback_on_settings_updated() after a save, surfaced here
-					// so a merchant sees a failure without re-entering the form.
-					$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
-					if ( $gateway_key ) {
-						IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
-					}
-
-					IfthenpayAdminFormRenderer::render_others_configuration();
+				// The last registration outcome for the currently saved Gateway Key —
+				// stored by register_callback_on_settings_updated() after a save, surfaced here
+				// so a merchant sees a failure without re-entering the form.
+				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
+				if ( $gateway_key ) {
+					IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
 				}
 			}
 		}
 
-		// Loads addon specific javascript and stylesheets for frontend site
 		public function load_front_scripts_and_styles() {
-			// Stylesheets
 			wp_enqueue_style( 'ifthenpay-payments-for-latepoint-front', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-front.css', false, $this->version );
-
-			// Javascripts
 			wp_enqueue_script( 'ifthenpay-payments-for-latepoint-front', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-front.js', array( 'jquery' ), true, $this->version );
 		}
 
-		// Loads addon specific javascript and stylesheets for backend (wp-admin)
-		public function load_admin_scripts_and_styles( $localized_vars ) {
-			// Stylesheets
+		public function load_admin_scripts_and_styles() {
 			wp_enqueue_style( 'ifthenpay-payments-for-latepoint', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-admin.css', false, $this->version );
-
-			// Javascripts
 			wp_enqueue_script( 'ifthenpay-payments-for-latepoint', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-admin.js', array( 'jquery' ), true, $this->version );
 		}
 
-		// Add scripts to the clean layout.
 		public function add_scripts_to_clean_layout( array $js_files ): array {
 			$js_files[] = 'ifthenpay-payments-for-latepoint-front';
 
 			return $js_files;
 		}
 
-		// Add styles to the clean layout.
 		public function add_styles_to_clean_layout( array $css_files ): array {
 			$css_files[] = 'ifthenpay-payments-for-latepoint-front';
 
 			return $css_files;
 		}
 
-		/**
-		 * Init addon when WordPress Initialises.
-		 */
 		public function init() {
 			// Domain Path in the plugin header (see the top of this file) is not itself enough —
 			// nothing loads the compiled .mo files without this call.
@@ -517,7 +453,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
-			// Optional: save version to maintain manual control
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
 		}
 
