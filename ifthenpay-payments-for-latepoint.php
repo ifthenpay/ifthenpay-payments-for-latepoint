@@ -64,6 +64,22 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return plugin_dir_url( __FILE__ ) . 'public/images/';
 		}
 
+		/**
+		 * Cache-busting query arg for a public asset: the file's own last-modified time when it can
+		 * be read, falling back to the plugin version. A static version string across many commits
+		 * within the same unreleased version (as during active development) means the browser never
+		 * sees a reason to refetch an edited .css/.js file — this changes on every edit instead, in
+		 * both dev and production, without needing a manual version bump per asset tweak.
+		 *
+		 * @param string $relative_path Path under the plugin root, e.g. `public/stylesheets/x.css`.
+		 */
+		public function asset_version( string $relative_path ): string {
+			$path  = plugin_dir_path( __FILE__ ) . $relative_path;
+			$mtime = file_exists( $path ) ? filemtime( $path ) : false;
+
+			return false !== $mtime ? (string) $mtime : $this->version;
+		}
+
 		public function define( $name, $value ) {
 			if ( ! defined( $name ) ) {
 				define( $name, $value );
@@ -689,13 +705,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		public function load_front_scripts_and_styles() {
-			wp_enqueue_style( 'ifthenpay-payments-for-latepoint-front', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-front.css', false, $this->version );
-			wp_enqueue_script( 'ifthenpay-payments-for-latepoint-front', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-front.js', array( 'jquery' ), true, $this->version );
+			wp_enqueue_style( 'ifthenpay-payments-for-latepoint-front', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-front.css', false, $this->asset_version( 'public/stylesheets/ifthenpay-payments-for-latepoint-front.css' ) );
+			wp_enqueue_script( 'ifthenpay-payments-for-latepoint-front', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-front.js', array( 'jquery' ), $this->asset_version( 'public/javascripts/ifthenpay-payments-for-latepoint-front.js' ), true );
 		}
 
 		public function load_admin_scripts_and_styles() {
-			wp_enqueue_style( 'ifthenpay-payments-for-latepoint', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-admin.css', false, $this->version );
-			wp_enqueue_script( 'ifthenpay-payments-for-latepoint', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-admin.js', array( 'jquery' ), true, $this->version );
+			wp_enqueue_style( 'ifthenpay-payments-for-latepoint', $this->public_stylesheets() . 'ifthenpay-payments-for-latepoint-admin.css', false, $this->asset_version( 'public/stylesheets/ifthenpay-payments-for-latepoint-admin.css' ) );
+			wp_enqueue_script( 'ifthenpay-payments-for-latepoint', $this->public_javascripts() . 'ifthenpay-payments-for-latepoint-admin.js', array( 'jquery' ), $this->asset_version( 'public/javascripts/ifthenpay-payments-for-latepoint-admin.js' ), true );
 		}
 
 		public function add_scripts_to_clean_layout( array $js_files ): array {
