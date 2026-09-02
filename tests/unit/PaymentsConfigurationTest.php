@@ -299,8 +299,19 @@ final class PaymentsConfigurationTest extends TestCase {
 	public function test_default_method_lists_eligible_methods_even_when_not_enabled(): void {
 		$select_html = $this->render_default_method_fixture( array( 'MBWAY' ) );
 
-		$this->assertStringContainsString( '<option value="MBWAY">MBWAY</option>', $select_html );
-		$this->assertStringContainsString( '<option value="CCARD" disabled>CCARD</option>', $select_html );
-		$this->assertStringContainsString( '<option value="PIX" disabled>PIX</option>', $select_html );
+		$this->assertStringContainsString( '<option value="MBWAY">MBWAY (HLP-000002)</option>', $select_html );
+		$this->assertStringContainsString( '<option value="CCARD" disabled>CCARD (HLP-000003)</option>', $select_html );
+		$this->assertStringContainsString( '<option value="PIX" disabled>PIX (HLP-000004)</option>', $select_html );
+	}
+
+	/**
+	 * An option's account key is exactly what identifies which ifthenpay account this default
+	 * actually points at — the method code alone doesn't say that, matching the same convention
+	 * each method's own checkbox row already uses.
+	 */
+	public function test_default_method_option_shows_account_key(): void {
+		$select_html = $this->render_default_method_fixture( array( 'MBWAY' ) );
+
+		$this->assertStringContainsString( 'HLP-000002', $select_html );
 	}
 }

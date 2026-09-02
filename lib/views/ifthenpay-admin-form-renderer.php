@@ -357,12 +357,17 @@ class IfthenpayAdminFormRenderer {
 				continue;
 			}
 
-			$is_active = isset( $accounts_for_gateway[ $code ] ) && in_array( $code, $enabled_methods, true );
+			$account_key = $accounts_for_gateway[ $code ] ?? '';
+			$is_active   = '' !== $account_key && in_array( $code, $enabled_methods, true );
+			// Same convention as each method's own checkbox row: the account key is what tells a
+			// merchant which ifthenpay account this option actually charges to, not the method
+			// code alone — shown only once there is one to show.
+			$option_text = strtoupper( $code ) . ( '' !== $account_key ? ' (' . $account_key . ')' : '' );
 
 			$options_html .= '<option value="' . esc_attr( $code ) . '"'
 				. ( ! $is_active ? ' disabled' : '' )
 				. ( $is_active && $code === $saved_default ? ' selected' : '' )
-				. '>' . esc_html( strtoupper( $code ) ) . '</option>';
+				. '>' . esc_html( $option_text ) . '</option>';
 		}
 
 		echo OsFormHelper::select_field(
