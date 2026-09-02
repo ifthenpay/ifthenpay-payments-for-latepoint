@@ -84,6 +84,9 @@ class IfthenpayLpReferenceDisplay {
 			<?php if ( $is_paid ) : ?>
 				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
 			<?php else : ?>
+				<p class="ifthenpay-reference-box-instructions">
+					<?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' ); ?>
+				</p>
 				<div class="ifthenpay-reference-box-details">
 					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-entity">
 						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Entity', 'ifthenpay-payments-for-latepoint' ); ?></span>
@@ -104,9 +107,6 @@ class IfthenpayLpReferenceDisplay {
 						</div>
 					<?php endif; ?>
 				</div>
-				<p class="ifthenpay-reference-box-instructions">
-					<?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference above.', 'ifthenpay-payments-for-latepoint' ); ?>
-				</p>
 				<div class="ifthenpay-reference-box-footer">
 					<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
 					<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
