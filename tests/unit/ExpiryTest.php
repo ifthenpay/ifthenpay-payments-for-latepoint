@@ -61,4 +61,36 @@ final class ExpiryTest extends TestCase {
 
 		$this->assertMatchesRegularExpression( '/^\d{8}$/', $result );
 	}
+
+	/**
+	 * The reverse direction: the reference API's own returned expiry date becomes end-of-day in
+	 * `expires_at`, plus the margin — never a straight "now + N days" recomputation. The most
+	 * likely correctness bug in the whole feature (plan.md §7): a reference created in the morning
+	 * with a one-day window must still be payable that evening.
+	 */
+	public function test_expires_at_is_end_of_the_returned_day_plus_margin(): void {
+		$result = IfthenpayLpExpiry::to_expires_at_datetime( '18-01-2026', 24 );
+
+		$this->assertSame( '2026-01-19 23:59:59', $result );
+	}
+
+	/**
+	 * A zero margin still lands at the very end of the returned day, not before it — the deadline
+	 * a customer paying late on the final evening must still land inside.
+	 */
+	public function test_zero_margin_still_reaches_end_of_day(): void {
+		$result = IfthenpayLpExpiry::to_expires_at_datetime( '18-01-2026', 0 );
+
+		$this->assertSame( '2026-01-18 23:59:59', $result );
+	}
+
+	/**
+	 * An unparseable expiry date never holds a slot forever — it falls back to "now" rather than
+	 * silently producing a far-future or empty deadline.
+	 */
+	public function test_unparseable_expiry_date_falls_back_to_now_not_forever(): void {
+		$result = IfthenpayLpExpiry::to_expires_at_datetime( 'not-a-date', 0 );
+
+		$this->assertSame( gmdate( 'Y-m-d' ) . ' 23:59:59', $result );
+	}
 }

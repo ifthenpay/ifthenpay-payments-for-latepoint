@@ -278,7 +278,7 @@ class IfthenpayAdminFormRenderer {
 			<div class="sub-section-content">
 				<div class="label-with-description">
 					<h3><?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?></h3>
-					<div class="label-desc"><?php echo esc_html__( 'Not yet functional — checking a method here has no effect at checkout for now.', 'ifthenpay-payments-for-latepoint' ); ?></div>
+					<div class="label-desc"><?php echo esc_html__( 'Multibanco lets customers pay by reference instead of on the spot. Other methods here are not yet functional.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
 				<div class="os-row os-mb-2">
 					<div class="os-col-12">
@@ -295,11 +295,13 @@ class IfthenpayAdminFormRenderer {
 	/**
 	 * The method codes currently enabled. Which account each one uses is looked up live from the
 	 * gateway dataset at checkout time (IfthenpayDataFormatter::build_accounts_string()) instead of
-	 * being stored here too.
+	 * being stored here too. Public: checkout-time gating (see the main plugin file's
+	 * is_multibanco_usable()) reads the same saved list this form renders checkboxes from — one
+	 * setting covers both "Pay Now" and "Pay Later Configuration", the split is display-only.
 	 *
 	 * @return string[]
 	 */
-	private static function get_saved_enabled_methods(): array {
+	public static function get_saved_enabled_methods(): array {
 		$enabled = OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
 		if ( ! is_array( $enabled ) ) {
 			return array();
