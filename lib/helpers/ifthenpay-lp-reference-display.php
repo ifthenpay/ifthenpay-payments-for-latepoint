@@ -58,10 +58,10 @@ class IfthenpayLpReferenceDisplay {
 	}
 
 	/**
-	 * Renders the reference box. Escaping happens here, not at each call site. Markup uses BEM-style
-	 * classes (`ifthenpay-reference-box__*`), styled in ifthenpay-payments-for-latepoint-front.css —
-	 * a merchant who wants a different look can target those same classes with their own CSS
-	 * (a child theme, or LatePoint's own custom CSS setting) without touching this file.
+	 * Renders the reference box. Escaping happens here, not at each call site. Markup uses
+	 * `ifthenpay-reference-box-*` classes, styled in ifthenpay-payments-for-latepoint-front.css — a
+	 * merchant who wants a different look can target those same classes with their own CSS (a child
+	 * theme, or LatePoint's own custom CSS setting) without touching this file.
 	 *
 	 * @param object $record As returned by for_order()/for_booking().
 	 */
@@ -74,7 +74,7 @@ class IfthenpayLpReferenceDisplay {
 		ob_start();
 		?>
 		<div class="ifthenpay-reference-box <?php echo $is_paid ? 'is-paid' : 'is-pending'; ?>">
-			<div class="ifthenpay-reference-box__title">
+			<div class="ifthenpay-reference-box-title">
 				<?php
 				echo $is_paid
 					? esc_html__( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
@@ -82,27 +82,34 @@ class IfthenpayLpReferenceDisplay {
 				?>
 			</div>
 			<?php if ( $is_paid ) : ?>
-				<p class="ifthenpay-reference-box__paid-message"><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
+				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
 			<?php else : ?>
-				<div class="ifthenpay-reference-box__details">
-					<div class="ifthenpay-reference-box__row ifthenpay-reference-box__row--entity">
-						<span class="ifthenpay-reference-box__label"><?php echo esc_html__( 'Entity', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box__value"><?php echo esc_html( (string) $record->entity ); ?></span>
+				<div class="ifthenpay-reference-box-details">
+					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-entity">
+						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Entity', 'ifthenpay-payments-for-latepoint' ); ?></span>
+						<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->entity ); ?></span>
 					</div>
-					<div class="ifthenpay-reference-box__row ifthenpay-reference-box__row--reference">
-						<span class="ifthenpay-reference-box__label"><?php echo esc_html__( 'Reference', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box__value"><?php echo esc_html( (string) $record->reference ); ?></span>
+					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-reference">
+						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Reference', 'ifthenpay-payments-for-latepoint' ); ?></span>
+						<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->reference ); ?></span>
 					</div>
-					<div class="ifthenpay-reference-box__row ifthenpay-reference-box__row--amount">
-						<span class="ifthenpay-reference-box__label"><?php echo esc_html__( 'Amount', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box__value"><?php echo esc_html( OsMoneyHelper::format_price( $record->amount, true, false ) ); ?></span>
+					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-amount">
+						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Amount', 'ifthenpay-payments-for-latepoint' ); ?></span>
+						<span class="ifthenpay-reference-box-value"><?php echo esc_html( OsMoneyHelper::format_price( $record->amount, true, false ) ); ?></span>
 					</div>
 					<?php if ( '' !== $deadline ) : ?>
-						<div class="ifthenpay-reference-box__row ifthenpay-reference-box__row--deadline">
-							<span class="ifthenpay-reference-box__label"><?php echo esc_html__( 'Pay by', 'ifthenpay-payments-for-latepoint' ); ?></span>
-							<span class="ifthenpay-reference-box__value"><?php echo esc_html( $deadline ); ?></span>
+						<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-deadline">
+							<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Pay by', 'ifthenpay-payments-for-latepoint' ); ?></span>
+							<span class="ifthenpay-reference-box-value"><?php echo esc_html( $deadline ); ?></span>
 						</div>
 					<?php endif; ?>
+				</div>
+				<p class="ifthenpay-reference-box-instructions">
+					<?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference above.', 'ifthenpay-payments-for-latepoint' ); ?>
+				</p>
+				<div class="ifthenpay-reference-box-footer">
+					<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
+					<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
 				</div>
 			<?php endif; ?>
 		</div>
