@@ -85,12 +85,17 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-payment-times.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-params.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-lock-unavailable-exception.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement-lock.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-email-helper.php';
 
 			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
 
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
+
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/cli/ifthenpay-lp-cli-commands.php';
