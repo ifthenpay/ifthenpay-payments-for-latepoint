@@ -104,6 +104,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/cli/ifthenpay-lp-cli-commands.php';
@@ -141,6 +142,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_process_payment_for_transaction_intent', array( $this, 'process_payment_for_transaction_intent' ), 10, 2 );
 
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
+			// Not IfthenpayLpExpirySweep::HOOK here — that class doesn't exist yet at this point
+			// (init_hooks() runs from this addon's own constructor, before includes() has loaded
+			// any lib/ file; see this method's own callable-array registrations above, which are
+			// resolved lazily when their hooks actually fire, unlike a class constant reference).
+			add_action( 'ifthenpay_lp_expiry_sweep', array( 'IfthenpayLpExpirySweep', 'run' ) );
 
 			add_action( 'init', array( $this, 'init' ), 0 );
 
@@ -599,13 +605,24 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Gateway Key that's stale the moment this version is active, not only after the
 			// merchant next saves settings.
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
+
+			// Same reasoning again: an in-place update from a version that never scheduled this
+			// cron must still end up with it scheduled, not only a fresh (re)activation.
+			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
+				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
+			}
 		}
 
 		public function latepoint_init() {
 			LatePoint\Cerber\Router::init_addon();
 		}
 
-		public function on_deactivate() {}
+		public function on_deactivate() {
+			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
+				require_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';
+			}
+			wp_clear_scheduled_hook( IfthenpayLpExpirySweep::HOOK );
+		}
 
 		public function on_activate() {
 			do_action( 'latepoint_on_addon_activate', $this->addon_name, $this->version );
@@ -622,6 +639,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				require_once __DIR__ . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
 			}
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
+
+			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
+				require_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';
+			}
+			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
+				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
+			}
 
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
 		}
