@@ -76,6 +76,21 @@ Payments are processed securely through ifthenpay's pay-by-link system. Customer
 </details>
 
 <details>
+<summary><strong>How does Multibanco payment work?</strong></summary>
+Multibanco is deferred, not instant: at checkout the customer gets an Entity/Reference/Amount to pay at an ATM or via homebanking, instead of a card-style payment page. The booking is created right away — pending, not confirmed — and the reference is shown on the confirmation page, in the confirmation email, and later in the customer's dashboard, so it isn't lost. The booking confirms automatically once ifthenpay notifies the site the reference was paid, typically within minutes of payment.
+</details>
+
+<details>
+<summary><strong>What happens if a Multibanco reference is never paid?</strong></summary>
+The booking still holds the time slot while the reference is pending — nobody else can book it in the meantime, so an unpaid reference blocks that slot until it expires. An hourly job cancels bookings whose reference has passed its validity window, releasing the slot back for others to book. Set how many days a reference stays valid under **LatePoint → Settings → Payments → Pay Later Configuration → Reference Validity (days)**; a payment that arrives after expiry is not accepted automatically and needs a manual re-check (see below).
+</details>
+
+<details>
+<summary><strong>A customer says they paid a Multibanco reference but the booking still shows pending — what do I do?</strong></summary>
+This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run <code>wp ifthenpay recheck-payment &lt;token&gt;</code> from the server. **Confirm the payment on ifthenpay's own backoffice first** — this command settles the booking on trust, it does not itself call ifthenpay to check the payment status.
+</details>
+
+<details>
 <summary><strong>Are payment details stored?</strong></summary>
 No. The plugin does not store card numbers or full bank details. Only small references needed for matching payments are kept.
 </details>

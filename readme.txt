@@ -70,7 +70,16 @@ Yes — after a Gateway Key is saved, the plugin registers a payment notificatio
 = How does the payment process work? =  
 Payments are processed securely through ifthenpay's pay-by-link system. Customers select a payment method during booking, and a secure payment page opens for completion. Once paid, the status is verified and the booking is confirmed automatically.
 
-= Are payment details stored? =  
+= How does Multibanco payment work? =
+Multibanco is deferred, not instant: at checkout the customer gets an Entity/Reference/Amount to pay at an ATM or via homebanking, instead of a card-style payment page. The booking is created right away — pending, not confirmed — and the reference is shown on the confirmation page, in the confirmation email, and later in the customer's dashboard, so it isn't lost. The booking confirms automatically once ifthenpay notifies the site the reference was paid, typically within minutes of payment.
+
+= What happens if a Multibanco reference is never paid? =
+The booking still holds the time slot while the reference is pending — nobody else can book it in the meantime, so an unpaid reference blocks that slot until it expires. An hourly job cancels bookings whose reference has passed its validity window, releasing the slot back for others to book. Set how many days a reference stays valid under **LatePoint → Settings → Payments → Pay Later Configuration → Reference Validity (days)**; a payment that arrives after expiry is not accepted automatically and needs a manual re-check (see below).
+
+= A customer says they paid a Multibanco reference but the booking still shows pending — what do I do? =
+This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run `wp ifthenpay recheck-payment <token>` from the server. **Confirm the payment on ifthenpay's own backoffice first** — this command settles the booking on trust, it does not itself call ifthenpay to check the payment status.
+
+= Are payment details stored? =
 No. The plugin does not store card numbers or full bank details. Only small references needed for matching payments are kept.
 
 = Is there a sandbox? =  
@@ -97,9 +106,10 @@ This plugin integrates with the ifthenpay payment platform to process payments f
     - During payment processing: Minimal transaction details including transaction ID, amount, and booking details to generate payment references.  
   - **End-User License Agreement (EULA)**: [EULA](https://ifthenpay.com/eula/)  
   - **Privacy Policy**: [Privacy Policy](https://ifthenpay.com/politica-de-privacidade/)
-- **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:  
-  - api.ifthenpay.com (https://api.ifthenpay.com)  
+- **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:
+  - api.ifthenpay.com (https://api.ifthenpay.com)
   - ifthenpay.com (https://ifthenpay.com)
+- **Inbound callback URL**: ifthenpay itself calls back to `https://your-site.com/wp-json/ifthenpay-lp/v1/callback` to confirm a payment. A site behind its own WAF, security plugin, or reverse proxy must allow GET requests to that path from ifthenpay's servers, or payment confirmations will not arrive.
 
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 
