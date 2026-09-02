@@ -125,6 +125,17 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * The customer-facing surfaces' own lookup: given the order/transaction intent id a checkout
+	 * was created from, finds the payment record it produced — one row per intent by construction
+	 * (each checkout attempt creates at most one), not enforced as a database constraint.
+	 *
+	 * @param int $intent_id An order or transaction intent id.
+	 */
+	public static function find_by_intent_id( int $intent_id ): ?object {
+		return self::find_one( 'intent_id', (string) $intent_id );
+	}
+
+	/**
 	 * The expiry sweep's own access path — deliberately restricted to `kind = 'deferred'`.
 	 * A still-PENDING realtime row means the order was never created (send_ifthenpay_options()
 	 * only ever inserts before checkout confirms), so there is nothing for the sweep to cancel

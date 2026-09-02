@@ -1,0 +1,151 @@
+<?php
+/**
+ * Proves IfthenpayLpReferenceDisplay — the shared lookup+render behind every customer-facing
+ * surface for a deferred payment's own reference (T-13, spec 001) — plus the email-content
+ * injection hook that reuses it.
+ *
+ * @package ifthenpay-payments-for-latepoint
+ */
+
+// phpcs:ignore Squiz.Commenting.FileComment.Missing -- docblock above is the file comment; the sniff misclassifies it when a require is the first statement.
+require_once __DIR__ . '/../support/class-latepoint-order-fixture.php';
+
+/**
+ * Reference display proof.
+ */
+class ReferenceDisplayTest extends WP_UnitTestCase {
+
+	/**
+	 * A real, real-looking Multibanco row for a converted order.
+	 *
+	 * @phpstan-param object{customer: OsCustomerModel, order_intent: OsOrderIntentModel, order: OsOrderModel, order_item: OsOrderItemModel, booking: OsBookingModel, invoice: OsInvoiceModel} $fixture
+	 *
+	 * @param object $fixture As returned by ifthenpay_lp_create_order_fixture().
+	 * @param string $status  Repository row status; defaults to still-PENDING.
+	 */
+	private function seed_deferred_row( object $fixture, string $status = 'PENDING' ): void {
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-display-' . $fixture->order->id,
+				'request_id'  => 'REQ-DISPLAY-' . $fixture->order->id,
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'MB',
+				'status'      => $status,
+				'amount'      => $fixture->invoice->charge_amount,
+				'gateway_key' => 'TEST-GW-KEY-0001',
+				'entity'      => '11990',
+				'reference'   => '123456789',
+				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+			)
+		);
+	}
+
+	/**
+	 * Finds the deferred record for a real order.
+	 */
+	public function test_for_order_finds_the_deferred_record(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+
+		$this->assertNotNull( $record );
+		$this->assertSame( '11990', $record->entity ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( '123456789', $record->reference ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * An order with no deferred payment at all (a realtime one, or none) returns null — nothing to
+	 * show, no error.
+	 */
+	public function test_for_order_returns_null_without_a_deferred_record(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+
+		$this->assertNull( IfthenpayLpReferenceDisplay::for_order( $fixture->order->id ) );
+	}
+
+	/**
+	 * Resolves to the same record via the booking's own order item → order chain.
+	 */
+	public function test_for_booking_resolves_via_the_order(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_booking( $fixture->booking->id );
+
+		$this->assertNotNull( $record );
+		$this->assertSame( '123456789', $record->reference ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The rendered box shows entity, reference and amount while still pending.
+	 */
+	public function test_render_html_shows_details_while_pending(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringContainsString( '11990', $html );
+		$this->assertStringContainsString( '123456789', $html );
+	}
+
+	/**
+	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
+	 * customer who already paid doesn't need to be told the entity/reference again.
+	 */
+	public function test_render_html_hides_details_once_paid(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture, 'PAID' );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringNotContainsString( '123456789', $html );
+	}
+
+	/**
+	 * The confirmation-email filter appends the reference box to an order_created email's own
+	 * already-prepared content, without touching anything else about the action.
+	 */
+	public function test_email_filter_appends_reference_for_order_created(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture );
+
+		global $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY;
+
+		$action                        = new \LatePoint\Misc\ProcessAction();
+		$action->type                  = 'send_email';
+		$action->event                 = new \LatePoint\Misc\ProcessEvent( array( 'type' => 'order_created' ) );
+		$action->selected_data_objects = array(
+			array(
+				'model' => 'order',
+				'id'    => $fixture->order->id,
+			),
+		);
+		$action->prepared_data_for_run = array( 'content' => '<p>Thanks for your booking.</p>' );
+
+		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
+
+		$this->assertStringContainsString( 'Thanks for your booking.', $result->prepared_data_for_run['content'] );
+		$this->assertStringContainsString( '123456789', $result->prepared_data_for_run['content'] );
+	}
+
+	/**
+	 * An unrelated action type (e.g. send_sms) is left completely untouched.
+	 */
+	public function test_email_filter_ignores_non_email_actions(): void {
+		global $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY;
+
+		$action                        = new \LatePoint\Misc\ProcessAction();
+		$action->type                  = 'send_sms';
+		$action->event                 = new \LatePoint\Misc\ProcessEvent( array( 'type' => 'order_created' ) );
+		$action->prepared_data_for_run = array( 'content' => 'Thanks!' );
+
+		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
+
+		$this->assertSame( 'Thanks!', $result->prepared_data_for_run['content'] );
+	}
+}

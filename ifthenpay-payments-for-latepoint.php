@@ -106,6 +106,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-manual-recheck.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-reference-display.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -150,6 +151,14 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// any lib/ file; see this method's own callable-array registrations above, which are
 			// resolved lazily when their hooks actually fire, unlike a class constant reference).
 			add_action( 'ifthenpay_lp_expiry_sweep', array( 'IfthenpayLpExpirySweep', 'run' ) );
+
+			// Customer-facing surfaces for a deferred payment's own reference (T-13, spec 001) —
+			// see IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
+			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
+			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
+			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_order_summary' ) );
+			add_action( 'latepoint_booking_full_summary_head_info_after', array( $this, 'render_reference_on_booking_summary' ) );
+			add_filter( 'latepoint_process_prepare_data_for_run', array( $this, 'append_reference_to_email_content' ) );
 
 			add_action( 'init', array( $this, 'init' ), 0 );
 
@@ -464,6 +473,93 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			IfthenpayLpCallbackRegistration::register( $gateway_key );
+		}
+
+		/**
+		 * Prints the reference box on the booking confirmation step.
+		 *
+		 * @param OsOrderModel $order As passed by the hook.
+		 */
+		public function render_reference_on_confirmation_step( $order ) {
+			if ( ! ( $order instanceof OsOrderModel ) ) {
+				return;
+			}
+			$record = IfthenpayLpReferenceDisplay::for_order( (int) $order->id );
+			if ( $record ) {
+				echo IfthenpayLpReferenceDisplay::render_html( $record ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_html() escapes internally.
+			}
+		}
+
+		/**
+		 * Prints the reference box on a customer dashboard booking tile.
+		 *
+		 * @param OsBookingModel $booking As passed by the hook.
+		 */
+		public function render_reference_on_dashboard_tile( $booking ) {
+			if ( ! ( $booking instanceof OsBookingModel ) ) {
+				return;
+			}
+			$record = IfthenpayLpReferenceDisplay::for_booking( (int) $booking->id );
+			if ( $record ) {
+				echo IfthenpayLpReferenceDisplay::render_html( $record ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_html() escapes internally.
+			}
+		}
+
+		/**
+		 * Prints the reference box on the order summary lightbox.
+		 *
+		 * @param OsOrderModel $order As passed by the hook.
+		 */
+		public function render_reference_on_order_summary( $order ) {
+			$this->render_reference_on_confirmation_step( $order );
+		}
+
+		/**
+		 * Prints the reference box on the booking summary lightbox.
+		 *
+		 * @param OsBookingModel $booking As passed by the hook.
+		 */
+		public function render_reference_on_booking_summary( $booking ) {
+			$this->render_reference_on_dashboard_tile( $booking );
+		}
+
+		/**
+		 * Appends the reference box to the confirmation email's own already-prepared content —
+		 * fires after ProcessAction::prepare_data_for_run() has already built
+		 * `prepared_data_for_run['content']` from the merchant's own template (process_action.php),
+		 * so this only ever adds to it, never replaces it.
+		 *
+		 * @param \LatePoint\Misc\ProcessAction $action The action about to run.
+		 * @return \LatePoint\Misc\ProcessAction
+		 */
+		public function append_reference_to_email_content( $action ) {
+			if ( ! ( $action instanceof \LatePoint\Misc\ProcessAction ) || 'send_email' !== $action->type ) {
+				return $action;
+			}
+			if ( ! in_array( $action->event->type ?? '', array( 'order_created', 'booking_created' ), true ) ) {
+				return $action;
+			}
+			if ( ! isset( $action->prepared_data_for_run['content'] ) ) {
+				return $action;
+			}
+
+			$record = null;
+			foreach ( $action->selected_data_objects as $data_object ) {
+				if ( 'order' === ( $data_object['model'] ?? '' ) ) {
+					$record = IfthenpayLpReferenceDisplay::for_order( (int) $data_object['id'] );
+				} elseif ( 'booking' === ( $data_object['model'] ?? '' ) ) {
+					$record = IfthenpayLpReferenceDisplay::for_booking( (int) $data_object['id'] );
+				}
+				if ( $record ) {
+					break;
+				}
+			}
+
+			if ( $record ) {
+				$action->prepared_data_for_run['content'] .= IfthenpayLpReferenceDisplay::render_html( $record );
+			}
+
+			return $action;
 		}
 
 		public function localized_vars_for_admin( $localized_vars ) {
