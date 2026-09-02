@@ -76,11 +76,12 @@ final class PaymentsConfigurationTest extends TestCase {
 	}
 
 	/**
-	 * The method's own ifthenpay code (MB, MBWAY, …) is visible next to its display name, not
-	 * only present as a `data-entity` attribute — a merchant reading ifthenpay's own docs or
-	 * talking to their support team needs the code, not just the display label.
+	 * The account key behind a method is visible next to its display name — not the method's own
+	 * ifthenpay code, which the icon and name already identify. The code has no `data-entity`-only
+	 * fallback either: a merchant needs to see which ifthenpay account a row actually charges to,
+	 * not just recognize the method itself.
 	 */
-	public function test_method_code_is_visible_next_to_the_name(): void {
+	public function test_account_key_is_visible_next_to_the_name(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
@@ -98,7 +99,8 @@ final class PaymentsConfigurationTest extends TestCase {
 		);
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( '<span class="ifthenpay-method-code">(MBWAY)</span>', $html );
+		$this->assertStringContainsString( '<span class="ifthenpay-method-account-key">(HLP-000001)</span>', $html );
+		$this->assertStringNotContainsString( '(MBWAY)', $html );
 	}
 
 	/**

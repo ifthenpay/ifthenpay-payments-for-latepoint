@@ -280,8 +280,9 @@ class IfthenpayAdminFormRenderer {
 		<div class="ifthenpay-methods-list">
 			<?php
 			foreach ( $catalog_subset as $code => $props ) :
-				$has_account = isset( $accounts_for_gateway[ $code ] );
-				self::render_payment_method_checkbox( $code, $props, $has_account, $has_account && in_array( $code, $enabled_methods, true ) );
+				$account_key = $accounts_for_gateway[ $code ] ?? '';
+				$has_account = '' !== $account_key;
+				self::render_payment_method_checkbox( $code, $props, $account_key, $has_account && in_array( $code, $enabled_methods, true ) );
 			endforeach;
 			?>
 		</div>
@@ -289,17 +290,23 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * One method's own checkbox row.
+	 * One method's own checkbox row. The method's own ifthenpay code (MB, MBWAY, …) has no real
+	 * use to a merchant once the icon and name already identify it — the account key behind it is
+	 * the piece worth showing, so a merchant can confirm which ifthenpay account this row actually
+	 * charges to.
 	 *
 	 * @param string                                                       $code        The method's own ifthenpay code (MB, MBWAY, …).
 	 * @param array{position:int,image:string,tooltip:string,label:string} $props       Catalog metadata for this method.
-	 * @param bool                                                         $has_account Whether the selected gateway has an account for this method.
+	 * @param string                                                       $account_key The selected gateway's account key for this method, or '' if it has none.
 	 * @param bool                                                         $is_checked  Whether this method is currently enabled.
 	 */
-	private static function render_payment_method_checkbox( string $code, array $props, bool $has_account, bool $is_checked ): void {
+	private static function render_payment_method_checkbox( string $code, array $props, string $account_key, bool $is_checked ): void {
+		$has_account = '' !== $account_key;
+		$key_display = $has_account ? ' <span class="ifthenpay-method-account-key">(' . esc_html( $account_key ) . ')</span>' : '';
+
 		$label = '<span class="ifthenpay-method-content">'
 			. '<img src="' . esc_url( $props['image'] ) . '" class="ifthenpay-method-icon" alt="" />'
-			. '<span class="ifthenpay-method-name">' . esc_html( strtoupper( $props['label'] ) ) . ' <span class="ifthenpay-method-code">(' . esc_html( $code ) . ')</span></span>'
+			. '<span class="ifthenpay-method-name">' . esc_html( strtoupper( $props['label'] ) ) . $key_display . '</span>'
 			. '<span class="ifthenpay-no-accounts">' . esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' )
 			. ' <a href="#" class="ifthenpay-activate" data-entity="' . esc_attr( $code ) . '">' . esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ) . '</a>.</span>'
 			. '</span>';
@@ -319,8 +326,13 @@ class IfthenpayAdminFormRenderer {
 			$is_checked,
 			$atts,
 			array(
-				'class'       => 'ifthenpay-method-item' . ( $has_account ? '' : ' is-disabled' ),
-				'data-entity' => $code,
+				'class'                 => 'ifthenpay-method-item' . ( $has_account ? '' : ' is-disabled' ),
+				'data-entity'           => $code,
+				// Read by the admin script's updateDefaultMethodOptions() so a method checked
+				// client-side can only become a Default Method option when it's actually eligible
+				// — the same rule render_default_method_select() applies to whatever is already
+				// checked at page-load time.
+				'data-default-eligible' => IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default( $code ) ? '1' : '0',
 			),
 			false // No "off" fallback value — an unchecked box simply isn't in the submitted array, same as any other checkbox list.
 		);
@@ -364,10 +376,15 @@ class IfthenpayAdminFormRenderer {
 				<div class="os-row">
 					<div class="os-col-12">
 						<?php
+						// text_field() defaults to its bare "transparent" theme (an underline, no
+						// box) unless told otherwise — 'simple' is what every other field on this
+						// page already uses (see the Backoffice Key field), so this one matches
+						// instead of standing out as unstyled.
 						echo OsFormHelper::text_field(
 							'settings[ifthenpay_description]',
 							esc_html__( 'Description', 'ifthenpay-payments-for-latepoint' ),
-							esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_description' ) )
+							esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_description' ) ),
+							array( 'theme' => 'simple' )
 						);
 						?>
 					</div>

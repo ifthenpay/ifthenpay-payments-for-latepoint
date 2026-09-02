@@ -191,7 +191,9 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.updateDefaultMethodOptions();
 	}
 
-	// The Default Method dropdown can only offer methods that are actually checked.
+	// The Default Method dropdown can only offer methods that are both checked and PBL can
+	// actually pre-select — `data-default-eligible` (server-rendered per row) is the same rule
+	// IfthenpayAdminFormRenderer::render_default_method_select() applies at page load.
 	updateDefaultMethodOptions() {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 		const $select = jQuery(S.defaultMethodSelect);
@@ -202,7 +204,9 @@ class LatepointPaymentsIfthenpayAdmin {
 		const previouslySelected = $select.data('selected') || $select.val();
 		const enabledEntities = jQuery(S.methodCheckbox)
 			.filter(':checked')
-			.map((_, checkbox) => jQuery(checkbox).closest(S.methodItem).data('entity'))
+			.map((_, checkbox) => jQuery(checkbox).closest(S.methodItem))
+			.filter((_, row) => jQuery(row).data('default-eligible') === 1)
+			.map((_, row) => jQuery(row).data('entity'))
 			.get();
 
 		$select.empty();

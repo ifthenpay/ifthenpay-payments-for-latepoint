@@ -47,7 +47,7 @@
 	width: auto;
 }
 
-#paymentProcessorToggler_ifthenpay .ifthenpay-method-code,
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-account-key,
 #paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
 	color: #788291;
 	font-size: 0.85em;
