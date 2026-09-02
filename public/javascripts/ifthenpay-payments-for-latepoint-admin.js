@@ -191,9 +191,12 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.updateDefaultMethodOptions();
 	}
 
-	// The Default Method dropdown can only offer methods that are both checked and PBL can
-	// actually pre-select — `data-default-eligible` (server-rendered per row) is the same rule
-	// IfthenpayAdminFormRenderer::render_default_method_select() applies at page load.
+	// The Default Method dropdown always lists every method PBL can be told to pre-select
+	// (IfthenpayAdminFormRenderer::render_default_method_select() renders the full fixed set up
+	// front) — a method's own <option> is only enabled while its checkbox above is checked, never
+	// added or removed, so checking/unchecking a box just flips the one option that already
+	// exists for it. A method with no <option> at all here (Multibanco, Payshop, Google Pay, Apple
+	// Pay) was never eligible in the first place, so there is nothing for this to do for it.
 	updateDefaultMethodOptions() {
 		const S = LatepointPaymentsIfthenpayAdmin.SELECTORS;
 		const $select = jQuery(S.defaultMethodSelect);
@@ -201,30 +204,21 @@ class LatepointPaymentsIfthenpayAdmin {
 			return;
 		}
 
-		const previouslySelected = $select.data('selected') || $select.val();
-		const enabledEntities = jQuery(S.methodCheckbox)
-			.filter(':checked')
-			.map((_, checkbox) => jQuery(checkbox).closest(S.methodItem))
-			.filter((_, row) => jQuery(row).data('default-eligible') === 1)
-			.map((_, row) => jQuery(row).data('entity'))
-			.get();
+		const checkedEntities = new Set(
+			jQuery(S.methodCheckbox)
+				.filter(':checked')
+				.map((_, checkbox) => jQuery(checkbox).closest(S.methodItem).data('entity'))
+				.get()
+		);
 
-		$select.empty();
-
-		if (!enabledEntities.length) {
-			$select.append(jQuery('<option>', { value: '' }));
-			return;
-		}
-
-		enabledEntities.forEach((entity) => {
-			$select.append(
-				jQuery('<option>', {
-					value: entity,
-					text: entity,
-					selected: entity === previouslySelected,
-				})
-			);
+		$select.find('option[value]:not([value=""])').each((_, option) => {
+			jQuery(option).prop('disabled', !checkedEntities.has(option.value));
 		});
+
+		// A previously-selected default that just got unchecked can't stay selected.
+		if ($select.find('option:selected').prop('disabled')) {
+			$select.val('');
+		}
 	}
 
 	// Emails ifthenpay support asking them to activate a method for the currently selected

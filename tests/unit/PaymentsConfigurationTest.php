@@ -72,7 +72,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringNotContainsString( 'is-disabled', $html );
-		$this->assertStringNotContainsString( 'disabled', $html );
+		$this->assertStringContainsString( 'name="settings[ifthenpay_payment_methods_configuration][]" value="MBWAY" />', $html );
 	}
 
 	/**
@@ -232,54 +232,75 @@ final class PaymentsConfigurationTest extends TestCase {
 	}
 
 	/**
-	 * Default Method offers only methods PBL can actually be told to pre-select — MB, PAYSHOP,
-	 * GOOGLE, and APPLE are all excluded even when enabled, per
-	 * IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default().
+	 * Default Method's own catalog fixture and render call, shared by the tests below — three
+	 * eligible methods (MBWAY, CCARD, PIX) plus one ineligible one (MB), each with an account for
+	 * GATEWAY-1, only some of them enabled.
+	 *
+	 * @param string[] $enabled_methods Saved enabled method codes.
 	 */
-	public function test_default_method_excludes_ineligible_enabled_methods(): void {
+	private function render_default_method_fixture( array $enabled_methods ): string {
 		OsSettingsHelper::$values['ifthenpay_gateway_key']                   = 'GATEWAY-1';
-		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MB', 'MBWAY', 'GOOGLE' );
+		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = $enabled_methods;
+
+		$labels  = array(
+			'MB'    => 'multibanco',
+			'MBWAY' => 'mbway',
+			'CCARD' => 'credit card',
+			'PIX'   => 'pix',
+		);
+		$catalog = array();
+		foreach ( $labels as $code => $label ) {
+			$catalog[ $code ] = array(
+				'position' => array_search( $code, array_keys( $labels ), true ),
+				'image'    => '',
+				'tooltip'  => '',
+				'label'    => $label,
+			);
+		}
 
 		ob_start();
 		IfthenpayAdminFormRenderer::render_payments_configuration(
 			array( 'GATEWAY-1' => 'GATEWAY-1' ),
 			array(
 				'GATEWAY-1' => array(
-					'MB'     => 'HLP-000001',
-					'MBWAY'  => 'HLP-000002',
-					'GOOGLE' => 'HLP-000003',
+					'MB'    => 'HLP-000001',
+					'MBWAY' => 'HLP-000002',
+					'CCARD' => 'HLP-000003',
+					'PIX'   => 'HLP-000004',
 				),
 			),
-			array(
-				'MB'     => array(
-					'position' => 1,
-					'image'    => '',
-					'tooltip'  => '',
-					'label'    => 'multibanco',
-				),
-				'MBWAY'  => array(
-					'position' => 2,
-					'image'    => '',
-					'tooltip'  => '',
-					'label'    => 'mbway',
-				),
-				'GOOGLE' => array(
-					'position' => 6,
-					'image'    => '',
-					'tooltip'  => '',
-					'label'    => 'google pay',
-				),
-			)
+			$catalog
 		);
 		$html = (string) ob_get_clean();
 
 		$select_start = strpos( $html, 'name="settings[ifthenpay_default_method]"' );
 		$select_start = strrpos( substr( $html, 0, $select_start ), '<select' );
 		$select_end   = strpos( $html, '</select>', $select_start );
-		$select_html  = substr( $html, $select_start, $select_end - $select_start );
 
-		$this->assertStringContainsString( 'MBWAY', $select_html );
-		$this->assertStringNotContainsString( 'MB<', $select_html );
-		$this->assertStringNotContainsString( 'GOOGLE', $select_html );
+		return substr( $html, $select_start, $select_end - $select_start );
+	}
+
+	/**
+	 * Multibanco never gets an `<option>` at all — not merely disabled — since it is never
+	 * eligible as a default regardless of enabled state, per
+	 * IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default().
+	 */
+	public function test_default_method_never_offers_an_ineligible_method_as_an_option(): void {
+		$select_html = $this->render_default_method_fixture( array( 'MB', 'MBWAY' ) );
+
+		$this->assertStringNotContainsString( 'value="MB"', $select_html );
+	}
+
+	/**
+	 * An eligible method that isn't currently enabled still gets an `<option>` — just a `disabled`
+	 * one — so the merchant sees the full set of possible defaults up front, not an empty dropdown
+	 * that only grows as boxes are checked.
+	 */
+	public function test_default_method_lists_eligible_methods_even_when_not_enabled(): void {
+		$select_html = $this->render_default_method_fixture( array( 'MBWAY' ) );
+
+		$this->assertStringContainsString( '<option value="MBWAY">MBWAY</option>', $select_html );
+		$this->assertStringContainsString( '<option value="CCARD" disabled>CCARD</option>', $select_html );
+		$this->assertStringContainsString( '<option value="PIX" disabled>PIX</option>', $select_html );
 	}
 }

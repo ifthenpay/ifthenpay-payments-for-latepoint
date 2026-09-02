@@ -18,20 +18,30 @@ if ( ! class_exists( 'OsFormHelper' ) ) {
 		 * which one is selected — everything else (theme classes, validation attrs) is LatePoint's
 		 * own concern and is not reproduced.
 		 *
-		 * @param string               $name           Field name.
-		 * @param string               $label          Label text.
-		 * @param array<string,string> $options        `{value: label}`.
-		 * @param mixed                $selected_value Currently selected value; the real method
-		 *                                              takes no type of its own (a loose `==`
-		 *                                              comparison), so callers may pass `null`.
-		 * @param array<string,mixed>  ...$rest         Unused by this stand-in; kept for signature parity.
+		 * @param string                      $name           Field name.
+		 * @param string                      $label          Label text.
+		 * @param array<string,string>|string $options `{value: label}`, or a raw `<option>` HTML
+		 *                                              string — the real method accepts either,
+		 *                                              inserting a string as-is instead of
+		 *                                              iterating it.
+		 * @param mixed                       $selected_value Currently selected value; the real method
+		 *                                                     takes no type of its own (a loose `==`
+		 *                                                     comparison), so callers may pass `null`. Only
+		 *                                                     applied when $options is an array — a raw
+		 *                                                     HTML string is expected to embed its own
+		 *                                                     `selected` attribute already.
+		 * @param array<string,mixed>         ...$rest         Unused by this stand-in; kept for signature parity.
 		 * @phpstan-ignore missingType.parameter (deliberately untyped variadic stand-in for a LatePoint core signature this plugin doesn't own)
 		 */
-		public static function select_field( string $name, string $label, array $options = array(), $selected_value = '', ...$rest ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- $rest unused by this stand-in; kept for signature parity with the real method.
-			$option_tags = '';
-			foreach ( $options as $value => $option_label ) {
-				$selected     = ( (string) $value == $selected_value ) ? ' selected' : ''; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- reproducing the real method's own loose `==` comparison against a possibly-null $selected_value.
-				$option_tags .= '<option value="' . esc_attr( $value ) . '"' . $selected . '>' . esc_html( $option_label ) . '</option>';
+		public static function select_field( string $name, string $label, $options = array(), $selected_value = '', ...$rest ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- $rest unused by this stand-in; kept for signature parity with the real method.
+			if ( is_array( $options ) ) {
+				$option_tags = '';
+				foreach ( $options as $value => $option_label ) {
+					$selected     = ( (string) $value == $selected_value ) ? ' selected' : ''; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- reproducing the real method's own loose `==` comparison against a possibly-null $selected_value.
+					$option_tags .= '<option value="' . esc_attr( $value ) . '"' . $selected . '>' . esc_html( $option_label ) . '</option>';
+				}
+			} else {
+				$option_tags = $options;
 			}
 
 			return '<div class="os-form-group os-form-select-group"><label>' . esc_html( $label ) . '</label>'

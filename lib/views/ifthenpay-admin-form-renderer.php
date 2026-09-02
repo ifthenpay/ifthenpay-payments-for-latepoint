@@ -154,6 +154,7 @@ class IfthenpayAdminFormRenderer {
 	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ): void {
 		$enabled_methods      = self::get_saved_enabled_methods();
 		$selected_gateway_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		$accounts_for_gateway = $accounts[ $selected_gateway_key ] ?? array();
 		?>
 		<div class="sub-section-row">
 			<div class="sub-section-label">
@@ -165,10 +166,10 @@ class IfthenpayAdminFormRenderer {
 						<?php self::render_gateway_key_select( $gatewaykeys, $selected_gateway_key ); ?>
 					</div>
 				</div>
-				<?php self::render_payment_methods( $catalog, $accounts[ $selected_gateway_key ] ?? array(), $enabled_methods ); ?>
+				<?php self::render_payment_methods( $catalog, $accounts_for_gateway, $enabled_methods ); ?>
 				<div class="os-row">
 					<div class="os-col-6">
-						<?php self::render_default_method_select( $enabled_methods ); ?>
+						<?php self::render_default_method_select( $catalog, $accounts_for_gateway, $enabled_methods ); ?>
 					</div>
 				</div>
 			</div>
@@ -326,34 +327,49 @@ class IfthenpayAdminFormRenderer {
 			$is_checked,
 			$atts,
 			array(
-				'class'                 => 'ifthenpay-method-item' . ( $has_account ? '' : ' is-disabled' ),
-				'data-entity'           => $code,
-				// Read by the admin script's updateDefaultMethodOptions() so a method checked
-				// client-side can only become a Default Method option when it's actually eligible
-				// — the same rule render_default_method_select() applies to whatever is already
-				// checked at page-load time.
-				'data-default-eligible' => IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default( $code ) ? '1' : '0',
+				'class'       => 'ifthenpay-method-item' . ( $has_account ? '' : ' is-disabled' ),
+				'data-entity' => $code,
 			),
 			false // No "off" fallback value — an unchecked box simply isn't in the submitted array, same as any other checkbox list.
 		);
 	}
 
 	/**
-	 * The Default Method `<select>`, offering only enabled methods PBL can actually be told to
-	 * pre-select — Multibanco, Payshop, Google Pay, and Apple Pay never appear here even if
-	 * enabled, since PBL's `selected_method` field has no value for any of them
-	 * (IfthenpayDataFormatter::get_selected_method() applies the same rule at checkout).
+	 * The Default Method `<select>` always lists every method PBL can be told to pre-select
+	 * (MBWAY, credit card, Pix — never Multibanco, Payshop, Google Pay, or Apple Pay, per
+	 * IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default(), the same rule
+	 * IfthenpayDataFormatter::get_selected_method() applies at checkout) — an option is only
+	 * `disabled` while its own checkbox above isn't checked, rather than disappearing from the
+	 * list entirely, so a merchant sees the full set of possible defaults up front instead of an
+	 * empty dropdown before checking anything.
 	 *
-	 * @param string[] $enabled_methods Saved enabled method codes.
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
+	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
+	 * @param string[]                                                                   $enabled_methods      Saved enabled method codes.
 	 */
-	private static function render_default_method_select( array $enabled_methods ): void {
-		$eligible_methods = array_values( array_filter( $enabled_methods, array( 'IfthenpayLpPayByLinkMethodEligibility', 'is_eligible_as_default' ) ) );
-		$options          = array( '' => '' ) + array_combine( $eligible_methods, array_map( 'strtoupper', $eligible_methods ) );
+	private static function render_default_method_select( array $catalog, array $accounts_for_gateway, array $enabled_methods ): void {
+		uasort( $catalog, fn( $a, $b ) => $a['position'] <=> $b['position'] );
+		$saved_default = OsSettingsHelper::get_settings_value( 'ifthenpay_default_method' );
+
+		$options_html = '<option value=""></option>';
+		foreach ( array_keys( $catalog ) as $code ) {
+			if ( ! IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default( $code ) ) {
+				continue;
+			}
+
+			$is_active = isset( $accounts_for_gateway[ $code ] ) && in_array( $code, $enabled_methods, true );
+
+			$options_html .= '<option value="' . esc_attr( $code ) . '"'
+				. ( ! $is_active ? ' disabled' : '' )
+				. ( $is_active && $code === $saved_default ? ' selected' : '' )
+				. '>' . esc_html( strtoupper( $code ) ) . '</option>';
+		}
+
 		echo OsFormHelper::select_field(
 			'settings[ifthenpay_default_method]',
 			esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
-			$options,
-			OsSettingsHelper::get_settings_value( 'ifthenpay_default_method' ),
+			$options_html,
+			'',
 			array( 'class' => 'ifthenpay-default-method' )
 		);
 		?>
