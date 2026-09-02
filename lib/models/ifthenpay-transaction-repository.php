@@ -125,6 +125,32 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * The expiry sweep's own access path — deliberately restricted to `kind = 'deferred'`.
+	 * A still-PENDING realtime row means the order was never created (send_ifthenpay_options()
+	 * only ever inserts before checkout confirms), so there is nothing for the sweep to cancel
+	 * there; only deferred methods (Multibanco) hold a slot open across a real waiting period.
+	 * Uses the table's own `status_expires` index — no wp_cache layer, since this always runs
+	 * against a fresh, possibly large set on an hourly cron tick, not a per-request lookup.
+	 *
+	 * @return object[]
+	 */
+	public static function find_expired_pending(): array {
+		global $wpdb;
+		$table = self::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- $table has no user-controlled part (built from $wpdb->prefix); values are placeholders.
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table has no user-controlled part (built from $wpdb->prefix); the %s placeholders cover every real value.
+				"SELECT * FROM `{$table}` WHERE status = %s AND kind = %s AND expires_at IS NOT NULL AND expires_at < %s",
+				'PENDING',
+				'deferred',
+				current_time( 'mysql', true )
+			)
+		);
+	}
+
+	/**
 	 * Sets the status column.
 	 *
 	 * @param string $token  Our correlation handle.
