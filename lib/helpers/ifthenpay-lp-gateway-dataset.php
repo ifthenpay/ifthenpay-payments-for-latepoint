@@ -122,11 +122,15 @@ class IfthenpayLpGatewayDataset {
 
 	/**
 	 * A catalog-visible method's account "key" is its whole raw field value, unmodified — for most
-	 * methods that already reads as `"{METHOD}|{accountKey}"`, but Multibanco alone can carry
-	 * either that same shape (a dynamic MB key) or a raw `"{entidade}|{subentidade}"` pair (a
-	 * static MB key), both confirmed live against real gateways — a merchant assigns their gateway
-	 * one or the other, never both, and there is no reliable way to tell them apart other than
-	 * trusting the whole value as-is.
+	 * methods that already reads as `"{METHOD}|{accountKey}"` and every current consumer wants it
+	 * that way (Pay By Link's own `accounts` field is built from this same raw shape). Multibanco
+	 * is the one exception with a real, live-confirmed consumer of the bare key: the Multibanco
+	 * reference API's `mbKey` parameter (contracts/api.md operation "Multibanco reference") rejects
+	 * the `"MB | {accountKey}"` form outright (401/403, "credentials rejected") and only accepts the
+	 * bare `{accountKey}` — confirmed by calling both forms against a real gateway. A gateway
+	 * configured with a static offline key instead carries a raw `"{entidade}|{subentidade}"` pair
+	 * with no `"MB | "` prefix to strip; that form is passed through unchanged; see
+	 * contracts/api.md's own note on `Multibanco`'s two shapes.
 	 *
 	 * @param array<string,mixed>                                                        $record  One gateway record.
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog to intersect against.
@@ -139,6 +143,10 @@ class IfthenpayLpGatewayDataset {
 			$field_name  = self::CATALOG_TO_FIELD_NAME[ $method_key ] ?? $method_key;
 			$raw_value   = $record[ $field_name ] ?? '';
 			$account_key = is_string( $raw_value ) ? trim( $raw_value ) : '';
+
+			if ( 'MB' === $method_key && 0 === strpos( $account_key, 'MB | ' ) ) {
+				$account_key = substr( $account_key, strlen( 'MB | ' ) );
+			}
 
 			if ( '' !== $account_key ) {
 				$accounts[ $method_key ] = $account_key;
