@@ -310,11 +310,17 @@ class IfthenpayAdminFormRenderer {
 	 */
 	private static function render_payment_method_checkbox( string $code, array $props, string $account_key, bool $is_checked ): void {
 		$has_account = '' !== $account_key;
-		$key_display = $has_account ? ' <span class="ifthenpay-method-account-key">(' . esc_html( $account_key ) . ')</span>' : '';
+		// The name and its account key are two separate flex children (gap-spaced in CSS, not a
+		// literal space character) so the admin script can add, update, or remove the account key
+		// span on a gateway change without having to also manage a stray text node around it.
+		$key_display = $has_account ? '<span class="ifthenpay-method-account-key">(' . esc_html( $account_key ) . ')</span>' : '';
 
 		$label = '<span class="ifthenpay-method-content">'
 			. '<img src="' . esc_url( $props['image'] ) . '" class="ifthenpay-method-icon" alt="" />'
-			. '<span class="ifthenpay-method-name">' . esc_html( strtoupper( $props['label'] ) ) . $key_display . '</span>'
+			. '<span class="ifthenpay-method-name">'
+			. '<span class="ifthenpay-method-label-text">' . esc_html( strtoupper( $props['label'] ) ) . '</span>'
+			. $key_display
+			. '</span>'
 			. '<span class="ifthenpay-no-accounts">' . esc_html__( 'No accounts.', 'ifthenpay-payments-for-latepoint' )
 			. ' <a href="#" class="ifthenpay-activate" data-entity="' . esc_attr( $code ) . '">' . esc_html__( 'Activate', 'ifthenpay-payments-for-latepoint' ) . '</a>.</span>'
 			. '</span>';

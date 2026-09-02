@@ -165,7 +165,8 @@ class LatepointPaymentsIfthenpayAdmin {
 
 		jQuery(S.methodItem).each((_, row) => {
 			const $row = jQuery(row);
-			const hasAccount = !!accounts[$row.data('entity')];
+			const accountKey = accounts[$row.data('entity')];
+			const hasAccount = !!accountKey;
 			const checkbox = $row.find('input[type="checkbox"]').prop('disabled', !hasAccount).get(0);
 
 			if (!hasAccount) {
@@ -174,9 +175,30 @@ class LatepointPaymentsIfthenpayAdmin {
 
 			$row.toggleClass('is-disabled', !hasAccount);
 			this.syncCheckedClass(checkbox);
+			this.updateAccountKeyDisplay($row, accountKey);
 		});
 
 		this.updateDefaultMethodOptions();
+	}
+
+	// The account key shown next to a method's name is baked into the label
+	// IfthenpayAdminFormRenderer rendered for whichever gateway was selected at page load —
+	// switching gateways client-side needs to update it too, or a merchant would keep seeing a
+	// different gateway's account key (or a stale one for a method that no longer has an account
+	// at all).
+	updateAccountKeyDisplay($row, accountKey) {
+		const $name = $row.find('.ifthenpay-method-name');
+		let $key = $name.find('.ifthenpay-method-account-key');
+
+		if (!accountKey) {
+			$key.remove();
+			return;
+		}
+
+		if (!$key.length) {
+			$key = jQuery('<span>', { class: 'ifthenpay-method-account-key' }).appendTo($name);
+		}
+		$key.text(`(${accountKey})`);
 	}
 
 	// LatePoint's own checkbox component only paints its `is-checked` (bordered, highlighted)

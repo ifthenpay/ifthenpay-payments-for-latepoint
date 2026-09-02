@@ -47,6 +47,15 @@
 	width: auto;
 }
 
+/* Name and account key are gap-spaced flex children, not a literal space character between them
+   — the admin script adds/updates/removes the account key span on a gateway change, and a real
+   gap survives that without any text-node bookkeeping on its part. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-method-name {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
 #paymentProcessorToggler_ifthenpay .ifthenpay-method-account-key,
 #paymentProcessorToggler_ifthenpay .ifthenpay-no-accounts {
 	color: #788291;
