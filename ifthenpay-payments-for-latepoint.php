@@ -105,6 +105,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {

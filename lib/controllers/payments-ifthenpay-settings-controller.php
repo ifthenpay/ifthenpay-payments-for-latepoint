@@ -148,6 +148,57 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 				);
 			}
 		}
+
+		/**
+		 * Manual recovery for a missed or failed inbound callback (D-5, spec 001) — not in
+		 * `action_access['public']`, so this keeps this controller's own default (LatePoint's
+		 * `settings__edit` capability), same as every other action here. The actual decision is
+		 * IfthenpayLpManualRecheck::run() — shared with the WP-CLI equivalent — this method only
+		 * maps its outcome to a merchant-facing message.
+		 *
+		 * @return void Sends JSON with status and message.
+		 */
+		public function recheck_payment() {
+			$outcome = IfthenpayLpManualRecheck::run( sanitize_text_field( $this->params['token'] ?? '' ) );
+
+			$this->send_json( self::recheck_response_for( $outcome['outcome'] ) );
+		}
+
+		/**
+		 * Maps an IfthenpayLpManualRecheck::run() outcome to a response.
+		 *
+		 * @param string $outcome One of IfthenpayLpManualRecheck's own constants.
+		 * @return array{status:string,message:string}
+		 */
+		private static function recheck_response_for( string $outcome ): array {
+			switch ( $outcome ) {
+				case IfthenpayLpManualRecheck::SETTLED:
+					return array(
+						'status'  => LATEPOINT_STATUS_SUCCESS,
+						'message' => __( 'Payment confirmed and settled.', 'ifthenpay-payments-for-latepoint' ),
+					);
+				case IfthenpayLpManualRecheck::MISSING_ARGUMENT:
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'Missing payment reference.', 'ifthenpay-payments-for-latepoint' ),
+					);
+				case IfthenpayLpManualRecheck::NOT_FOUND:
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'Payment record not found.', 'ifthenpay-payments-for-latepoint' ),
+					);
+				case IfthenpayLpManualRecheck::REJECTED:
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' ),
+					);
+				default:
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'Could not settle this payment right now. Please try again shortly.', 'ifthenpay-payments-for-latepoint' ),
+					);
+			}
+		}
 	}
 
 endif;
