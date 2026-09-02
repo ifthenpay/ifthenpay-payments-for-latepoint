@@ -1,5 +1,4 @@
 class LatepointPaymentsIfthenpayFront {
-	// Centralized class names
 	static CLS = {
 		overlay: 'ifp-overlay',
 		container: 'ifp-container',
@@ -58,7 +57,7 @@ class LatepointPaymentsIfthenpayFront {
 				'json'
 			);
 		} catch {
-			return { status: 'error', message: 'Request failed.' };
+			return { status: 'error', message: latepoint_helper.ifthenpay_translations.request_failed };
 		}
 	}
 
@@ -93,7 +92,6 @@ class LatepointPaymentsIfthenpayFront {
 		}
 
 		this.toggleScroll(false);
-		// build and append modal
 		const html = `
       <div class="${LatepointPaymentsIfthenpayFront.CLS.overlay}">
         <div class="${LatepointPaymentsIfthenpayFront.CLS.container}">
@@ -109,7 +107,8 @@ class LatepointPaymentsIfthenpayFront {
 			`.${LatepointPaymentsIfthenpayFront.CLS.iframe}`
 		);
 
-		// detect return URL once same-origin
+		// A cross-origin iframe throws reading contentWindow.location until PBL redirects back to
+		// this site's own return URL.
 		$iframe.on('load', () => {
 			let href;
 			try {
@@ -130,7 +129,6 @@ class LatepointPaymentsIfthenpayFront {
 			}
 		});
 
-		// close handler
 		$modal
 			.find(`.${LatepointPaymentsIfthenpayFront.CLS.closeButton}`)
 			.one('click', () => {
@@ -147,7 +145,6 @@ class LatepointPaymentsIfthenpayFront {
 			`<div class="${LatepointPaymentsIfthenpayFront.CLS.spinnerOverlay}"></div>`
 		).appendTo($container);
 
-		// Perform verification request
 		const resp = await this.request(
 			latepoint_helper.ifthenpay_check_status_route,
 			{
@@ -157,12 +154,10 @@ class LatepointPaymentsIfthenpayFront {
 			}
 		);
 
-		// Clean up spinner and modal, restore scroll
 		$spin.remove();
 		$modal.remove();
 		this.toggleScroll(true);
 
-		// Handle response
 		if (resp.status === 'success') {
 			if (type === 'order') {
 				$form.find('[name="cart[payment_token]"]').val(token);

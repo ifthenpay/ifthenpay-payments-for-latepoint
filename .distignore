@@ -6,6 +6,10 @@
 # This file itself
 .distignore
 
+# Spec-driven planning bundle (internal, never ship)
+.claude
+specs
+
 # Git / meta
 .git
 .github
