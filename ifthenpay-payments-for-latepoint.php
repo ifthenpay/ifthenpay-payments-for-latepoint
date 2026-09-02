@@ -334,9 +334,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$backoffice_key = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
 			$dataset        = $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
 
-			$localized_vars['ifthenpay_gateway_options']  = $dataset['gatewaykeys'] ?? array();
-			$localized_vars['ifthenpay_accounts']         = $dataset['accounts'] ?? array();
-			$localized_vars['ifthenpay_gateway_selected'] = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+			$localized_vars['ifthenpay_accounts'] = $dataset['accounts'] ?? array();
 			// Toasted once on page load by the admin script — the only place this state is shown at
 			// all, since add_settings_fields() renders nothing else below a missing gateway key.
 			$localized_vars['ifthenpay_connection_notice'] = $backoffice_key ? IfthenpayAdminFormRenderer::get_connection_notice( $dataset ) : null;

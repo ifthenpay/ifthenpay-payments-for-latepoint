@@ -154,6 +154,13 @@ class IfthenpayAdminFormRenderer {
 	public static function render_payments_configuration( array $gatewaykeys, array $accounts, array $catalog ): void {
 		$enabled_methods      = self::get_saved_enabled_methods();
 		$selected_gateway_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		if ( '' === $selected_gateway_key && array() !== $gatewaykeys ) {
+			// A <select> with no `selected` option shows its first one regardless of what this
+			// renders below it — without this, that visual default (whatever gateway key happens
+			// to sort first) and the accounts actually looked up here would silently disagree, and
+			// every method would show as unavailable for a gateway that plainly isn't empty.
+			$selected_gateway_key = array_key_first( $gatewaykeys );
+		}
 		$accounts_for_gateway = $accounts[ $selected_gateway_key ] ?? array();
 		?>
 		<div class="sub-section-row">
