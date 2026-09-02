@@ -11,6 +11,17 @@ class LatepointPaymentsIfthenpayAdmin {
 
 	constructor() {
 		this.initEvents();
+		this.notifyConnectionStatus();
+	}
+
+	// The connection notice (couldn't check ifthenpay, or connected with no gateway keys yet) is
+	// the only thing said about that state at all — add_settings_fields() renders nothing else
+	// below a missing gateway key, so this is what tells the merchant why.
+	notifyConnectionStatus() {
+		const notice = latepoint_helper.ifthenpay_connection_notice;
+		if (notice) {
+			this.notify(notice.message, notice.type);
+		}
 	}
 
 	initEvents() {
@@ -75,10 +86,8 @@ class LatepointPaymentsIfthenpayAdmin {
 		})
 			.done((res) => {
 				// Everything the previous preview (or the page's own initial render) put after
-				// the Backoffice Key row, not only its `.sub-section-row`s — the connection
-				// status pill and "no gateway keys yet" note are both plain siblings of their
-				// own, and `res.html` on success rebuilds all of it fresh; left in place, each
-				// "Connect" click would stack another status pill on top of the last one.
+				// the Backoffice Key row — `res.html` on success rebuilds it fresh (or rebuilds
+				// nothing at all, if this key has no gateway keys of its own).
 				$section.nextAll().remove();
 
 				if (res.status !== 'success') {
@@ -89,7 +98,14 @@ class LatepointPaymentsIfthenpayAdmin {
 				// This preview's own dataset, not necessarily what was localized at page
 				// load — the key being previewed here hasn't been saved yet.
 				latepoint_helper.ifthenpay_accounts = res.inline_data.accounts;
-				$section.after(res.html);
+
+				if (res.notice) {
+					this.notify(res.notice.message, res.notice.type);
+				}
+
+				if (res.html) {
+					$section.after(res.html);
+				}
 			})
 			.fail(() => this.notify(latepoint_helper.ifthenpay_translations.server_error, 'error'))
 			.always(() => {

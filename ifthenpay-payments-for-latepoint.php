@@ -97,6 +97,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-enabled-method-gate.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-pay-by-link-method-eligibility.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-multibanco-reference.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-callback-registration.php';
@@ -336,6 +337,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_gateway_options']  = $dataset['gatewaykeys'] ?? array();
 			$localized_vars['ifthenpay_accounts']         = $dataset['accounts'] ?? array();
 			$localized_vars['ifthenpay_gateway_selected'] = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+			// Toasted once on page load by the admin script — the only place this state is shown at
+			// all, since add_settings_fields() renders nothing else below a missing gateway key.
+			$localized_vars['ifthenpay_connection_notice'] = $backoffice_key ? IfthenpayAdminFormRenderer::get_connection_notice( $dataset ) : null;
 
 			$localized_vars['ifthenpay_translations'] = array(
 				'no_accounts'        => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
@@ -416,25 +420,30 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				// Re-fetched on every render, not only right after "Connect" — a key
 				// can be revoked after it was stored, or gateway keys added/removed on
 				// ifthenpay's side, independently of this site. The dataset is cached per request,
-				// so this and render_payments_configuration()'s use below cost one HTTP call, not two.
+				// so this and localized_vars_for_admin()'s use of the same key cost one HTTP call,
+				// not two. Nothing here below a missing gateway key: an empty Gateway Key select and
+				// a Payment Methods list that can only ever say "No accounts" has nothing a merchant
+				// can act on — the connection notice (localized_vars_for_admin(), surfaced as a
+				// toast) already says why.
 				$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
-				IfthenpayAdminFormRenderer::render_connection_status( $dataset );
 
-				IfthenpayAdminFormRenderer::render_payments_configuration(
-					$dataset['gatewaykeys'] ?? array(),
-					$dataset['accounts'] ?? array(),
-					IfthenpayLpMethodCatalog::get() ?? array()
-				);
+				if ( ! empty( $dataset['gatewaykeys'] ) ) {
+					IfthenpayAdminFormRenderer::render_payments_configuration(
+						$dataset['gatewaykeys'],
+						$dataset['accounts'] ?? array(),
+						IfthenpayLpMethodCatalog::get() ?? array()
+					);
 
-				// The last registration outcome for the currently saved Gateway Key —
-				// stored by register_callback_on_settings_updated() after a save, surfaced here so
-				// a merchant sees a failure without re-entering the form.
-				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
-				if ( $gateway_key ) {
-					IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
+					// The last registration outcome for the currently saved Gateway Key —
+					// stored by register_callback_on_settings_updated() after a save, surfaced here
+					// so a merchant sees a failure without re-entering the form.
+					$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
+					if ( $gateway_key ) {
+						IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
+					}
+
+					IfthenpayAdminFormRenderer::render_others_configuration();
 				}
-
-				IfthenpayAdminFormRenderer::render_others_configuration();
 			}
 		}
 

@@ -28,7 +28,7 @@ class IfthenpayAdminFormRenderer {
 	 */
 	public static function render_backoffice_configuration( string $backoffice_key ): void {
 		// A saved key already says "connected" as plainly as a button can — no separate status
-		// pill needed for that state (see render_connection_status()). The button doubles as the
+		// pill needed for that state (see get_connection_notice()). The button doubles as the
 		// disconnect action so there is one control for the whole relationship, not a button plus
 		// a status message that both say the same thing.
 		$mode = '' === $backoffice_key ? 'connect' : 'disconnect';
@@ -83,38 +83,36 @@ class IfthenpayAdminFormRenderer {
 	 * only right after "Connect" — so a key revoked on ifthenpay's side, or gateway keys
 	 * added/removed there, shows up without the merchant touching this page. A rejected key can
 	 * never reach this method: the save itself is blocked before a bad key is ever stored, so a
-	 * saved key has already passed the remote check. Silent when the key is fully usable — the
+	 * saved key has already passed the remote check. Null when the key is fully usable — the
 	 * "Disconnect" button already says that plainly; this is only for the two states it can't say
-	 * on its own, "we don't know" and "connected but nothing to configure yet".
+	 * on its own, "we don't know" and "connected but nothing to configure yet". Returned rather
+	 * than echoed: both callers (the page's own render, and the "Connect" preview) surface this as
+	 * a toast, not an inline block sitting above a Payments Configuration section that has nothing
+	 * usable in it either way.
 	 *
 	 * @param array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>}|null $dataset The gateway dataset for this Backoffice Key, or null if it could not be fetched.
+	 * @return array{type:string,message:string}|null
 	 */
-	public static function render_connection_status( ?array $dataset ): void {
+	public static function get_connection_notice( ?array $dataset ): ?array {
 		if ( null === $dataset ) {
-			self::render_status_pill(
-				'error',
-				esc_html__( 'Could not check the connection to ifthenpay right now. This does not affect your saved settings — try reloading in a moment.', 'ifthenpay-payments-for-latepoint' )
+			return array(
+				'type'    => 'error',
+				'message' => esc_html__( 'Could not check the connection to ifthenpay right now. This does not affect your saved settings — try reloading in a moment.', 'ifthenpay-payments-for-latepoint' ),
 			);
-			return;
 		}
 
 		if ( empty( $dataset['gatewaykeys'] ) ) {
-			self::render_status_pill(
-				'pending',
-				esc_html__( 'Connected, but no gateway keys yet for this site.', 'ifthenpay-payments-for-latepoint' )
-			);
-			?>
-			<p class="ifthenpay-onboarding-steps">
-				<?php
-				printf(
+			return array(
+				'type'    => 'error',
+				'message' => sprintf(
 					/* translators: %s: ifthenpay helpdesk link */
-					esc_html__( 'Ask ifthenpay to provision a gateway key for this LatePoint site — contact %s.', 'ifthenpay-payments-for-latepoint' ),
-					'<a href="https://helpdesk.ifthenpay.com" target="_blank" rel="noopener noreferrer">helpdesk.ifthenpay.com</a>' // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a fixed, literal link, not dynamic content.
-				);
-				?>
-			</p>
-			<?php
+					esc_html__( 'Connected, but no gateway keys yet for this site. Ask ifthenpay to provision one — contact %s.', 'ifthenpay-payments-for-latepoint' ),
+					'<a href="https://helpdesk.ifthenpay.com" target="_blank" rel="noopener noreferrer">helpdesk.ifthenpay.com</a>' // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a fixed, literal link, not dynamic content; latepoint_add_notification() renders its message as HTML, so this reaches the merchant as a real, clickable link rather than escaped markup.
+				),
+			);
 		}
+
+		return null;
 	}
 
 	/**
@@ -128,40 +126,17 @@ class IfthenpayAdminFormRenderer {
 		if ( null === $status || $status['success'] ) {
 			return;
 		}
-
-		self::render_status_pill(
-			'error',
-			sprintf(
-				/* translators: %s: reason the callback registration failed */
-				esc_html__( 'The payment notification URL could not be registered with ifthenpay: %s', 'ifthenpay-payments-for-latepoint' ),
-				esc_html( $status['message'] )
-			)
-		);
-	}
-
-	/**
-	 * `pending` renders with the exact status class LatePoint's own Stripe/Razorpay/PayPal connect
-	 * flows use for "connected, action still needed" (`.payment-processor-connect-status-wrapper` +
-	 * `.payment-processor-status-charges-disabled`) — the same markup, colored entirely by
-	 * LatePoint's own CSS. `error` has no first-party equivalent, since every native state there
-	 * assumes a definite connected/action-needed answer rather than "couldn't find out" — it falls
-	 * back to a small class this plugin owns (see the stylesheet). There is no `active` state here:
-	 * a fully usable key is already said plainly by the "Disconnect" button, so nothing needs to
-	 * say it again.
-	 *
-	 * @param string $state   One of `pending`, `error`.
-	 * @param string $message Already-escaped text.
-	 */
-	private static function render_status_pill( string $state, string $message ): void {
-		$native_class = array(
-			'pending' => 'payment-processor-status-charges-disabled',
-		);
-		$class        = $native_class[ $state ] ?? 'ifthenpay-status-' . $state;
 		?>
 		<div class="payment-processor-connect-status-wrapper">
-			<div class="<?php echo esc_attr( $class ); ?>">
+			<div class="ifthenpay-status-error">
 				<span>
-					<?php echo $message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped; this method's whole contract is "pass pre-escaped text". ?>
+					<?php
+					printf(
+						/* translators: %s: reason the callback registration failed */
+						esc_html__( 'The payment notification URL could not be registered with ifthenpay: %s', 'ifthenpay-payments-for-latepoint' ),
+						esc_html( $status['message'] )
+					);
+					?>
 				</span>
 			</div>
 		</div>
@@ -241,12 +216,16 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * One real `OsFormHelper::checkbox_field()` per catalog method — not a card, not a toggle
-	 * switch built by hand. A gateway record carries at most one account per method, verified
-	 * against ifthenpay's own API response, so there is nothing to configure beyond on/off: a
-	 * method with no account for the selected gateway is a plain, natively-`disabled` checkbox —
-	 * browsers already exclude a disabled field from submission, so an unavailable method can
-	 * never be saved as enabled without this plugin doing anything else about it.
+	 * Two groups, not one flat list — the same split IfthenpayDataFormatter applies at checkout
+	 * (IfthenpayLpPayByLinkMethodEligibility::is_listed_in_pay_by_link()), made visible here so a
+	 * merchant sees *why* Multibanco/Payshop behave differently instead of discovering it only
+	 * once a booking silently never offers them. Each row is still a real
+	 * `OsFormHelper::checkbox_field()` — not a card, not a toggle switch built by hand. A gateway
+	 * record carries at most one account per method, verified against ifthenpay's own API
+	 * response, so there is nothing to configure beyond on/off: a method with no account for the
+	 * selected gateway is a plain, natively-`disabled` checkbox — browsers already exclude a
+	 * disabled field from submission, so an unavailable method can never be saved as enabled
+	 * without this plugin doing anything else about it.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog              Method catalog, keyed by method code.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
@@ -254,21 +233,57 @@ class IfthenpayAdminFormRenderer {
 	 */
 	private static function render_payment_methods( array $catalog, array $accounts_for_gateway, array $enabled_methods ): void {
 		uasort( $catalog, fn( $a, $b ) => $a['position'] <=> $b['position'] );
+		$pay_now_codes  = array_filter( array_keys( $catalog ), array( 'IfthenpayLpPayByLinkMethodEligibility', 'is_listed_in_pay_by_link' ) );
+		$deferred_codes = array_diff( array_keys( $catalog ), $pay_now_codes );
 		?>
 		<div class="os-row">
 			<div class="os-col-12">
-				<label class="ifthenpay-section-label">
-					<?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?>
-				</label>
-				<div class="ifthenpay-methods-list">
-					<?php
-					foreach ( $catalog as $code => $props ) :
-						$has_account = isset( $accounts_for_gateway[ $code ] );
-						self::render_payment_method_checkbox( $code, $props, $has_account, $has_account && in_array( $code, $enabled_methods, true ) );
-					endforeach;
-					?>
-				</div>
+				<?php
+				self::render_method_group(
+					esc_html__( 'Pay Now', 'ifthenpay-payments-for-latepoint' ),
+					esc_html__( 'Charged immediately through Pay By Link, at checkout.', 'ifthenpay-payments-for-latepoint' ),
+					array_intersect_key( $catalog, array_flip( $pay_now_codes ) ),
+					$accounts_for_gateway,
+					$enabled_methods
+				);
+				self::render_method_group(
+					esc_html__( 'Deferred — coming soon', 'ifthenpay-payments-for-latepoint' ),
+					esc_html__( 'Generates a reference the customer pays later. Can be enabled here, but this plugin does not act on it yet — checking it has no effect at checkout for now.', 'ifthenpay-payments-for-latepoint' ),
+					array_intersect_key( $catalog, array_flip( $deferred_codes ) ),
+					$accounts_for_gateway,
+					$enabled_methods
+				);
+				?>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * One labeled group of method rows — "Pay Now" or "Deferred", per render_payment_methods().
+	 *
+	 * @param string                                                                     $title                Group heading.
+	 * @param string                                                                     $description          Group caption, shown under the heading.
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog_subset       This group's slice of the catalog.
+	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
+	 * @param string[]                                                                   $enabled_methods      Saved enabled method codes.
+	 */
+	private static function render_method_group( string $title, string $description, array $catalog_subset, array $accounts_for_gateway, array $enabled_methods ): void {
+		if ( array() === $catalog_subset ) {
+			return;
+		}
+		?>
+		<div class="label-with-description">
+			<h3><?php echo $title; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped, matching this method's own contract. ?></h3>
+			<div class="label-desc"><?php echo $description; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- caller already escaped, matching this method's own contract. ?></div>
+		</div>
+		<div class="ifthenpay-methods-list">
+			<?php
+			foreach ( $catalog_subset as $code => $props ) :
+				$has_account = isset( $accounts_for_gateway[ $code ] );
+				self::render_payment_method_checkbox( $code, $props, $has_account, $has_account && in_array( $code, $enabled_methods, true ) );
+			endforeach;
+			?>
 		</div>
 		<?php
 	}
@@ -312,12 +327,16 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * The Default Method `<select>`, offering only the methods currently enabled.
+	 * The Default Method `<select>`, offering only enabled methods PBL can actually be told to
+	 * pre-select — Multibanco, Payshop, Google Pay, and Apple Pay never appear here even if
+	 * enabled, since PBL's `selected_method` field has no value for any of them
+	 * (IfthenpayDataFormatter::get_selected_method() applies the same rule at checkout).
 	 *
 	 * @param string[] $enabled_methods Saved enabled method codes.
 	 */
 	private static function render_default_method_select( array $enabled_methods ): void {
-		$options = array( '' => '' ) + array_combine( $enabled_methods, array_map( 'strtoupper', $enabled_methods ) );
+		$eligible_methods = array_values( array_filter( $enabled_methods, array( 'IfthenpayLpPayByLinkMethodEligibility', 'is_eligible_as_default' ) ) );
+		$options          = array( '' => '' ) + array_combine( $eligible_methods, array_map( 'strtoupper', $eligible_methods ) );
 		echo OsFormHelper::select_field(
 			'settings[ifthenpay_default_method]',
 			esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
@@ -325,6 +344,11 @@ class IfthenpayAdminFormRenderer {
 			OsSettingsHelper::get_settings_value( 'ifthenpay_default_method' ),
 			array( 'class' => 'ifthenpay-default-method' )
 		);
+		?>
+		<p class="ifthenpay-field-note">
+			<?php echo esc_html__( 'Only Pay Now methods can be set as default — Google Pay, Apple Pay, and the deferred methods above are never pre-selected.', 'ifthenpay-payments-for-latepoint' ); ?>
+		</p>
+		<?php
 	}
 
 	/**

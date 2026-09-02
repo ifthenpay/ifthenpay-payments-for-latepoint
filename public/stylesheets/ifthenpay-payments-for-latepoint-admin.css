@@ -7,13 +7,6 @@
    consecutive rows apart (the base `.os-form-group` bottom margin) — nothing here re-declares any
    of that. What follows is only the handful of things with no native equivalent at all. */
 
-/* A label ("Payment Methods") one nesting level deeper than a sub-section-row's own h3. */
-#paymentProcessorToggler_ifthenpay label.ifthenpay-section-label {
-	display: block;
-	margin: 1rem 0 0.5rem;
-	font-weight: 600;
-}
-
 /* `.os-col-N` carries no gutter of its own — the negative margin on `.os-row` exists only to
    offset the section's own padding, not to space columns apart — so the Backoffice Key field and
    its Connect button need their own gap. Both stack label-then-control in a column so the two
@@ -66,6 +59,16 @@
 
 #paymentProcessorToggler_ifthenpay .ifthenpay-method-item.is-disabled .ifthenpay-no-accounts {
 	display: inline;
+}
+
+/* Matches the colour/size of LatePoint's own `.label-with-description .label-desc` (used for the
+   two method-group captions above), reused here for a single-line note under a select — that
+   native class is scoped to sit only under a `.label-with-description` heading, which a lone
+   select doesn't have of its own. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-field-note {
+	color: #b0b0b0;
+	font-size: 13px;
+	margin-top: 4px;
 }
 
 /* "pending" uses the exact status class Stripe/Razorpay/PayPal's own connect flow uses for

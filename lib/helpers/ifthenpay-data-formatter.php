@@ -123,7 +123,9 @@ class IfthenpayDataFormatter {
 	 * Serialize enabled methods into "METHOD|account;METHOD|account" format, the shape Pay By
 	 * Link's own `accounts` field expects. The settings page stores only which methods are
 	 * enabled, not their account keys — those come from the same live gateway dataset the
-	 * settings page itself reads, matched here against the saved Gateway Key.
+	 * settings page itself reads, matched here against the saved Gateway Key. Multibanco and
+	 * Payshop are excluded even if enabled: they are deferred-reference methods PBL never offers,
+	 * and a merchant can enable them today for a future deferred flow this plugin doesn't have yet.
 	 */
 	private static function build_accounts_string(): string {
 		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
@@ -140,7 +142,7 @@ class IfthenpayDataFormatter {
 
 		$parts = array();
 		foreach ( $enabled_methods as $method_code ) {
-			if ( isset( $accounts_for_gateway[ $method_code ] ) ) {
+			if ( IfthenpayLpPayByLinkMethodEligibility::is_listed_in_pay_by_link( $method_code ) && isset( $accounts_for_gateway[ $method_code ] ) ) {
 				$parts[] = $method_code . '|' . $accounts_for_gateway[ $method_code ];
 			}
 		}
@@ -150,11 +152,13 @@ class IfthenpayDataFormatter {
 
 	/**
 	 * The saved default method's position in the live method catalog, the shape Pay By Link's
-	 * own `selected_method` field expects.
+	 * own `selected_method` field expects. Only MBWAY, credit card, and Pix are valid values here
+	 * — Multibanco, Payshop, Google Pay, and Apple Pay are not, even though the last two are valid
+	 * `accounts` entries.
 	 */
 	private static function get_selected_method(): string {
 		$default = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_default_method', '' );
-		if ( '' === $default ) {
+		if ( '' === $default || ! IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default( $default ) ) {
 			return '';
 		}
 

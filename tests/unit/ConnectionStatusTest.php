@@ -1,13 +1,13 @@
 <?php
 /**
- * Proves the two small status-pill renderers in IfthenpayAdminFormRenderer, both built on the
- * same render_status_pill():
+ * Proves two things in IfthenpayAdminFormRenderer:
  *
- * - render_connection_status(): silent for a fully usable key — the "Disconnect" button
- *   already says that — and only pills the two states it can't say on its own, "couldn't check"
- *   and "connected but nothing to configure yet". A rejected key can never reach this method at
- *   all, since save-time validation already blocks that save; "Rejected" is the "Connect"
- *   preview's own state, not this one's.
+ * - get_connection_notice(): `null` for a fully usable key — the "Disconnect" button
+ *   already says that — and a toast-ready `{type, message}` for the two states it can't say on
+ *   its own, "couldn't check" and "connected but nothing to configure yet". A rejected key can
+ *   never reach this method at all, since save-time validation already blocks that save;
+ *   "Rejected" is the "Connect" preview's own state, not this one's. Both callers (the page's own
+ *   render and the "Connect" preview) surface the result as a toast, not inline markup.
  * - render_callback_status(): silent unless a callback registration attempt is on
  *   record and failed — success and "never attempted" both render nothing.
  *
@@ -51,34 +51,31 @@ final class ConnectionStatusTest extends TestCase {
 	}
 
 	/**
-	 * A fetch failure (`null`) renders the grey/neutral "error" pill, not the red "disabled" one
-	 * — a transport hiccup is not the merchant's problem to fix.
+	 * A fetch failure (`null`) is a toast-ready "error" notice — a transport hiccup is not the
+	 * merchant's problem to fix, but it is worth a heads-up.
 	 */
-	public function test_null_dataset_renders_neutral_could_not_check_state(): void {
-		ob_start();
-		IfthenpayAdminFormRenderer::render_connection_status( null );
-		$html = (string) ob_get_clean();
+	public function test_null_dataset_returns_error_notice(): void {
+		$notice = IfthenpayAdminFormRenderer::get_connection_notice( null );
 
-		$this->assertStringContainsString( 'ifthenpay-status-error', $html );
-		$this->assertStringNotContainsString( 'ifthenpay-status-disabled', $html );
+		$this->assertNotNull( $notice );
+		$this->assertSame( 'error', $notice['type'] );
 	}
 
 	/**
-	 * An empty gatewaykeys list is the normal first-run state — the amber "pending" pill, plus
-	 * onboarding steps — never the same as the failure state above.
+	 * An empty gatewaykeys list is the normal first-run state — its own notice, including the
+	 * ifthenpay helpdesk contact so the merchant knows the next step, never the same as the
+	 * failure state above.
 	 */
-	public function test_empty_gatewaykeys_renders_pending_state_with_onboarding(): void {
-		ob_start();
-		IfthenpayAdminFormRenderer::render_connection_status(
+	public function test_empty_gatewaykeys_returns_notice_with_helpdesk_contact(): void {
+		$notice = IfthenpayAdminFormRenderer::get_connection_notice(
 			array(
 				'gatewaykeys' => array(),
 				'accounts'    => array(),
 			)
 		);
-		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'payment-processor-status-charges-disabled', $html );
-		$this->assertStringContainsString( 'ifthenpay-onboarding-steps', $html );
+		$this->assertNotNull( $notice );
+		$this->assertStringContainsString( 'helpdesk.ifthenpay.com', $notice['message'] );
 	}
 
 	/**
@@ -86,17 +83,15 @@ final class ConnectionStatusTest extends TestCase {
 	 * "Disconnect" button (rendered elsewhere, by render_backoffice_configuration()) already says
 	 * that plainly.
 	 */
-	public function test_non_empty_gatewaykeys_renders_nothing(): void {
-		ob_start();
-		IfthenpayAdminFormRenderer::render_connection_status(
+	public function test_non_empty_gatewaykeys_returns_null(): void {
+		$notice = IfthenpayAdminFormRenderer::get_connection_notice(
 			array(
 				'gatewaykeys' => array( 'GATEWAY-1' => 'GATEWAY-1' ),
 				'accounts'    => array(),
 			)
 		);
-		$html = (string) ob_get_clean();
 
-		$this->assertSame( '', $html );
+		$this->assertNull( $notice );
 	}
 
 	/**
@@ -113,7 +108,7 @@ final class ConnectionStatusTest extends TestCase {
 
 	/**
 	 * A saved key: the button is in "disconnect" mode — this is the only signal that a key is
-	 * usable, since render_connection_status() itself renders nothing for that case.
+	 * usable, since get_connection_notice() itself returns null for that case.
 	 */
 	public function test_saved_backoffice_key_renders_disconnect_mode(): void {
 		ob_start();

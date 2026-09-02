@@ -14,6 +14,7 @@ use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-admin-form-renderer.php';
+require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-pay-by-link-method-eligibility.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
 
@@ -179,5 +180,104 @@ final class PaymentsConfigurationTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringNotContainsString( 'checked', $html );
+	}
+
+	/**
+	 * MB and PAYSHOP — never offered by Pay By Link at all, per ifthenpay — render under their own
+	 * "Deferred" group, separate from the PBL-eligible methods; a merchant can still check them
+	 * (for whenever this plugin actually acts on them), but the grouping itself is what says "this
+	 * behaves differently", not a disabled/greyed-out checkbox.
+	 */
+	public function test_mb_and_payshop_render_in_the_deferred_group_not_pay_now(): void {
+		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
+
+		ob_start();
+		IfthenpayAdminFormRenderer::render_payments_configuration(
+			array( 'GATEWAY-1' => 'GATEWAY-1' ),
+			array(
+				'GATEWAY-1' => array(
+					'MB'    => 'HLP-000001',
+					'MBWAY' => 'HLP-000002',
+				),
+			),
+			array(
+				'MB'    => array(
+					'position' => 1,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'multibanco',
+				),
+				'MBWAY' => array(
+					'position' => 2,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'mbway',
+				),
+			)
+		);
+		$html = (string) ob_get_clean();
+
+		$pay_now_pos  = strpos( $html, 'Pay Now' );
+		$deferred_pos = strpos( $html, 'Deferred' );
+		$mb_pos       = strpos( $html, 'data-entity="MB"' );
+		$mbway_pos    = strpos( $html, 'data-entity="MBWAY"' );
+
+		$this->assertNotFalse( $pay_now_pos );
+		$this->assertNotFalse( $deferred_pos );
+		// MBWAY sits after the "Pay Now" heading but before "Deferred"; MB sits after "Deferred".
+		$this->assertTrue( $pay_now_pos < $mbway_pos && $mbway_pos < $deferred_pos );
+		$this->assertTrue( $deferred_pos < $mb_pos );
+	}
+
+	/**
+	 * Default Method offers only methods PBL can actually be told to pre-select — MB, PAYSHOP,
+	 * GOOGLE, and APPLE are all excluded even when enabled, per
+	 * IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default().
+	 */
+	public function test_default_method_excludes_ineligible_enabled_methods(): void {
+		OsSettingsHelper::$values['ifthenpay_gateway_key']                   = 'GATEWAY-1';
+		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MB', 'MBWAY', 'GOOGLE' );
+
+		ob_start();
+		IfthenpayAdminFormRenderer::render_payments_configuration(
+			array( 'GATEWAY-1' => 'GATEWAY-1' ),
+			array(
+				'GATEWAY-1' => array(
+					'MB'     => 'HLP-000001',
+					'MBWAY'  => 'HLP-000002',
+					'GOOGLE' => 'HLP-000003',
+				),
+			),
+			array(
+				'MB'     => array(
+					'position' => 1,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'multibanco',
+				),
+				'MBWAY'  => array(
+					'position' => 2,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'mbway',
+				),
+				'GOOGLE' => array(
+					'position' => 6,
+					'image'    => '',
+					'tooltip'  => '',
+					'label'    => 'google pay',
+				),
+			)
+		);
+		$html = (string) ob_get_clean();
+
+		$select_start = strpos( $html, 'name="settings[ifthenpay_default_method]"' );
+		$select_start = strrpos( substr( $html, 0, $select_start ), '<select' );
+		$select_end   = strpos( $html, '</select>', $select_start );
+		$select_html  = substr( $html, $select_start, $select_end - $select_start );
+
+		$this->assertStringContainsString( 'MBWAY', $select_html );
+		$this->assertStringNotContainsString( 'MB<', $select_html );
+		$this->assertStringNotContainsString( 'GOOGLE', $select_html );
 	}
 }

@@ -48,22 +48,28 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 			}
 
 			$dataset = IfthenpayLpGatewayDataset::get( $key );
-			$catalog = IfthenpayLpMethodCatalog::get() ?? array();
+			$notice  = IfthenpayAdminFormRenderer::get_connection_notice( $dataset );
 
-			ob_start();
-			IfthenpayAdminFormRenderer::render_connection_status( $dataset );
-			IfthenpayAdminFormRenderer::render_payments_configuration(
-				$dataset['gatewaykeys'] ?? array(),
-				$dataset['accounts'] ?? array(),
-				$catalog
-			);
-			IfthenpayAdminFormRenderer::render_others_configuration();
-			$html = ob_get_clean();
+			// Nothing to configure without a gateway key — same as the page's own render, an empty
+			// Gateway Key select and an all-"No accounts" method list would only repeat what the
+			// notice above already says.
+			$html = '';
+			if ( ! empty( $dataset['gatewaykeys'] ) ) {
+				ob_start();
+				IfthenpayAdminFormRenderer::render_payments_configuration(
+					$dataset['gatewaykeys'],
+					$dataset['accounts'] ?? array(),
+					IfthenpayLpMethodCatalog::get() ?? array()
+				);
+				IfthenpayAdminFormRenderer::render_others_configuration();
+				$html = ob_get_clean();
+			}
 
 			$this->send_json(
 				array(
 					'status'      => LATEPOINT_STATUS_SUCCESS,
 					'html'        => $html,
+					'notice'      => $notice,
 					'inline_data' => array(
 						'accounts' => $dataset['accounts'] ?? array(),
 					),
