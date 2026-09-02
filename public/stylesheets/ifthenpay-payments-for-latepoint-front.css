@@ -111,49 +111,76 @@
 	border-color: #d3ecd6;
 }
 
-.ifthenpay-reference-box__title {
+.ifthenpay-reference-box-title {
 	margin: 0 0 12px;
 	font-size: 15px;
 	font-weight: 600;
 	color: #14161d;
 }
 
-.ifthenpay-reference-box.is-paid .ifthenpay-reference-box__title {
+.ifthenpay-reference-box.is-paid .ifthenpay-reference-box-title {
 	margin-bottom: 4px;
 }
 
-.ifthenpay-reference-box__paid-message {
+.ifthenpay-reference-box-paid-message {
 	margin: 0;
 	color: #2e7d32;
 	font-weight: 600;
 }
 
-.ifthenpay-reference-box__details {
+.ifthenpay-reference-box-details {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 }
 
-.ifthenpay-reference-box__row {
+.ifthenpay-reference-box-row {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
 	gap: 12px;
 }
 
-.ifthenpay-reference-box__label {
+.ifthenpay-reference-box-label {
 	color: #7c85a3;
 	font-size: 13px;
 }
 
-.ifthenpay-reference-box__value {
+.ifthenpay-reference-box-value {
 	font-weight: 600;
 	color: #14161d;
 	text-align: right;
 }
 
-.ifthenpay-reference-box__row--reference .ifthenpay-reference-box__value {
-	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+.ifthenpay-reference-box-row-reference .ifthenpay-reference-box-value {
+	font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
 	font-size: 16px;
 	letter-spacing: 0.5px;
+}
+
+.ifthenpay-reference-box-instructions {
+	margin: 12px 0 0;
+	font-size: 12px;
+	color: #7c85a3;
+	line-height: 1.4;
+}
+
+.ifthenpay-reference-box-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	margin-top: 12px;
+	padding-top: 10px;
+	border-top: 1px solid #e2e5f1;
+}
+
+.ifthenpay-reference-box-footer span {
+	font-size: 11px;
+	color: #a8afc4;
+}
+
+.ifthenpay-reference-box-brand {
+	height: 14px;
+	width: auto;
 }
