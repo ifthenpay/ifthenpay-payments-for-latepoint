@@ -174,11 +174,6 @@ class IfthenpayAdminFormRenderer {
 					</div>
 				</div>
 				<?php self::render_payment_methods( $catalog, $accounts_for_gateway, $enabled_methods ); ?>
-				<div class="os-row">
-					<div class="os-col-6">
-						<?php self::render_default_method_select( $catalog, $accounts_for_gateway, $enabled_methods ); ?>
-					</div>
-				</div>
 			</div>
 		</div>
 		<?php
@@ -219,7 +214,10 @@ class IfthenpayAdminFormRenderer {
 			esc_html__( 'Gateway Key', 'ifthenpay-payments-for-latepoint' ),
 			$gatewaykeys,
 			$selected_gateway_key,
-			array( 'class' => 'ifthenpay-gateway-select' )
+			array(
+				'class' => 'ifthenpay-gateway-select',
+				'theme' => 'simple',
+			)
 		);
 	}
 
@@ -254,6 +252,9 @@ class IfthenpayAdminFormRenderer {
 					$accounts_for_gateway,
 					$enabled_methods
 				);
+				// Belongs with Pay Now, not after Deferred below it — it configures which Pay Now
+				// method PBL pre-selects, nothing about the deferred methods.
+				self::render_default_method_select( $catalog, $accounts_for_gateway, $enabled_methods );
 				self::render_method_group(
 					esc_html__( 'Deferred — coming soon', 'ifthenpay-payments-for-latepoint' ),
 					esc_html__( 'Generates a reference the customer pays later. Can be enabled here, but this plugin does not act on it yet — checking it has no effect at checkout for now.', 'ifthenpay-payments-for-latepoint' ),
@@ -383,17 +384,29 @@ class IfthenpayAdminFormRenderer {
 				. '>' . esc_html( $option_text ) . '</option>';
 		}
 
-		echo OsFormHelper::select_field(
-			'settings[ifthenpay_default_method]',
-			esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
-			$options_html,
-			'',
-			array( 'class' => 'ifthenpay-default-method' )
-		);
 		?>
-		<p class="ifthenpay-field-note">
-			<?php echo esc_html__( 'Only Pay Now methods can be set as default — Google Pay, Apple Pay, and the deferred methods above are never pre-selected.', 'ifthenpay-payments-for-latepoint' ); ?>
-		</p>
+		<div class="os-row">
+			<div class="os-col-12">
+				<?php
+				// 'theme' => 'simple' matches every other field on this page (Backoffice Key,
+				// Description) — select_field(), like text_field(), defaults to a bare
+				// "transparent" theme (an underline, no box) unless told otherwise.
+				echo OsFormHelper::select_field(
+					'settings[ifthenpay_default_method]',
+					esc_html__( 'Default Method', 'ifthenpay-payments-for-latepoint' ),
+					$options_html,
+					'',
+					array(
+						'class' => 'ifthenpay-default-method',
+						'theme' => 'simple',
+					)
+				);
+				?>
+				<p class="ifthenpay-field-note">
+					<?php echo esc_html__( 'Only Pay Now methods can be set as default — Google Pay, Apple Pay, and the deferred methods above are never pre-selected.', 'ifthenpay-payments-for-latepoint' ); ?>
+				</p>
+			</div>
+		</div>
 		<?php
 	}
 
