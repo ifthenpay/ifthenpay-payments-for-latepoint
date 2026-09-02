@@ -92,3 +92,68 @@
 		transform: rotate(360deg);
 	}
 }
+
+/*
+ * The deferred-payment (Multibanco) reference box — confirmation step, confirmation email,
+ * customer dashboard, order/booking summary lightboxes. BEM-style classes so a merchant can
+ * override any part of this from their own theme/custom CSS without touching plugin code.
+ */
+.ifthenpay-reference-box {
+	margin: 16px 0;
+	padding: 16px 18px;
+	border: 1px solid #e2e5f1;
+	border-radius: 8px;
+	background: #f7f8fc;
+}
+
+.ifthenpay-reference-box.is-paid {
+	background: #f2f9f3;
+	border-color: #d3ecd6;
+}
+
+.ifthenpay-reference-box__title {
+	margin: 0 0 12px;
+	font-size: 15px;
+	font-weight: 600;
+	color: #14161d;
+}
+
+.ifthenpay-reference-box.is-paid .ifthenpay-reference-box__title {
+	margin-bottom: 4px;
+}
+
+.ifthenpay-reference-box__paid-message {
+	margin: 0;
+	color: #2e7d32;
+	font-weight: 600;
+}
+
+.ifthenpay-reference-box__details {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.ifthenpay-reference-box__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.ifthenpay-reference-box__label {
+	color: #7c85a3;
+	font-size: 13px;
+}
+
+.ifthenpay-reference-box__value {
+	font-weight: 600;
+	color: #14161d;
+	text-align: right;
+}
+
+.ifthenpay-reference-box__row--reference .ifthenpay-reference-box__value {
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: 16px;
+	letter-spacing: 0.5px;
+}
