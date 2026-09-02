@@ -73,6 +73,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		public function includes() {
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-checkout-controller.php';
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
+			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-callback-rest-controller.php';
 
 			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-exception.php';
@@ -138,6 +139,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			add_filter( 'latepoint_process_payment_for_order_intent', array( $this, 'process_payments_for_order_intent' ), 10, 2 );
 			add_filter( 'latepoint_process_payment_for_transaction_intent', array( $this, 'process_payment_for_transaction_intent' ), 10, 2 );
+
+			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
 
 			add_action( 'init', array( $this, 'init' ), 0 );
 
