@@ -135,6 +135,23 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * Stamps a record settled — status PAID and settled_at now, together, in one update. Written
+	 * last inside settle_payment()'s locked section, only once the LatePoint state change it
+	 * guards has actually succeeded (see IfthenpayLpSettlement).
+	 *
+	 * @param string $token Our correlation handle.
+	 */
+	public static function mark_settled( string $token ): bool {
+		return self::update_columns(
+			$token,
+			array(
+				'status'     => 'PAID',
+				'settled_at' => current_time( 'mysql', true ),
+			)
+		);
+	}
+
+	/**
 	 * Merges data into the method_data JSON column, preserving keys already there. For anything
 	 * genuinely method-specific that arrives after the initial insert — e.g. the realtime flow's
 	 * ifthenpay transaction id, used for status polling and unrelated to request_id (a different
@@ -156,17 +173,25 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Shared column update by token, with cache invalidation.
+	 * Shared column update by token, with cache invalidation. A row is cacheable by either of two
+	 * unique columns (find_by_token(), find_by_request_id()) — both entries are cleared, not just
+	 * the one this method was called with, or a caller that only ever looks a row up by the other
+	 * column (settle_payment() always looks up by request_id) would keep seeing a stale, pre-update
+	 * copy for the lifetime of that cache entry.
 	 *
 	 * @param string              $token Our correlation handle.
 	 * @param array<string,mixed> $data  Column => value.
 	 */
 	private static function update_columns( string $token, array $data ): bool {
 		global $wpdb;
+		$before  = self::find_by_token( $token );
 		$updated = (bool) $wpdb->update( self::table_name(), $data, array( 'token' => $token ) );
 
 		if ( $updated ) {
 			wp_cache_delete( "token_{$token}", self::CACHE_GROUP );
+			if ( $before && $before->request_id ) {
+				wp_cache_delete( "request_id_{$before->request_id}", self::CACHE_GROUP );
+			}
 		}
 
 		return $updated;
