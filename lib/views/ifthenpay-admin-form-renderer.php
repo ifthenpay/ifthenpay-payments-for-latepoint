@@ -258,9 +258,9 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * Multibanco and Payshop: real, checkable methods this plugin doesn't act on yet — their own
-	 * section, since nothing in Pay Now Configuration (Gateway Key, Default Method, Description)
-	 * applies to them.
+	 * Multibanco (functional) and Payshop (not yet — spec 002) — their own section, since nothing
+	 * in Pay Now Configuration (Gateway Key, Default Method, Description) applies to them, and
+	 * Multibanco has its own setting (reference validity) nothing else needs.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $deferred_catalog     Deferred slice of the catalog.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
@@ -287,6 +287,34 @@ class IfthenpayAdminFormRenderer {
 						</div>
 					</div>
 				</div>
+				<?php self::render_multibanco_validity_field(); ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * How many days a Multibanco reference stays payable — always sent to the reference API
+	 * (D-2: the API's own default is no expiry at all, which would hold a booking slot forever).
+	 * Save-time range validation is IfthenpayLpMultibancoValidityValidation, wired up in the main
+	 * plugin file; left blank, IfthenpayPaymentsForLatepoint::DEFAULT_MULTIBANCO_VALIDITY_DAYS
+	 * applies at payment time.
+	 */
+	private static function render_multibanco_validity_field(): void {
+		?>
+		<div class="os-row">
+			<div class="os-col-12">
+				<?php
+				echo OsFormHelper::text_field(
+					'settings[ifthenpay_multibanco_validity_days]',
+					esc_html__( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
+					esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days' ) ),
+					array( 'theme' => 'simple' )
+				);
+				?>
+				<p class="ifthenpay-field-note">
+					<?php echo esc_html__( 'How many days a customer has to pay before the reference expires and the booking is released. Leave blank to use the default.', 'ifthenpay-payments-for-latepoint' ); ?>
+				</p>
 			</div>
 		</div>
 		<?php
