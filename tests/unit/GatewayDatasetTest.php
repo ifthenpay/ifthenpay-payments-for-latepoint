@@ -2,8 +2,11 @@
 /**
  * Proves IfthenpayLpGatewayDataset: per-request caching, the MB/Multibanco field-name
  * mapping, that an invisible catalog method is excluded even with real account data in the raw
- * record, and that a raw-entidade Multibanco value still yields an
- * account rather than being silently dropped.
+ * record, and that a method's account "key" is its whole raw field value, unmodified —
+ * including for Multibanco, which (confirmed live against two different real gateways) can be
+ * either a dynamic MB key ("MB | ACC-000008", the same shape every other method uses) or a
+ * static one ("11687 | 991", a raw entidade/subentidade pair) depending on what the merchant
+ * assigned to that gateway.
  *
  * Each test uses its own Backoffice Key value — IfthenpayLpGatewayDataset's per-request cache is
  * a static property that persists across tests in the same process, so a shared key would leak
@@ -98,8 +101,10 @@ final class GatewayDatasetTest extends TestCase {
 	}
 
 	/**
-	 * The modern-shaped gateway: every catalog-visible method with a "METHOD | account" value is
-	 * extracted, correctly for the MB → Multibanco field-name mapping too.
+	 * The second fixture gateway: every catalog-visible method's whole raw field value is kept
+	 * as-is (no splitting), correctly for the MB → Multibanco field-name mapping too — here
+	 * Multibanco carries a dynamic MB key ("MB | ACC-000008"), the same shape every other method
+	 * uses.
 	 */
 	public function test_modern_gateway_accounts_are_extracted_including_multibanco_mapping(): void {
 		$this->mock_catalog_then_gateway_responses();
@@ -111,13 +116,13 @@ final class GatewayDatasetTest extends TestCase {
 		// unordered.
 		$this->assertEqualsCanonicalizing(
 			array(
-				'MB'      => 'ACC-000008',
-				'MBWAY'   => 'ACC-000005',
-				'PAYSHOP' => 'ACC-000006',
-				'CCARD'   => 'ACC-000002',
-				'GOOGLE'  => 'ACC-000004',
-				'APPLE'   => 'ACC-000001',
-				'PIX'     => 'ACC-000007',
+				'MB'      => 'MB | ACC-000008',
+				'MBWAY'   => 'MBWAY | ACC-000005',
+				'PAYSHOP' => 'PAYSHOP | ACC-000006',
+				'CCARD'   => 'CCARD | ACC-000002',
+				'GOOGLE'  => 'GOOGLE | ACC-000004',
+				'APPLE'   => 'APPLE | ACC-000001',
+				'PIX'     => 'PIX | ACC-000007',
 			),
 			$dataset['accounts']['MODERN-GATEWAY']
 		);
@@ -138,16 +143,16 @@ final class GatewayDatasetTest extends TestCase {
 	}
 
 	/**
-	 * The legacy-shaped gateway's raw-entidade Multibanco value ("11687 | 991", not "MB | …") is
-	 * still extracted as an account — not silently dropped just because it doesn't match the
-	 * usual "METHOD | account" shape.
+	 * Multibanco can also carry a static key ("11687 | 991", entidade | subentidade) instead of a
+	 * dynamic one — kept whole here too, same as every other method's value, since there is no
+	 * reliable way to tell a static key's entidade from an arbitrary prefix.
 	 */
-	public function test_legacy_raw_entidade_multibanco_value_still_yields_an_account(): void {
+	public function test_multibanco_value_is_kept_whole_not_split(): void {
 		$this->mock_catalog_then_gateway_responses();
 
 		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-LEGACY' );
 
-		$this->assertSame( array( 'MB' => '991' ), $dataset['accounts']['LEGACY-GATEWAY'] );
+		$this->assertSame( array( 'MB' => '11687 | 991' ), $dataset['accounts']['LEGACY-GATEWAY'] );
 	}
 
 	/**

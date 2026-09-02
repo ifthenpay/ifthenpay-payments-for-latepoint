@@ -121,7 +121,12 @@ class IfthenpayLpGatewayDataset {
 	}
 
 	/**
-	 * Extracts a catalog-visible method's account key from one gateway record, method by method.
+	 * A catalog-visible method's account "key" is its whole raw field value, unmodified — for most
+	 * methods that already reads as `"{METHOD}|{accountKey}"`, but Multibanco alone can carry
+	 * either that same shape (a dynamic MB key) or a raw `"{entidade}|{subentidade}"` pair (a
+	 * static MB key), both confirmed live against real gateways — a merchant assigns their gateway
+	 * one or the other, never both, and there is no reliable way to tell them apart other than
+	 * trusting the whole value as-is.
 	 *
 	 * @param array<string,mixed>                                                        $record  One gateway record.
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog to intersect against.
@@ -130,39 +135,16 @@ class IfthenpayLpGatewayDataset {
 	private static function extract_accounts( array $record, array $catalog ): array {
 		$accounts = array();
 
-		foreach ( $catalog as $method_key => $method_meta ) {
-			$field_name = self::CATALOG_TO_FIELD_NAME[ $method_key ] ?? $method_key;
-			$raw_value  = $record[ $field_name ] ?? '';
+		foreach ( array_keys( $catalog ) as $method_key ) {
+			$field_name  = self::CATALOG_TO_FIELD_NAME[ $method_key ] ?? $method_key;
+			$raw_value   = $record[ $field_name ] ?? '';
+			$account_key = is_string( $raw_value ) ? trim( $raw_value ) : '';
 
-			if ( ! is_string( $raw_value ) || '' === $raw_value ) {
-				continue;
-			}
-
-			$account_key = self::extract_account_key( $raw_value );
-			if ( null !== $account_key ) {
+			if ( '' !== $account_key ) {
 				$accounts[ $method_key ] = $account_key;
 			}
 		}
 
 		return $accounts;
-	}
-
-	/**
-	 * A method field's raw value is `"{METHOD}|{accountKey}"` — except Multibanco can instead be
-	 * the raw `"{entidade}|{subentidade}"` form. Either way, what
-	 * comes after the separator is a real, non-empty account reference; only its meaning differs,
-	 * which is a concern for the Multibanco-specific consumer, not this intersection.
-	 *
-	 * @param string $raw_value One method field's raw value.
-	 */
-	private static function extract_account_key( string $raw_value ): ?string {
-		$parts = explode( '|', $raw_value, 2 );
-		if ( ! isset( $parts[1] ) ) {
-			return null;
-		}
-
-		$account_key = trim( $parts[1] );
-
-		return '' === $account_key ? null : $account_key;
 	}
 }
