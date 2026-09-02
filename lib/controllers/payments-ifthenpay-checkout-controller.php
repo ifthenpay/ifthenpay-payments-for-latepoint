@@ -89,6 +89,11 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						'kind'          => 'realtime',
 						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
 						'paybylink_url' => $api_result->redirect_url,
+						// Needed so the inbound callback route (ifthenpay-lp/v1/callback) can
+						// authenticate a real async notification for this payment, on gateways
+						// where ifthenpay also sends one for realtime methods — without this, every
+						// such callback would fail anti-phishing verification against an empty key.
+						'gateway_key'   => OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
 					)
 				);
 
@@ -114,11 +119,12 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 		/**
 		 * Handle overlay callback and update payment status — the polling fallback for realtime
-		 * methods. All the decision logic lives in resolve_payment_status_from_modal_url(), kept
-		 * separate so it's testable without a real HTTP/AJAX round trip; this method's only job is
-		 * to gather $this->params and hand the result to send_json().
+		 * methods, called repeatedly by the browser (front.js) while the response says 'pending'.
+		 * All the decision logic lives in resolve_payment_status_from_modal_url(), kept separate so
+		 * it's testable without a real HTTP/AJAX round trip; this method's only job is to gather
+		 * $this->params and hand the result to send_json().
 		 *
-		 * @return void Sends JSON with status and message.
+		 * @return void Sends JSON with status, message and pending.
 		 */
 		public function update_payment_repo_by_modal_url() {
 			$this->send_json(
@@ -131,10 +137,21 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		}
 
 		/**
-		 * Settlement itself goes through IfthenpayLpSettlement::settle_payment(), the same function
-		 * the inbound callback route and the manual re-check action call: this method's own job is
-		 * only to ask ifthenpay whether $txid is paid, then let settle_payment() do the actual state
-		 * change (invariant 3, one settlement function).
+		 * At the point this runs, the order does not exist yet — the browser only submits the
+		 * booking form (which is what actually creates it, via convert_to_order()) once this
+		 * returns a non-pending result. So a verified payment is marked PAID directly on our own
+		 * row, not through IfthenpayLpSettlement::settle_payment(), which needs a real order to
+		 * settle against and would always fail here with "order not ready". The existing, unchanged
+		 * process_payment_by_intent() reads this PAID status once the form submits, and LatePoint's
+		 * own convert_to_order() creates the transaction/invoice/booking natively from it — the
+		 * same, already-proven realtime path. settle_payment() is for the inbound callback route
+		 * (which only ever fires once an order can exist) and the deferred/manual re-check paths.
+		 *
+		 * Using mark_settled() (status PAID + settled_at together) rather than a bare status update,
+		 * and set_request_id() linking $txid onto the row, both matter for the same reason: if ifthenpay
+		 * also sends a real async callback for this same realtime payment (now possible — the
+		 * gateway_key stored at checkout time lets it authenticate), settle_payment() must recognise
+		 * the row as already settled and no-op, not re-run the whole state change a second time.
 		 *
 		 * Security fix (FR-13, spec 001): the previous version wrote CANCELLED/FAILED straight from
 		 * the browser's own $type, with no verification at all — anyone holding a payment_token
@@ -147,67 +164,79 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 *                      trusted on its own — see above.
 		 * @param string $txid  ifthenpay's transaction id, from the redirect return URL.
 		 * @param string $token Our own correlation handle (the repository row's token column).
-		 * @return array{status:string,message:string}
+		 * @return array{status:string,message:string,pending:bool}
 		 */
 		private function resolve_payment_status_from_modal_url( string $type, string $txid, string $token ): array {
 			try {
 				$record = IfthenpayLpTransactionRepository::find_by_token( $token );
 				if ( ! $record ) {
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' ),
-					);
+					return $this->terminal_error( __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' ) );
 				}
 
 				if ( 'PAID' === $record->status ) {
-					return array(
-						'status'  => LATEPOINT_STATUS_SUCCESS,
-						'message' => __( 'Payment completed', 'ifthenpay-payments-for-latepoint' ),
-					);
+					return $this->paid_response();
 				}
 
 				if ( '' !== $txid && IfthenpayAPIClient::get_payment_status_by_transaction_id( $txid ) ) {
-					// The repository row's own token is the only correlation handle stored at
-					// checkout time (send_ifthenpay_options() never had $txid to store); linking
-					// $txid onto it here, right as we confirm ifthenpay considers it paid, is what
-					// lets settle_payment() find this row by its own idempotency key afterwards.
+					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 					IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
+					IfthenpayLpTransactionRepository::mark_settled( $token );
 
-					$result = IfthenpayLpSettlement::settle_payment( $txid, array(), 'polling' );
+					return $this->paid_response();
+				}
 
-					return $result->is_settled()
-						? array(
-							'status'  => LATEPOINT_STATUS_SUCCESS,
-							'message' => __( 'Payment completed', 'ifthenpay-payments-for-latepoint' ),
-						)
-						: array(
-							'status'  => LATEPOINT_STATUS_ERROR,
-							'message' => __( 'Payment could not be confirmed. Please try again.', 'ifthenpay-payments-for-latepoint' ),
-						);
+				if ( 'success' === $type ) {
+					// The redirect says success, but ifthenpay doesn't confirm it yet — a real,
+					// if narrow, propagation delay (MBWAY via SIBS in particular can take a while
+					// to report back; this is why the old blocking retry loop ran up to 45s). Ask
+					// the browser to poll again rather than declaring failure outright.
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => '',
+						'pending' => true,
+					);
 				}
 
 				if ( 'cancel' === $type ) {
 					IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
 
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Payment cancelled', 'ifthenpay-payments-for-latepoint' ),
-					);
+					return $this->terminal_error( __( 'Payment cancelled', 'ifthenpay-payments-for-latepoint' ) );
 				}
 
 				IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
 				IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 
-				return array(
-					'status'  => LATEPOINT_STATUS_ERROR,
-					'message' => __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ),
-				);
+				return $this->terminal_error( __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ) );
 			} catch ( Exception $e ) {
-				return array(
-					'status'  => LATEPOINT_STATUS_ERROR,
-					'message' => $e->getMessage(),
-				);
+				return $this->terminal_error( $e->getMessage() );
 			}
+		}
+
+		/**
+		 * A confirmed-paid response.
+		 *
+		 * @return array{status:string,message:string,pending:bool}
+		 */
+		private function paid_response(): array {
+			return array(
+				'status'  => LATEPOINT_STATUS_SUCCESS,
+				'message' => __( 'Payment completed', 'ifthenpay-payments-for-latepoint' ),
+				'pending' => false,
+			);
+		}
+
+		/**
+		 * A non-pending failure response — the browser stops polling on this.
+		 *
+		 * @param string $message Already-translated, customer-facing message.
+		 * @return array{status:string,message:string,pending:bool}
+		 */
+		private function terminal_error( string $message ): array {
+			return array(
+				'status'  => LATEPOINT_STATUS_ERROR,
+				'message' => $message,
+				'pending' => false,
+			);
 		}
 	}
 
