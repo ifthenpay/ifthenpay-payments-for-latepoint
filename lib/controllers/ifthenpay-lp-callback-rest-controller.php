@@ -22,13 +22,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class IfthenpayLpCallbackRestController {
 
 	/**
-	 * Registers `GET /wp-json/ifthenpay/v1/callback` — public by design, ifthenpay calls it
+	 * Registers `GET /wp-json/ifthenpay-lp/v1/callback` — public by design, ifthenpay calls it
 	 * server-to-server with no WordPress auth of any kind; authenticity rests entirely on the
 	 * anti-phishing key parameter (see IfthenpayLpCallbackParams::matches_gateway_key()).
 	 */
 	public static function register_routes(): void {
 		register_rest_route(
-			'ifthenpay/v1',
+			'ifthenpay-lp/v1',
 			'/callback',
 			array(
 				'methods'             => 'GET',
@@ -39,7 +39,11 @@ class IfthenpayLpCallbackRestController {
 	}
 
 	/**
-	 * @param WP_REST_Request<array<string,mixed>> $request The inbound request.
+	 * Handles one inbound notification, per the validation order documented on this class.
+	 *
+	 * @phpstan-param WP_REST_Request<array<string,mixed>> $request
+	 *
+	 * @param WP_REST_Request $request The inbound request.
 	 */
 	public static function handle( WP_REST_Request $request ): WP_REST_Response {
 		$params = IfthenpayLpCallbackParams::from_array( $request->get_query_params() );

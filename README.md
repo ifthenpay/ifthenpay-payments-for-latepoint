@@ -117,7 +117,7 @@ This plugin integrates with the ifthenpay payment platform to process payments f
 - **Network & VPN Requirements**: Outbound HTTPS requests are made to ifthenpay APIs for setup, link generation, and status validation. Servers behind strict firewalls or restrictive outbound VPNs must allowlist the following domains to prevent connection timeouts:
     - [api.ifthenpay.com](https://api.ifthenpay.com)
     - [ifthenpay.com](https://ifthenpay.com)
-- **Inbound callback URL**: ifthenpay itself calls back to `https://your-site.com/wp-json/ifthenpay/v1/callback` to confirm a payment. A site behind its own WAF, security plugin, or reverse proxy must allow POST requests to that path from ifthenpay's servers, or payment confirmations will not arrive.
+- **Inbound callback URL**: ifthenpay itself calls back to `https://your-site.com/wp-json/ifthenpay-lp/v1/callback` to confirm a payment. A site behind its own WAF, security plugin, or reverse proxy must allow GET requests to that path from ifthenpay's servers, or payment confirmations will not arrive.
 
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored in site options and are not publicly exposed. The plugin does not store raw card numbers or full bank account details.
 
