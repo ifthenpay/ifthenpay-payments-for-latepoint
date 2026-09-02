@@ -2,11 +2,12 @@
 /**
  * Proves IfthenpayLpGatewayDataset: per-request caching, the MB/Multibanco field-name
  * mapping, that an invisible catalog method is excluded even with real account data in the raw
- * record, and that a method's account "key" is its whole raw field value, unmodified —
- * including for Multibanco, which (confirmed live against two different real gateways) can be
- * either a dynamic MB key ("MB | ACC-000008", the same shape every other method uses) or a
- * static one ("11687 | 991", a raw entidade/subentidade pair) depending on what the merchant
- * assigned to that gateway.
+ * record, and that a method's account "key" is its whole raw field value, unmodified — except
+ * Multibanco, which (confirmed live against two different real gateways) can be either a dynamic
+ * MB key ("MB | ACC-000008", the same prefixed shape every other method uses — but with the
+ * "MB | " prefix stripped here, since the Multibanco reference API's `mbKey` param rejects the
+ * prefixed form outright, 401/403) or a static one ("11687 | 991", a raw entidade/subentidade
+ * pair with no prefix to strip) depending on what the merchant assigned to that gateway.
  *
  * Each test uses its own Backoffice Key value — IfthenpayLpGatewayDataset's per-request cache is
  * a static property that persists across tests in the same process, so a shared key would leak
@@ -102,9 +103,11 @@ final class GatewayDatasetTest extends TestCase {
 
 	/**
 	 * The second fixture gateway: every catalog-visible method's whole raw field value is kept
-	 * as-is (no splitting), correctly for the MB → Multibanco field-name mapping too — here
-	 * Multibanco carries a dynamic MB key ("MB | ACC-000008"), the same shape every other method
-	 * uses.
+	 * as-is (no splitting), correctly for the MB → Multibanco field-name mapping too — except MB
+	 * itself, whose "MB | " prefix is stripped down to the bare account key
+	 * ("MB | ACC-000008" -> "ACC-000008"), since that bare form is what the Multibanco reference
+	 * API's `mbKey` parameter actually accepts (confirmed live: the prefixed form gets a 401/403
+	 * "credentials rejected", the bare form succeeds).
 	 */
 	public function test_modern_gateway_accounts_are_extracted_including_multibanco_mapping(): void {
 		$this->mock_catalog_then_gateway_responses();
@@ -116,7 +119,7 @@ final class GatewayDatasetTest extends TestCase {
 		// unordered.
 		$this->assertEqualsCanonicalizing(
 			array(
-				'MB'      => 'MB | ACC-000008',
+				'MB'      => 'ACC-000008',
 				'MBWAY'   => 'MBWAY | ACC-000005',
 				'PAYSHOP' => 'PAYSHOP | ACC-000006',
 				'CCARD'   => 'CCARD | ACC-000002',
@@ -144,8 +147,8 @@ final class GatewayDatasetTest extends TestCase {
 
 	/**
 	 * Multibanco can also carry a static key ("11687 | 991", entidade | subentidade) instead of a
-	 * dynamic one — kept whole here too, same as every other method's value, since there is no
-	 * reliable way to tell a static key's entidade from an arbitrary prefix.
+	 * dynamic one — kept whole here, since it carries no "MB | " prefix to strip and there is no
+	 * reliable way to tell a static key's entidade from an arbitrary prefix otherwise.
 	 */
 	public function test_multibanco_value_is_kept_whole_not_split(): void {
 		$this->mock_catalog_then_gateway_responses();
