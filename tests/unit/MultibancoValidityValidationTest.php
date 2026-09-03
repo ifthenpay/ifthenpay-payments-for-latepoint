@@ -42,7 +42,7 @@ final class MultibancoValidityValidationTest extends TestCase {
 
 	/**
 	 * An empty value is allowed — the field can be left blank, a sane default applies at payment
-	 * time (IfthenpayPaymentsForLatepoint::DEFAULT_MULTIBANCO_VALIDITY_DAYS).
+	 * time (IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS).
 	 */
 	public function test_empty_value_is_allowed(): void {
 		$this->assertNull( IfthenpayLpMultibancoValidityValidation::check( '' ) );

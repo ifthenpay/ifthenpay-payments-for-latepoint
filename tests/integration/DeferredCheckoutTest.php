@@ -1,8 +1,9 @@
 <?php
 /**
- * Proves process_deferred_payment_by_intent() end to end: a real order intent, real settings, a
- * mocked ifthenpay HTTP layer (method catalog, gateway dataset, Multibanco reference), through the
- * plugin's real public filter entry point — the same one LatePoint calls during checkout.
+ * Proves IfthenpayLpPaymentProcessor's deferred-checkout path end to end: a real order intent,
+ * real settings, a mocked ifthenpay HTTP layer (method catalog, gateway dataset, Multibanco
+ * reference), through the plugin's real public filter entry point — the same one LatePoint calls
+ * during checkout.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -90,7 +91,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	/**
 	 * Builds a not-yet-converted order intent selecting Multibanco, the shape
 	 * OsPaymentsHelper::should_processor_handle_payment_for_order_intent() and
-	 * process_deferred_payment_by_intent() both need to see.
+	 * IfthenpayLpPaymentProcessor::process_deferred_payment_by_intent() both need to see.
 	 *
 	 * @param string $amount The intent's charge_amount.
 	 */
@@ -119,15 +120,6 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The plugin's own singleton, the way LatePoint's real filter chain would call it.
-	 */
-	private function plugin(): IfthenpayPaymentsForLatepoint {
-		global $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY;
-
-		return $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY;
-	}
-
-	/**
 	 * A Multibanco checkout produces a pending, unpaid order intent and a stored reference —
 	 * without blocking (tasks.md T-09's own "Done when"), and without adding an intent error, so
 	 * OsOrderIntentModel::convert_to_order() goes on to commit the booking.
@@ -135,7 +127,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	public function test_deferred_checkout_produces_a_pending_reference_without_an_intent_error(): void {
 		$order_intent = $this->create_multibanco_order_intent( '25.00' );
 
-		$result = $this->plugin()->process_payments_for_order_intent( array(), $order_intent );
+		$result = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
 		$this->assertFalse( $order_intent->get_error() );
@@ -158,7 +150,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	public function test_stores_ifthenpays_own_request_id(): void {
 		$order_intent = $this->create_multibanco_order_intent();
 
-		$this->plugin()->process_payments_for_order_intent( array(), $order_intent );
+		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$record = IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key );
 		$this->assertSame( 'B8kWFoPQ3b6lyjYeETa4', $record->request_id ); // @phpstan-ignore-line property.notFound -- from multibanco-reference-valid.json
@@ -172,7 +164,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'MBWAY' ) );
 
 		$order_intent = $this->create_multibanco_order_intent();
-		$result       = $this->plugin()->process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
 
 		$this->assertSame( array( 'sentinel' => true ), $result );
 		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key ) );
@@ -187,7 +179,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'GATEWAY-WITH-NO-ACCOUNTS' );
 
 		$order_intent = $this->create_multibanco_order_intent();
-		$result       = $this->plugin()->process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
 
 		$this->assertSame( array( 'sentinel' => true ), $result );
 		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key ) );
@@ -223,7 +215,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		);
 
 		$order_intent = $this->create_multibanco_order_intent();
-		$result       = $this->plugin()->process_payments_for_order_intent( array(), $order_intent );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
 		$this->assertNotFalse( $order_intent->get_error() );
@@ -262,7 +254,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		);
 		$transaction_intent->save();
 
-		$result = $this->plugin()->process_payment_for_transaction_intent( array( 'sentinel' => true ), $transaction_intent );
+		$result = IfthenpayLpPaymentProcessor::process_payment_for_transaction_intent( array( 'sentinel' => true ), $transaction_intent );
 
 		$this->assertSame( array( 'sentinel' => true ), $result );
 		$this->assertFalse( $transaction_intent->get_error() );

@@ -297,7 +297,7 @@ class IfthenpayAdminFormRenderer {
 	 * How many days a Multibanco reference stays payable — always sent to the reference API
 	 * (D-2: the API's own default is no expiry at all, which would hold a booking slot forever).
 	 * Save-time range validation is IfthenpayLpMultibancoValidityValidation, wired up in the main
-	 * plugin file; left blank, IfthenpayPaymentsForLatepoint::DEFAULT_MULTIBANCO_VALIDITY_DAYS
+	 * plugin file; left blank, IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS
 	 * applies at payment time.
 	 */
 	private static function render_multibanco_validity_field(): void {
