@@ -120,14 +120,4 @@ class IfthenpayLpCallbackParams {
 
 		return hash_equals( $record_gateway_key, $decoded );
 	}
-
-	/**
-	 * Compares the notified amount to an expected amount as formatted strings, per the contract
-	 * (never as floats).
-	 *
-	 * @param string $expected_amount The order/record's own amount, in the same string format.
-	 */
-	public function amount_matches( string $expected_amount ): bool {
-		return $this->amount === $expected_amount;
-	}
 }
