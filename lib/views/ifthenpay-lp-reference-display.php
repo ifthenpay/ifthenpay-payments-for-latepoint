@@ -132,8 +132,16 @@ class IfthenpayLpReferenceDisplay {
 	 * appended to a LatePoint notification (append_reference_to_email_content(), main plugin
 	 * file). Uses OsPriceBreakdownHelper::output_price_breakdown_row( ..., true ) — the same
 	 * inline-styled row primitive LatePoint's own "Order Summary" section in that same email
-	 * already renders with — instead of inventing separate styling, so this reads as a native
-	 * part of the email rather than a foreign block.
+	 * already renders with — instead of inventing separate styling.
+	 *
+	 * Wrapped in its own card matching LatePoint's own email layout (mailers/layouts/default.html
+	 * — same background/padding/max-width/shadow/radius, copied by value, not read from that file:
+	 * it's a stored, merchant-editable option (`email_layout_template`) by the time this runs, not
+	 * a template this plugin can hook into). $action->prepared_data_for_run['content']
+	 * (append_reference_to_email_content()) is that layout already fully rendered — its own white
+	 * card is already closed — so appending here always lands outside every one of its wrapper
+	 * divs, on the plain page background; a card of our own, rather than bare unstyled content, is
+	 * what makes that unavoidable placement still read as a deliberate second section.
 	 *
 	 * @param object $record As returned by for_order()/for_booking().
 	 */
@@ -142,44 +150,46 @@ class IfthenpayLpReferenceDisplay {
 
 		ob_start();
 		?>
-		<h4 style="margin-bottom: 10px; margin-top: 20px; font-size: 16px; font-weight: bold;">
-			<?php
-			echo $is_paid
-				? esc_html__( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
-				: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
-			?>
-		</h4>
-		<?php if ( $is_paid ) : ?>
-			<p><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
-		<?php else : ?>
-			<p><?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' ); ?></p>
-			<?php
-			$rows     = array(
-				array(
-					'label' => __( 'Entity', 'ifthenpay-payments-for-latepoint' ),
-					'value' => (string) $record->entity,
-				),
-				array(
-					'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
-					'value' => (string) $record->reference,
-				),
-				array(
-					'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
-					'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
-				),
-			);
-			$deadline = self::deadline_for( $record );
-			if ( '' !== $deadline ) {
-				$rows[] = array(
-					'label' => __( 'Pay by', 'ifthenpay-payments-for-latepoint' ),
-					'value' => $deadline,
+		<div style="background-color: #fff; padding: 30px; margin: 20px auto 0 auto; max-width: 450px; box-shadow: 0px 2px 6px -1px rgba(0,0,0,0.2); border-radius: 6px; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 16px; line-height: 1.5;">
+			<h4 style="margin-bottom: 10px; margin-top: 0; font-size: 16px; font-weight: bold;">
+				<?php
+				echo $is_paid
+					? esc_html__( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
+					: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
+				?>
+			</h4>
+			<?php if ( $is_paid ) : ?>
+				<p><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
+			<?php else : ?>
+				<p><?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' ); ?></p>
+				<?php
+				$rows     = array(
+					array(
+						'label' => __( 'Entity', 'ifthenpay-payments-for-latepoint' ),
+						'value' => (string) $record->entity,
+					),
+					array(
+						'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
+						'value' => (string) $record->reference,
+					),
+					array(
+						'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+						'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
+					),
 				);
-			}
-			foreach ( $rows as $row ) {
-				OsPriceBreakdownHelper::output_price_breakdown_row( $row, true );
-			}
-			?>
-		<?php endif; ?>
+				$deadline = self::deadline_for( $record );
+				if ( '' !== $deadline ) {
+					$rows[] = array(
+						'label' => __( 'Pay by', 'ifthenpay-payments-for-latepoint' ),
+						'value' => $deadline,
+					);
+				}
+				foreach ( $rows as $row ) {
+					OsPriceBreakdownHelper::output_price_breakdown_row( $row, true );
+				}
+				?>
+			<?php endif; ?>
+		</div>
 		<?php
 		return (string) ob_get_clean();
 	}
