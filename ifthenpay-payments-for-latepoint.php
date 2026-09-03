@@ -231,9 +231,17 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 * by IfthenpayLpCallbackRegistration itself, for add_settings_fields() to surface on the
 		 * next render; never blocks or unwinds the settings save that just happened.
 		 *
+		 * Also clears IfthenpayLpGatewayDataset's cache for this Backoffice Key, keyed separately
+		 * from the Gateway Key check below — a merchant editing settings must never wait out that
+		 * cache's own short TTL to see the save just made.
+		 *
 		 * @param array<string,mixed> $settings The submitted settings, keyed by setting name.
 		 */
 		public function register_callback_on_settings_updated( $settings ) {
+			if ( isset( $settings['ifthenpay_backoffice_key'] ) ) {
+				IfthenpayLpGatewayDataset::invalidate( sanitize_text_field( $settings['ifthenpay_backoffice_key'] ) );
+			}
+
 			if ( ! isset( $settings['ifthenpay_gateway_key'] ) ) {
 				return;
 			}
