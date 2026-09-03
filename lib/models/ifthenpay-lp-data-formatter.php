@@ -119,12 +119,15 @@ class IfthenpayLpDataFormatter {
 	}
 
 	/**
-	 * Serialize enabled methods into "METHOD|account;METHOD|account" format, the shape Pay By
-	 * Link's own `accounts` field expects. The settings page stores only which methods are
-	 * enabled, not their account keys — those come from the same live gateway dataset the
-	 * settings page itself reads, matched here against the saved Gateway Key. Multibanco and
-	 * Payshop are excluded even if enabled: they are deferred-reference methods PBL never offers,
-	 * and a merchant can enable them today for a future deferred flow this plugin doesn't have yet.
+	 * Serialize enabled methods into "METHOD|account;METHOD|account" format — confirmed by
+	 * ifthenpay's own accounts-field documentation (`MBWAY|MBWAY-KEY;CCARD|CCARD-KEY;...`, a bare
+	 * key with no spaces and no repeated method name) — the shape Pay By Link's own `accounts`
+	 * field expects. The settings page stores only which methods are enabled, not their account
+	 * keys — those come from the same live gateway dataset the settings page itself reads
+	 * (IfthenpayLpGatewayDataset already strips the raw `"{METHOD} | "` display prefix down to
+	 * the bare key), matched here against the saved Gateway Key. Multibanco and Payshop are
+	 * excluded even if enabled: they are deferred-reference methods PBL never offers, and a
+	 * merchant can enable them today for a future deferred flow this plugin doesn't have yet.
 	 */
 	private static function build_accounts_string(): string {
 		// Drops the settings page's always-present hidden fallback entry (an empty string — see

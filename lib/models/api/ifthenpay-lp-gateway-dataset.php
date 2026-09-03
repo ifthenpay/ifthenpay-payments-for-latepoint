@@ -121,20 +121,26 @@ class IfthenpayLpGatewayDataset {
 	}
 
 	/**
-	 * A catalog-visible method's account "key" is its whole raw field value, unmodified — for most
-	 * methods that already reads as `"{METHOD}|{accountKey}"` and every current consumer wants it
-	 * that way (Pay By Link's own `accounts` field is built from this same raw shape). Multibanco
-	 * is the one exception with a real, live-confirmed consumer of the bare key: the Multibanco
-	 * reference API's `mbKey` parameter (contracts/api.md operation "Multibanco reference") rejects
-	 * the `"MB | {accountKey}"` form outright (401/403, "credentials rejected") and only accepts the
-	 * bare `{accountKey}` — confirmed by calling both forms against a real gateway. A gateway
-	 * configured with a static offline key instead carries a raw `"{entidade}|{subentidade}"` pair
-	 * with no `"MB | "` prefix to strip; that form is passed through unchanged; see
-	 * contracts/api.md's own note on `Multibanco`'s two shapes.
+	 * A catalog-visible method's account "key" is its raw field value with the gateway/get
+	 * response's own `"{METHOD} | "` display prefix stripped, leaving the bare account key every
+	 * real consumer actually needs: ifthenpay's own accounts-field documentation gives the exact
+	 * shape (`ENTITY|SUBENTITY`, `MB|MB-KEY`, `MBWAY|MBWAY-KEY`, `PAYSHOP|PAYSHOP-KEY`,
+	 * `CCARD|CCARD-KEY`, `GOOGLE|GOOGLE-KEY`, `APPLE|APPLE-KEY`) — a bare key, no repeated method
+	 * name, no spaces — and the Multibanco reference API's `mbKey` parameter independently
+	 * confirms the same for MB specifically (rejects the prefixed form outright, 401/403,
+	 * "credentials rejected"; accepts the bare key). Caught live: leaving the prefix on for every
+	 * method other than MB produced a Pay By Link `accounts` field double-prefixed with the
+	 * method code (e.g. `"MBWAY|MBWAY | ACC-000005"` instead of `"MBWAY|ACC-000005"`), silently
+	 * accepted by link creation but unusable for picking any method besides the link's own
+	 * default.
+	 *
+	 * A gateway configured with a static Multibanco offline key instead carries a raw
+	 * `"{entidade}|{subentidade}"` pair with no `"MB | "` prefix to strip; that form is passed
+	 * through unchanged — see contracts/api.md's own note on `Multibanco`'s two shapes.
 	 *
 	 * @param array<string,mixed>                                                        $record  One gateway record.
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog Method catalog to intersect against.
-	 * @return array<string,string> methodKey => accountKey, catalog methods only.
+	 * @return array<string,string> methodKey => bare accountKey, catalog methods only.
 	 */
 	private static function extract_accounts( array $record, array $catalog ): array {
 		$accounts = array();
@@ -144,8 +150,9 @@ class IfthenpayLpGatewayDataset {
 			$raw_value   = $record[ $field_name ] ?? '';
 			$account_key = is_string( $raw_value ) ? trim( $raw_value ) : '';
 
-			if ( 'MB' === $method_key && 0 === strpos( $account_key, 'MB | ' ) ) {
-				$account_key = substr( $account_key, strlen( 'MB | ' ) );
+			$prefix = $method_key . ' | ';
+			if ( 0 === strpos( $account_key, $prefix ) ) {
+				$account_key = substr( $account_key, strlen( $prefix ) );
 			}
 
 			if ( '' !== $account_key ) {

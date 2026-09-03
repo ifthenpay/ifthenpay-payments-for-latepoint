@@ -2,12 +2,14 @@
 /**
  * Proves IfthenpayLpGatewayDataset: per-request caching, the MB/Multibanco field-name
  * mapping, that an invisible catalog method is excluded even with real account data in the raw
- * record, and that a method's account "key" is its whole raw field value, unmodified — except
- * Multibanco, which (confirmed live against two different real gateways) can be either a dynamic
- * MB key ("MB | ACC-000008", the same prefixed shape every other method uses — but with the
- * "MB | " prefix stripped here, since the Multibanco reference API's `mbKey` param rejects the
- * prefixed form outright, 401/403) or a static one ("11687 | 991", a raw entidade/subentidade
- * pair with no prefix to strip) depending on what the merchant assigned to that gateway.
+ * record, and that every method's raw field value ("{METHOD} | {accountKey}", confirmed live) has
+ * that display prefix stripped down to the bare account key — the shape ifthenpay's own
+ * accounts-field documentation gives (`MBWAY|MBWAY-KEY`, `CCARD|CCARD-KEY`, ...) and the shape the
+ * Multibanco reference API's `mbKey` param independently requires (rejects the prefixed form,
+ * 401/403; accepts the bare key). Multibanco can also carry a static key ("11687 | 991", a raw
+ * entidade/subentidade pair with no "MB | " prefix) instead of a dynamic one, depending on what
+ * the merchant assigned to that gateway — passed through unchanged, since there is no prefix to
+ * strip and no reliable way to tell a static key's entidade from an arbitrary prefix otherwise.
  *
  * Each test uses its own Backoffice Key value — IfthenpayLpGatewayDataset's per-request cache is
  * a static property that persists across tests in the same process, so a shared key would leak
@@ -100,12 +102,13 @@ final class GatewayDatasetTest extends TestCase {
 	}
 
 	/**
-	 * The second fixture gateway: every catalog-visible method's whole raw field value is kept
-	 * as-is (no splitting), correctly for the MB → Multibanco field-name mapping too — except MB
-	 * itself, whose "MB | " prefix is stripped down to the bare account key
-	 * ("MB | ACC-000008" -> "ACC-000008"), since that bare form is what the Multibanco reference
-	 * API's `mbKey` parameter actually accepts (confirmed live: the prefixed form gets a 401/403
-	 * "credentials rejected", the bare form succeeds).
+	 * The second fixture gateway: every catalog-visible method's raw field value has its
+	 * "{METHOD} | " display prefix stripped down to the bare account key ("MBWAY | ACC-000005" ->
+	 * "ACC-000005"), correctly for the MB → Multibanco field-name mapping too
+	 * ("MB | ACC-000008" -> "ACC-000008") — the shape ifthenpay's own accounts-field
+	 * documentation gives, and the shape the Multibanco reference API's `mbKey` parameter actually
+	 * accepts (confirmed live: the prefixed form gets a 401/403 "credentials rejected", the bare
+	 * form succeeds).
 	 */
 	public function test_modern_gateway_accounts_are_extracted_including_multibanco_mapping(): void {
 		$this->mock_catalog_then_gateway_responses();
@@ -118,12 +121,12 @@ final class GatewayDatasetTest extends TestCase {
 		$this->assertEqualsCanonicalizing(
 			array(
 				'MB'      => 'ACC-000008',
-				'MBWAY'   => 'MBWAY | ACC-000005',
-				'PAYSHOP' => 'PAYSHOP | ACC-000006',
-				'CCARD'   => 'CCARD | ACC-000002',
-				'GOOGLE'  => 'GOOGLE | ACC-000004',
-				'APPLE'   => 'APPLE | ACC-000001',
-				'PIX'     => 'PIX | ACC-000007',
+				'MBWAY'   => 'ACC-000005',
+				'PAYSHOP' => 'ACC-000006',
+				'CCARD'   => 'ACC-000002',
+				'GOOGLE'  => 'ACC-000004',
+				'APPLE'   => 'ACC-000001',
+				'PIX'     => 'ACC-000007',
 			),
 			$dataset['accounts']['MODERN-GATEWAY']
 		);
