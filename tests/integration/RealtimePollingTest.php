@@ -142,10 +142,11 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * must not have their own successful payment marked failed/cancelled. Not routed through
 	 * settle_payment() here: the order does not exist yet at this point in the realtime flow (the
 	 * browser only submits the booking form after seeing this response), so settle_payment() would
-	 * always fail with "order not ready". request_id is still linked and settled_at still stamped
-	 * (mark_settled(), not a bare status update) so that a real async callback arriving later for
-	 * this same payment — now possible, since gateway_key is stored — recognises it as already
-	 * settled instead of trying to settle it a second time.
+	 * always fail with "order not ready". settled_at is still stamped (mark_settled(), not a bare
+	 * status update); request_id itself is untouched — it's ifthenpay's own settlement/refund
+	 * identifier, a different value from the transaction id verified here (see
+	 * resolve_payment_status_from_modal_url()'s own docblock) — the txid is recorded in
+	 * method_data instead.
 	 */
 	public function test_verified_payment_is_marked_paid_regardless_of_reported_type(): void {
 		$this->mock_transaction_status( true, 'tok-verified-despite-cancel' );
@@ -157,7 +158,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$this->assertFalse( $result['pending'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-verified-despite-cancel' );
 		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
-		$this->assertSame( 'TXID-REAL-001', $record->request_id ); // @phpstan-ignore-line property.notFound
+		$this->assertNull( $record->request_id ); // @phpstan-ignore-line property.notFound
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
 		// The generic PAYBYLINK method the row was inserted with is corrected to what ifthenpay
 		// itself confirms the customer actually used.
