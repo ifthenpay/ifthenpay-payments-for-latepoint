@@ -65,6 +65,10 @@ class IfthenpayLpCallbackRestController {
 			return new WP_REST_Response( null, 403 );
 		}
 
+		if ( 'realtime' === $record->kind ) {
+			return new WP_REST_Response( null, self::settle_realtime( $record, $params ) );
+		}
+
 		$result = IfthenpayLpSettlement::settle_payment(
 			$params->request_id,
 			array( 'amount' => $params->amount ),
@@ -73,6 +77,46 @@ class IfthenpayLpCallbackRestController {
 		);
 
 		return new WP_REST_Response( null, self::status_for( $result ) );
+	}
+
+	/**
+	 * A realtime row never has an order to settle against at the point a callback typically
+	 * arrives — that only exists once the browser's own polling round-trip tells LatePoint the
+	 * payment succeeded (IfthenpayLpPaymentProcessor::process_payment_by_intent()), and a callback
+	 * is server-to-server, often faster than the browser's own redirect. Routing it through
+	 * IfthenpayLpSettlement::settle_payment() would reject with 'order_not_ready' every time,
+	 * forcing ifthenpay to retry until the browser eventually finishes on its own — no better than
+	 * not handling the callback at all, and never recovers a customer who doesn't come back.
+	 *
+	 * Marks the row paid directly instead, the same way the polling path already does
+	 * (IfthenpayLpTransactionRepository::record_verification()) — one mechanism for "this realtime
+	 * row is paid", reachable from either trigger, not two that could disagree. Idempotent via the
+	 * row's own status, not request_id (a realtime row is looked up by token here, same as
+	 * polling — request_id was never stored at creation for this kind either way).
+	 *
+	 * @param object                    $record As found by token; already gateway-key authenticated.
+	 * @param IfthenpayLpCallbackParams $params As parsed from the request.
+	 * @return int HTTP status.
+	 */
+	private static function settle_realtime( object $record, IfthenpayLpCallbackParams $params ): int {
+		if ( 'PAID' === $record->status ) {
+			return 200;
+		}
+
+		if ( null !== $record->amount && IfthenpayLpDataFormatter::format_amount( $record->amount ) !== IfthenpayLpDataFormatter::format_amount( $params->amount ) ) {
+			return 409;
+		}
+
+		// Not a txid — the callback's own request_id, the only correlation handle it carries. Kept
+		// under the same method_data key record_verification() already uses for either shape.
+		$confirmation = (object) array(
+			'payment_method' => $params->method,
+			'amount'         => $params->amount,
+			'order_id'       => $params->reference,
+		);
+		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, true );
+
+		return 200;
 	}
 
 	/**

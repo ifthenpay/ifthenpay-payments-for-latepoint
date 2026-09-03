@@ -159,6 +159,101 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A callback for a `realtime` row settles it directly — proving settle_payment() (which needs
+	 * OsOrderIntentHelper::is_converted() to already be true) is bypassed entirely, since a realtime
+	 * callback typically arrives before the browser's own polling has ever created the order. Uses
+	 * a not-yet-converted intent to make that bypass unambiguous: settle_payment() would fail
+	 * `order_not_ready` here, so a 200 with the row actually marked PAID proves the direct path ran.
+	 */
+	public function test_realtime_notification_settles_directly_without_an_order(): void {
+		$customer             = new OsCustomerModel();
+		$customer->first_name = 'Test';
+		$customer->last_name  = 'Realtime';
+		$customer->email      = 'ifthenpay-lp-realtime-' . wp_generate_password( 8, false ) . '@example.com';
+		$customer->save();
+
+		$order_intent                = new OsOrderIntentModel();
+		$order_intent->customer_id   = $customer->id;
+		$order_intent->charge_amount = '25.00';
+		$order_intent->status        = LATEPOINT_ORDER_INTENT_STATUS_NEW;
+		$order_intent->save();
+
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'         => 'lp-order-tok-abc123',
+				'request_id'    => null,
+				'intent_id'     => $order_intent->id,
+				'kind'          => 'realtime',
+				'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+				'amount'        => '25.00',
+				'gateway_key'   => ifthenpay_lp_callback_fixture_gateway_key(),
+				'paybylink_url' => 'https://pay.example/lp-order-tok-abc123',
+			)
+		);
+
+		$response = $this->dispatch( 'valid-multibanco.txt' );
+
+		$this->assertSame( 200, $response->get_status() );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'lp-order-tok-abc123' );
+		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
+		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'MB', $record->method ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * A second delivery of the same notification for an already-paid realtime row is a no-op 200 —
+	 * idempotent via the row's own status, the same guarantee settle_payment() gives the deferred
+	 * path, just without a request_id to key a lock on.
+	 */
+	public function test_realtime_notification_already_paid_is_idempotent(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'         => 'lp-order-tok-abc123',
+				'request_id'    => null,
+				'intent_id'     => $fixture->order_intent->id,
+				'kind'          => 'realtime',
+				'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+				'amount'        => '25.00',
+				'gateway_key'   => ifthenpay_lp_callback_fixture_gateway_key(),
+				'paybylink_url' => 'https://pay.example/lp-order-tok-abc123',
+			)
+		);
+
+		$first  = $this->dispatch( 'valid-multibanco.txt' );
+		$second = $this->dispatch( 'duplicate.txt' );
+
+		$this->assertSame( 200, $first->get_status() );
+		$this->assertSame( 200, $second->get_status() );
+	}
+
+	/**
+	 * A notified amount that doesn't match a realtime row's own stored amount is rejected with 409,
+	 * same as the deferred path — checked before anything is written.
+	 */
+	public function test_realtime_notification_wrong_amount_returns_409(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'         => 'lp-order-tok-abc123',
+				'request_id'    => null,
+				'intent_id'     => $fixture->order_intent->id,
+				'kind'          => 'realtime',
+				'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+				'amount'        => '25.00',
+				'gateway_key'   => ifthenpay_lp_callback_fixture_gateway_key(),
+				'paybylink_url' => 'https://pay.example/lp-order-tok-abc123',
+			)
+		);
+
+		$response = $this->dispatch( 'wrong-amount.txt' );
+
+		$this->assertSame( 409, $response->get_status() );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'lp-order-tok-abc123' );
+		$this->assertNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
 	 * A reference with no matching record at all is rejected with 404 — nothing is revealed about
 	 * whether a record with a different reference exists (NFR-6).
 	 */
