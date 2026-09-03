@@ -36,18 +36,17 @@ class IfthenpayLpSettlement {
 	 * @param array<string,string> $payload    Normalised notification data; at minimum `amount`,
 	 *                                          already formatted the same way as the stored
 	 *                                          record's own `amount` column (see amounts_match()).
-	 * @param string               $source     'callback' | 'polling' | 'manual'. Recorded nowhere
-	 *                                          yet in this task; kept in the signature now so every
-	 *                                          call site is already shaped correctly.
+	 * @param string               $source     'callback' | 'polling' | 'manual' — recorded on the
+	 *                                          LatePoint transaction's own `notes` field (see
+	 *                                          apply_state_change()), never used to change
+	 *                                          behaviour.
 	 */
 	public static function settle_payment( string $request_id, array $payload, string $source ): IfthenpayLpSettlementResult {
-		unset( $source ); // Not yet persisted anywhere; see the docblock above.
-
 		try {
 			return IfthenpayLpSettlementLock::with_lock(
 				$request_id,
-				static function () use ( $request_id, $payload ) {
-					return self::settle_locked( $request_id, $payload );
+				static function () use ( $request_id, $payload, $source ) {
+					return self::settle_locked( $request_id, $payload, $source );
 				}
 			);
 		} catch ( IfthenpayLpLockUnavailableException $e ) {
@@ -62,8 +61,9 @@ class IfthenpayLpSettlement {
 	 *
 	 * @param string               $request_id As passed to settle_payment().
 	 * @param array<string,string> $payload    As passed to settle_payment().
+	 * @param string               $source     As passed to settle_payment().
 	 */
-	private static function settle_locked( string $request_id, array $payload ): IfthenpayLpSettlementResult {
+	private static function settle_locked( string $request_id, array $payload, string $source ): IfthenpayLpSettlementResult {
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( $request_id );
 		if ( ! $record ) {
 			return IfthenpayLpSettlementResult::rejected( 'unknown_request_id' );
@@ -93,7 +93,7 @@ class IfthenpayLpSettlement {
 			return IfthenpayLpSettlementResult::rejected( 'order_not_settleable' );
 		}
 
-		if ( ! self::apply_state_change( $record, $order, $request_id ) ) {
+		if ( ! self::apply_state_change( $record, $order, $request_id, $source ) ) {
 			return IfthenpayLpSettlementResult::failed( 'state_change_failed' );
 		}
 
@@ -126,13 +126,14 @@ class IfthenpayLpSettlement {
 	 *
 	 * @param object       $record     The repository row (see IfthenpayLpTransactionRepository).
 	 * @param OsOrderModel $order      The already-loaded, already-validated order.
-	 * @param string       $request_id ifthenpay's identifier — becomes the LatePoint transaction's
-	 *                                 own token, giving core's own duplicate-token rejection
-	 *                                 (research.md) as a second, independent idempotency guard.
+	 * @param string       $request_id ifthenpay's identifier for this payment — recorded in
+	 *                                 `notes`, not as the transaction's own token (see
+	 *                                 build_transaction_notes()).
+	 * @param string       $source     'callback' | 'polling' | 'manual' — recorded in `notes`.
 	 */
-	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id ): bool {
+	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id, string $source ): bool {
 		$transaction                  = new OsTransactionModel();
-		$transaction->token           = $request_id;
+		$transaction->token           = (string) $record->token;
 		$transaction->payment_method  = $record->method;
 		$transaction->payment_portion = LATEPOINT_PAYMENT_PORTION_FULL;
 		$transaction->amount          = $record->amount;
@@ -141,6 +142,7 @@ class IfthenpayLpSettlement {
 		$transaction->processor       = 'ifthenpay';
 		$transaction->kind            = LATEPOINT_TRANSACTION_KIND_CAPTURE;
 		$transaction->status          = LATEPOINT_TRANSACTION_STATUS_SUCCEEDED;
+		$transaction->notes           = self::build_transaction_notes( $record, $request_id, $source );
 
 		$invoice = OsInvoicesHelper::get_matching_invoice_for_transaction( $transaction );
 		if ( ! $invoice->is_new_record() ) {
@@ -163,6 +165,31 @@ class IfthenpayLpSettlement {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Everything about this payment that isn't already the transaction's own token/amount/method —
+	 * ifthenpay's own request id (our token is what LatePoint shows as "Confirmation Code",
+	 * consistent with the realtime flow's own convention; request_id would only confuse a merchant
+	 * reconciling by the token they already see everywhere else), the Multibanco entity/reference
+	 * when this was a deferred payment, and which of the three settle_payment() call sites settled
+	 * it — all otherwise invisible once the row leaves the plugin's own table.
+	 *
+	 * @param object $record     The repository row.
+	 * @param string $request_id ifthenpay's identifier for this payment.
+	 * @param string $source     'callback' | 'polling' | 'manual'.
+	 */
+	private static function build_transaction_notes( object $record, string $request_id, string $source ): string {
+		$lines   = array();
+		$lines[] = 'ifthenpay request ID: ' . $request_id;
+
+		if ( ! empty( $record->entity ) && ! empty( $record->reference ) ) {
+			$lines[] = 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;
+		}
+
+		$lines[] = 'Settled via: ' . $source;
+
+		return implode( "\n", $lines );
 	}
 
 	/**
