@@ -1,8 +1,20 @@
 <?php
+/**
+ * Every place raw ifthenpay-shaped or LatePoint-settings-shaped data gets turned into something a
+ * specific ifthenpay API call or the plugin's own repository expects — centralized so, e.g.,
+ * format_amount()'s formula isn't reimplemented per caller (see its own docblock).
+ *
+ * @package ifthenpay-payments-for-latepoint
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Every method here is static and stateless — pure formatting/lookup, no caching or side effects
+ * of its own (callers like IfthenpayLpGatewayDataset and IfthenpayLpMethodCatalog own their own).
+ */
 class IfthenpayLpDataFormatter {
 
 	/**
@@ -17,7 +29,7 @@ class IfthenpayLpDataFormatter {
 
 		foreach ( $raw as $entry ) {
 			$method_key = $entry['Entity'] ?? '';
-			if ( ! $method_key ) {
+			if ( ! is_string( $method_key ) || '' === $method_key ) {
 				continue;
 			}
 
@@ -41,9 +53,10 @@ class IfthenpayLpDataFormatter {
 	/**
 	 * Build payload for Pay-by-Link endpoint.
 	 *
-	 * @param OsOrderIntentModel|OsTransactionIntentModel $intent
-	 * @param string                                      $token
-	 * @return array
+	 * @param OsOrderIntentModel|OsTransactionIntentModel $intent The intent being paid.
+	 * @param string                                      $token  Our own correlation handle.
+	 * @param float|int|string                            $amount How much to charge.
+	 * @return array<string,string>
 	 */
 	public static function build_pay_by_link_payload( $intent, $token, $amount ) {
 		$payload = array(
@@ -82,7 +95,7 @@ class IfthenpayLpDataFormatter {
 	 * IfthenpayLpPaymentProcessor and IfthenpayLpSettlement, so the one formula
 	 * (number_format($x, 2, '.', '')) isn't reimplemented in three places.
 	 *
-	 * @param float|int|string $raw
+	 * @param float|int|string $raw The value to format.
 	 */
 	public static function format_amount( $raw ): string {
 		return number_format( (float) $raw, 2, '.', '' );
@@ -90,6 +103,8 @@ class IfthenpayLpDataFormatter {
 
 	/**
 	 * Build the description as "Intent #{id} - {admin description}".
+	 *
+	 * @param OsOrderIntentModel|OsTransactionIntentModel $intent The intent being paid.
 	 */
 	private static function build_description( $intent ): string {
 		$admin_desc = OsSettingsHelper::get_settings_value( 'ifthenpay_description', '' );
@@ -122,11 +137,10 @@ class IfthenpayLpDataFormatter {
 	 * merchant can enable them today for a future deferred flow this plugin doesn't have yet.
 	 */
 	private static function build_accounts_string(): string {
-		// Drops the settings page's always-present hidden fallback entry (an empty string — see
-		// IfthenpayLpAdminFormRenderer::render_payments_configuration()), the same as that page's own
-		// read of this setting does.
-		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
-		$enabled_methods = array_values( array_filter( $saved, static fn( $value ) => is_string( $value ) && '' !== $value ) );
+		// Same reader the settings page's own checkboxes use — checkout-time gating must never
+		// drift from what that page renders as "enabled" (see get_saved_enabled_methods()'s own
+		// docblock on the shapes it filters out).
+		$enabled_methods = IfthenpayLpAdminFormRenderer::get_saved_enabled_methods();
 		$gateway_key     = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		$backoffice_key  = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 

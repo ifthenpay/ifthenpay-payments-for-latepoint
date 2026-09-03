@@ -36,11 +36,16 @@ require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 final class GatewayDatasetTest extends TestCase {
 
 	/**
-	 * Boots Brain Monkey and stubs the WP functions the client/catalog/dataset always touch.
+	 * Boots Brain Monkey and stubs the WP functions the client/catalog/dataset always touch. Also
+	 * resets IfthenpayLpMethodCatalog's own per-request in-memory cache — fetch() calls
+	 * IfthenpayLpMethodCatalog::get() internally, and unlike this class's own per-key cache (see the
+	 * file docblock), the catalog has no key dimension to keep it isolated between tests by
+	 * construction (see ifthenpay_lp_reset_method_catalog_cache()'s own docblock).
 	 */
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
 
 		Functions\stubs(
 			array(
@@ -63,32 +68,10 @@ final class GatewayDatasetTest extends TestCase {
 	}
 
 	/**
-	 * Stubs the transport for a catalog fetch followed by a gateway-dataset fetch, in that order.
-	 */
-	private function mock_catalog_then_gateway_responses(): void {
-		Functions\when( 'is_wp_error' )->justReturn( false );
-
-		$catalog_body = ifthenpay_lp_fixture( 'method-catalog.json' );
-		$gateway_body = ifthenpay_lp_fixture( 'gateway-dataset.json' );
-
-		Functions\expect( 'wp_remote_request' )
-			->twice()
-			->andReturn(
-				ifthenpay_lp_mock_response( 200, $catalog_body ),
-				ifthenpay_lp_mock_response( 200, $gateway_body )
-			);
-		// Extract from the actual response passed in, rather than a fixed value per call — with
-		// two different bodies across two calls, that is the only way to get the right body back
-		// to the right caller regardless of call order.
-		Functions\when( 'wp_remote_retrieve_response_code' )->alias( static fn( $response ) => $response['response']['code'] );
-		Functions\when( 'wp_remote_retrieve_body' )->alias( static fn( $response ) => $response['body'] );
-	}
-
-	/**
 	 * Both gateways appear in gatewaykeys, keyed by GatewayKey.
 	 */
 	public function test_gatewaykeys_lists_every_gateway(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-GATEWAYKEYS' );
 
@@ -111,7 +94,7 @@ final class GatewayDatasetTest extends TestCase {
 	 * form succeeds).
 	 */
 	public function test_modern_gateway_accounts_are_extracted_including_multibanco_mapping(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-MODERN' );
 
@@ -139,7 +122,7 @@ final class GatewayDatasetTest extends TestCase {
 	 * in the gateway record is not enough on its own to offer a method.
 	 */
 	public function test_invisible_catalog_method_is_excluded_even_with_real_account_data(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-COFIDIS' );
 
@@ -152,7 +135,7 @@ final class GatewayDatasetTest extends TestCase {
 	 * reliable way to tell a static key's entidade from an arbitrary prefix otherwise.
 	 */
 	public function test_multibanco_value_is_kept_whole_not_split(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-LEGACY' );
 
@@ -163,7 +146,7 @@ final class GatewayDatasetTest extends TestCase {
 	 * Two calls for the same key hit the network once — the per-request cache.
 	 */
 	public function test_second_call_for_the_same_key_is_cached(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$first  = IfthenpayLpGatewayDataset::get( 'TEST-KEY-CACHED' );
 		$second = IfthenpayLpGatewayDataset::get( 'TEST-KEY-CACHED' );
@@ -179,7 +162,7 @@ final class GatewayDatasetTest extends TestCase {
 	 * too, under its own key.
 	 */
 	public function test_successful_fetch_is_written_to_a_transient(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 		$calls = array();
 		Functions\when( 'set_transient' )->alias(
 			static function ( $key, $value, $ttl ) use ( &$calls ) {

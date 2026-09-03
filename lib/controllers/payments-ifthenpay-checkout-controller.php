@@ -42,7 +42,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * Public endpoint for “TRANSACTION” checkout.
 		 */
 		public function get_transaction_ifthenpay_options() {
-			if ( ! filter_var( $this->params['invoice_id'], FILTER_VALIDATE_INT ) ) {
+			if ( ! filter_var( $this->params['invoice_id'] ?? '', FILTER_VALIDATE_INT ) ) {
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,
@@ -132,10 +132,15 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					)
 				);
 			} catch ( Exception $e ) {
+				// Never $e->getMessage() here — IfthenpayLpApiClient's own transport failures embed
+				// the raw WP_Error string (e.g. a cURL error), which has no business reaching an
+				// anonymous customer's payment modal. Same generic wording as the empty-accounts
+				// branch above, for the same reason: this is our own side failing, not something the
+				// customer can act on.
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => $e->getMessage(),
+						'message' => __( 'Could not start this payment right now. Please try again or contact the site owner.', 'ifthenpay-payments-for-latepoint' ),
 					)
 				);
 			}

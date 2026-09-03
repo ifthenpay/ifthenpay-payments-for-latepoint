@@ -24,11 +24,15 @@ require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 final class MethodCatalogTest extends TestCase {
 
 	/**
-	 * Boots Brain Monkey and stubs the WP functions the client/catalog always touch.
+	 * Boots Brain Monkey and stubs the WP functions the client/catalog always touch. Also resets
+	 * IfthenpayLpMethodCatalog's own per-request in-memory cache — a static property that would
+	 * otherwise leak the first test's result into every test after it (see
+	 * ifthenpay_lp_reset_method_catalog_cache()'s own docblock).
 	 */
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
 
 		Functions\stubs(
 			array(

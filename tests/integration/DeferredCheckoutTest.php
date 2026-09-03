@@ -8,6 +8,9 @@
  * @package ifthenpay-payments-for-latepoint
  */
 
+// phpcs:ignore Squiz.Commenting.FileComment.Missing -- docblock above is the file comment; the sniff misclassifies it when a require is the first statement.
+require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
+
 /**
  * Deferred checkout proof.
  */
@@ -22,9 +25,15 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	 * Mocks the ifthenpay HTTP layer first — saving the Backoffice Key below goes through the
 	 * plugin's own save-time validation (IfthenpayLpBackofficeKeyValidation), which makes a real
 	 * network call unless intercepted. Then seeds the settings a working Multibanco checkout needs.
+	 *
+	 * Also resets IfthenpayLpMethodCatalog's own per-request in-memory cache — it has no key
+	 * dimension to keep it isolated between tests by construction (see
+	 * ifthenpay_lp_reset_method_catalog_cache()'s own docblock), and this file's own
+	 * mock_ifthenpay_http() relies on gateway/methods/available actually being asked again.
 	 */
 	protected function setUp(): void {
 		parent::setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
 
 		add_filter( 'pre_http_request', array( $this, 'mock_ifthenpay_http' ), 10, 3 );
 
@@ -56,36 +65,16 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 			);
 		}
 		if ( false !== strpos( $url, 'gateway/methods/available' ) ) {
-			return $this->fixture_response( 'method-catalog.json' );
+			return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'method-catalog.json' ) );
 		}
 		if ( false !== strpos( $url, 'gateway/get' ) ) {
-			return $this->fixture_response( 'gateway-dataset.json' );
+			return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'gateway-dataset.json' ) );
 		}
 		if ( false !== strpos( $url, 'multibanco/reference' ) ) {
-			return $this->fixture_response( 'multibanco-reference-valid.json' );
+			return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'multibanco-reference-valid.json' ) );
 		}
 
 		return $preempt;
-	}
-
-	/**
-	 * Loads a fixture file into a `wp_remote_request()`-shaped 200 response.
-	 *
-	 * @param string $name Fixture file name under tests/fixtures/ifthenpay/.
-	 * @return array{response: array{code:int,message:string}, body:string, headers: array<empty>}
-	 */
-	private function fixture_response( string $name ): array {
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local fixture file, not a remote URL.
-		$body = (string) file_get_contents( __DIR__ . '/../fixtures/ifthenpay/' . $name );
-
-		return array(
-			'response' => array(
-				'code'    => 200,
-				'message' => '',
-			),
-			'body'     => $body,
-			'headers'  => array(),
-		);
 	}
 
 	/**
@@ -198,15 +187,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 			'pre_http_request',
 			static function ( $preempt, $args, $url ) {
 				if ( false !== strpos( $url, 'multibanco/reference' ) ) {
-					return array(
-						'response' => array(
-							'code'    => 200,
-							'message' => '',
-						),
-						// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-						'body'     => (string) file_get_contents( __DIR__ . '/../fixtures/ifthenpay/multibanco-reference-invalid-amount.json' ),
-						'headers'  => array(),
-					);
+					return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'multibanco-reference-invalid-amount.json' ) );
 				}
 				return $preempt;
 			},

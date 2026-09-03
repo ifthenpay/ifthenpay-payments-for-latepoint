@@ -354,7 +354,13 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Shared single-row lookup by an indexed column.
+	 * Shared single-row lookup by an indexed column. The row itself is $wpdb->get_row()'s own raw
+	 * stdClass — deliberately not a typed model, since every column is nullable/optional depending
+	 * on kind and every caller already treats it as a plain data bag. Every property access on a
+	 * row returned from here (or from find_by_token()/find_by_request_id()/find_by_intent_id(),
+	 * which all funnel through this) is therefore untyped as far as phpstan is concerned; test code
+	 * marks each one with a bare property.notFound line suppression rather than repeating this
+	 * explanation at every one of those call sites.
 	 *
 	 * @param string $column Always a fixed literal from a method above, never external input —
 	 *                        interpolated as an identifier because %s placeholders are for values,

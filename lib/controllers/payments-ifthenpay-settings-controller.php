@@ -119,8 +119,8 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 			$wp_user = wp_get_current_user();
 
 			$payload = array(
-				'gateway_key'       => sanitize_text_field( $this->params['gateway_key'] ),
-				'entity'            => sanitize_text_field( $this->params['entity'] ),
+				'gateway_key'       => sanitize_text_field( $this->params['gateway_key'] ?? '' ),
+				'entity'            => sanitize_text_field( $this->params['entity'] ?? '' ),
 				'backoffice_key'    => OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' ),
 				'customer_email'    => $wp_user->data->user_email,
 				'site_url'          => home_url( '/' ),

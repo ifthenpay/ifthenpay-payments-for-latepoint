@@ -133,7 +133,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_clean_layout_js_files', array( $this, 'add_scripts_to_clean_layout' ), 10 );
 			add_filter( 'latepoint_clean_layout_css_files', array( $this, 'add_styles_to_clean_layout' ), 10 );
 
-			add_filter( 'latepoint_payment_processors', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_processor' ), 10, 2 );
+			add_filter( 'latepoint_payment_processors', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_processor' ) );
 			add_filter( 'latepoint_all_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_methods' ) );
 			add_filter( 'latepoint_enabled_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_enabled_payment_methods' ) );
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
@@ -365,8 +365,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_connection_notice'] = $backoffice_key ? IfthenpayLpAdminFormRenderer::get_connection_notice( $dataset ) : null;
 
 			$localized_vars['ifthenpay_translations'] = array(
-				'no_accounts'        => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
-				'activate'           => __( 'Activate', 'ifthenpay-payments-for-latepoint' ),
 				'validation_failed'  => __( 'Validation failed.', 'ifthenpay-payments-for-latepoint' ),
 				'server_error'       => __( 'Server error. Please try again.', 'ifthenpay-payments-for-latepoint' ),
 				'activation_sent'    => __( 'Your activation request has been sent to support.', 'ifthenpay-payments-for-latepoint' ),
