@@ -68,7 +68,8 @@ class IfthenpayLpCallbackRestController {
 		$result = IfthenpayLpSettlement::settle_payment(
 			$params->request_id,
 			array( 'amount' => $params->amount ),
-			'callback'
+			'callback',
+			$params->reference
 		);
 
 		return new WP_REST_Response( null, self::status_for( $result ) );

@@ -31,22 +31,35 @@ class IfthenpayLpSettlement {
 	 * Settles a payment. Safe to call more than once with the same $request_id: every call after
 	 * the first returns already-settled, with no further side effects.
 	 *
-	 * @param string               $request_id ifthenpay's own identifier for this payment — the
-	 *                                          idempotency key, and the lock key.
-	 * @param array<string,string> $payload    Normalised notification data; at minimum `amount`,
-	 *                                          already formatted the same way as the stored
-	 *                                          record's own `amount` column (see amounts_match()).
-	 * @param string               $source     'callback' | 'polling' | 'manual' — recorded on the
-	 *                                          LatePoint transaction's own `notes` field (see
-	 *                                          apply_state_change()), never used to change
-	 *                                          behaviour.
+	 * @param string               $request_id     ifthenpay's own identifier for this payment —
+	 *                                              the idempotency key, and the lock key.
+	 * @param array<string,string> $payload        Normalised notification data; at minimum
+	 *                                              `amount`, already formatted the same way as the
+	 *                                              stored record's own `amount` column (see
+	 *                                              amounts_match()).
+	 * @param string               $source         'callback' | 'polling' | 'manual' — recorded on
+	 *                                              the LatePoint transaction's own `notes` field
+	 *                                              (see apply_state_change()), never used to change
+	 *                                              behaviour.
+	 * @param string|null          $expected_token When given, the record $request_id resolves to
+	 *                                              must carry this exact token — the caller's own,
+	 *                                              independently-sourced correlation handle (e.g. a
+	 *                                              callback's own `reference` param, already
+	 *                                              authenticated against a specific record's
+	 *                                              gateway key before this is ever called). Two
+	 *                                              identifiers that don't refer to the same row is
+	 *                                              rejected outright, per contracts/callback.md's
+	 *                                              own note that this cross-check is "a signal worth
+	 *                                              rejecting on" — without it, a request_id for an
+	 *                                              unrelated record would still settle, no matter
+	 *                                              which reference/token accompanied it.
 	 */
-	public static function settle_payment( string $request_id, array $payload, string $source ): IfthenpayLpSettlementResult {
+	public static function settle_payment( string $request_id, array $payload, string $source, ?string $expected_token = null ): IfthenpayLpSettlementResult {
 		try {
 			return IfthenpayLpSettlementLock::with_lock(
 				$request_id,
-				static function () use ( $request_id, $payload, $source ) {
-					return self::settle_locked( $request_id, $payload, $source );
+				static function () use ( $request_id, $payload, $source, $expected_token ) {
+					return self::settle_locked( $request_id, $payload, $source, $expected_token );
 				}
 			);
 		} catch ( IfthenpayLpLockUnavailableException $e ) {
@@ -59,14 +72,19 @@ class IfthenpayLpSettlement {
 	 * IfthenpayLpSettlementLock. Re-reads the record fresh; anything read before the lock (by a
 	 * caller's own pre-checks) may already be stale.
 	 *
-	 * @param string               $request_id As passed to settle_payment().
-	 * @param array<string,string> $payload    As passed to settle_payment().
-	 * @param string               $source     As passed to settle_payment().
+	 * @param string               $request_id     As passed to settle_payment().
+	 * @param array<string,string> $payload        As passed to settle_payment().
+	 * @param string               $source         As passed to settle_payment().
+	 * @param string|null          $expected_token As passed to settle_payment().
 	 */
-	private static function settle_locked( string $request_id, array $payload, string $source ): IfthenpayLpSettlementResult {
+	private static function settle_locked( string $request_id, array $payload, string $source, ?string $expected_token ): IfthenpayLpSettlementResult {
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( $request_id );
 		if ( ! $record ) {
 			return IfthenpayLpSettlementResult::rejected( 'unknown_request_id' );
+		}
+
+		if ( null !== $expected_token && $expected_token !== $record->token ) {
+			return IfthenpayLpSettlementResult::rejected( 'token_mismatch' );
 		}
 
 		if ( null !== $record->settled_at ) {

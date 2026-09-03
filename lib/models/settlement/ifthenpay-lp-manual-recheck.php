@@ -71,7 +71,8 @@ class IfthenpayLpManualRecheck {
 		$result = IfthenpayLpSettlement::settle_payment(
 			(string) $record->request_id,
 			array( 'amount' => $confirmation->amount ),
-			'manual'
+			'manual',
+			$token
 		);
 
 		if ( $result->is_settled() ) {

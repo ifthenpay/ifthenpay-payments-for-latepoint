@@ -122,6 +122,43 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A `reference` that matches one record, paired with a `request_id` that belongs to a
+	 * different one — `apk` still passes, since it's checked against the reference's own record's
+	 * gateway key, but the two identifiers don't refer to the same payment. Rejected outright, per
+	 * contracts/callback.md's own note that this cross-check is "a signal worth rejecting on" —
+	 * without it, the request_id's own record would settle regardless of which reference/apk
+	 * accompanied it.
+	 */
+	public function test_request_id_belonging_to_a_different_record_is_rejected(): void {
+		$this->seed_record_for_fixture( 'lp-order-tok-abc123', 'REQ-VALID-0001', '25.00' );
+
+		$other_fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '999.00' ) );
+		ifthenpay_lp_insert_pending_transaction_row(
+			$other_fixture,
+			'REQ-UNRELATED-0099',
+			array(
+				'token'       => 'lp-order-tok-unrelated',
+				'amount'      => '999.00',
+				'gateway_key' => ifthenpay_lp_callback_fixture_gateway_key(),
+			)
+		);
+
+		global $wp_rest_server;
+		$params               = ifthenpay_lp_callback_fixture_params( 'valid-multibanco.txt' );
+		$params['request_id'] = 'REQ-UNRELATED-0099';
+		$request              = new WP_REST_Request( 'GET', '/ifthenpay-lp/v1/callback' );
+		$request->set_query_params( $params );
+
+		$response = $wp_rest_server->dispatch( $request );
+
+		$this->assertSame( 404, $response->get_status() );
+		$unrelated = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-UNRELATED-0099' );
+		$this->assertNull( $unrelated->settled_at ); // @phpstan-ignore-line property.notFound
+		$original = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-VALID-0001' );
+		$this->assertNull( $original->settled_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
 	 * A reference with no matching record at all is rejected with 404 — nothing is revealed about
 	 * whether a record with a different reference exists (NFR-6).
 	 */
