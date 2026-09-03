@@ -273,10 +273,10 @@ final class PaymentsConfigurationTest extends TestCase {
 			'GATEWAY-1',
 			array(
 				'GATEWAY-1' => array(
-					'MB'    => 'MB | HLP-000001',
-					'MBWAY' => 'MBWAY | HLP-000002',
-					'CCARD' => 'CCARD | HLP-000003',
-					'PIX'   => 'PIX | HLP-000004',
+					'MB'    => 'HLP-000001',
+					'MBWAY' => 'HLP-000002',
+					'CCARD' => 'HLP-000003',
+					'PIX'   => 'HLP-000004',
 				),
 			),
 			$catalog
@@ -306,7 +306,7 @@ final class PaymentsConfigurationTest extends TestCase {
 	 * one — so the merchant sees the full set of possible defaults up front, not an empty dropdown
 	 * that only grows as boxes are checked. Each option's text is the method's own display name,
 	 * matching its checkbox row above — not its account key, which would read as a duplicate once
-	 * the two are placed side by side in the same dropdown ("PIX" next to "PIX | HLP-000004" reads
+	 * the two are placed side by side in the same dropdown ("PIX" next to "HLP-000004" reads
 	 * like two different things when they're the same one).
 	 */
 	public function test_default_method_lists_eligible_methods_even_when_not_enabled(): void {
