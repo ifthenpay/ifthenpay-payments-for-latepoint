@@ -23,9 +23,10 @@ class IfthenpayLpPaymentProcessor {
 	/**
 	 * Used whenever the merchant's own validity setting is missing or zero — D-2 requires a
 	 * validity value is always sent to ifthenpay, since its own API default is no expiry at all,
-	 * which would hold a booking slot forever.
+	 * which would hold a booking slot forever. Public: also the settings field's own placeholder
+	 * (IfthenpayLpAdminFormRenderer::render_multibanco_validity_field()), so the two never drift.
 	 */
-	private const DEFAULT_MULTIBANCO_VALIDITY_DAYS = 3;
+	public const DEFAULT_MULTIBANCO_VALIDITY_DAYS = 3;
 
 	/**
 	 * The `latepoint_process_payment_for_order_intent` filter callback — a booking checkout.

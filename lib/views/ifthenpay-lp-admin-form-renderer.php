@@ -305,15 +305,26 @@ class IfthenpayLpAdminFormRenderer {
 		<div class="os-row">
 			<div class="os-col-12">
 				<?php
-				echo OsFormHelper::text_field(
+				echo OsFormHelper::number_field(
 					'settings[ifthenpay_multibanco_validity_days]',
 					esc_html__( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
 					esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days' ) ),
-					array( 'theme' => 'simple' )
+					IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
+					IfthenpayLpMultibancoValidityValidation::MAX_DAYS,
+					array(
+						'theme'       => 'simple',
+						'placeholder' => (string) IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
+					)
 				);
 				?>
 				<p class="ifthenpay-field-note">
-					<?php echo esc_html__( 'How many days a customer has to pay before the reference expires and the booking is released. Leave blank to use the default.', 'ifthenpay-payments-for-latepoint' ); ?>
+					<?php
+					printf(
+						/* translators: %d: default number of days, when the field is left blank */
+						esc_html__( 'How many days a customer has to pay before the reference expires and the booking is released. Leave blank to use the default of %d days.', 'ifthenpay-payments-for-latepoint' ),
+						IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS
+					);
+					?>
 				</p>
 			</div>
 		</div>

@@ -16,12 +16,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Range verified against the Multibanco reference API's own accepted `expiryDays` values (003
  * contracts/api.md): 0, or one of 1-31, 45, 60, 90, 120, 180, 365, 730 — an unlisted value in
  * between rounds up to the next one, so any whole number in this range is safe to send, not only
- * the exact listed steps.
+ * the exact listed steps. Public: also the settings field's own min/max
+ * (IfthenpayLpAdminFormRenderer::render_multibanco_validity_field()), so the two never drift.
  */
 class IfthenpayLpMultibancoValidityValidation {
 
-	private const MIN_DAYS = 0;
-	private const MAX_DAYS = 730;
+	public const MIN_DAYS = 0;
+	public const MAX_DAYS = 730;
 
 	/**
 	 * Decides whether a Reference Validity value should block the save it came from.
