@@ -89,6 +89,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						'kind'          => 'realtime',
 						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
 						'paybylink_url' => $api_result->redirect_url,
+						'pin_code'      => $api_result->pin_code,
 						// Needed so the inbound callback route (ifthenpay-lp/v1/callback) can
 						// authenticate a real async notification for this payment, on gateways
 						// where ifthenpay also sends one for realtime methods — without this, every
