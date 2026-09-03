@@ -28,14 +28,14 @@ class IfthenpayLpCallbackParams {
 	 *
 	 * @var string
 	 */
-	public $reference;
+	public string $reference;
 
 	/**
 	 * As sent by ifthenpay, formatted — compared as a string, never cast to a number.
 	 *
 	 * @var string
 	 */
-	public $amount;
+	public string $amount;
 
 	/**
 	 * Base64-encoded gateway key, still encoded — compare with matches_gateway_key(), never decode
@@ -43,21 +43,21 @@ class IfthenpayLpCallbackParams {
 	 *
 	 * @var string
 	 */
-	public $apk;
+	public string $apk;
 
 	/**
 	 * The ifthenpay method code, e.g. `MB`, `PAYBYLINK`.
 	 *
 	 * @var string
 	 */
-	public $method;
+	public string $method;
 
 	/**
 	 * The ifthenpay settlement identifier — the settle_payment() idempotency key.
 	 *
 	 * @var string
 	 */
-	public $request_id;
+	public string $request_id;
 
 	/**
 	 * Builds a fully-parsed instance; use from_array() instead of this directly.
