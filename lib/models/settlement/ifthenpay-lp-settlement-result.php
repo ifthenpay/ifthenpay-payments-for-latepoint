@@ -32,7 +32,7 @@ class IfthenpayLpSettlementResult {
 	 *
 	 * @var string
 	 */
-	private $status;
+	private string $status;
 
 	/**
 	 * Machine-readable reason code — empty for SETTLED/ALREADY_SETTLED, always set for
@@ -40,7 +40,7 @@ class IfthenpayLpSettlementResult {
 	 *
 	 * @var string
 	 */
-	private $reason;
+	private string $reason;
 
 	/**
 	 * Builds a result; use the named factories below instead of this directly.

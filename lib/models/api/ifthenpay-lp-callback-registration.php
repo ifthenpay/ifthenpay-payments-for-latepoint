@@ -12,10 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * The REST route this registers against (`ifthenpay-lp/v1/callback`) has no handler yet — that
- * arrives with a future callback-handling feature. Registering the URL now means the URL
- * ifthenpay has on file already matches the shape that handler will expect, instead of both
- * changing at once later.
+ * The route this registers against is handled by IfthenpayLpCallbackRestController.
  */
 class IfthenpayLpCallbackRegistration {
 
