@@ -96,6 +96,9 @@ class IfthenpayLpCliCommands {
 			case IfthenpayLpManualRecheck::UNCONFIRMED:
 				WP_CLI::error( __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' ) );
 				return;
+			case IfthenpayLpManualRecheck::MISMATCH:
+				WP_CLI::error( __( 'ifthenpay confirms this transaction, but it belongs to a different booking — nothing was settled.', 'ifthenpay-payments-for-latepoint' ) );
+				return;
 			case IfthenpayLpManualRecheck::REJECTED:
 				WP_CLI::error( __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' ) );
 				return;

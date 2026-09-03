@@ -16,12 +16,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  * call (invariant 3) — now with a fresh outbound check against ifthenpay first, via
  * IfthenpayLpTransactionStatus::check(). Confirms the request_id is a real, completed payment
  * before ever calling settle_payment(), closing the gap this class originally shipped without (no
- * independently-verified confirmation endpoint existed yet at the time).
+ * independently-verified confirmation endpoint existed yet at the time) — and, since that
+ * endpoint's response also carries the Pay By Link's own `id` (OrderId) and the confirmed
+ * `Amount`, confirms the txid actually belongs to *this* token specifically, not merely that it
+ * belongs to some completed payment: a stale or unrelated txid (e.g. one already used, or one
+ * from a different booking's own low-value Pay By Link) is rejected outright rather than trusted.
  */
 class IfthenpayLpManualRecheck {
 
 	public const NOT_FOUND        = 'not_found';
 	public const UNCONFIRMED      = 'unconfirmed';
+	public const MISMATCH         = 'mismatch';
 	public const SETTLED          = 'settled';
 	public const REJECTED         = 'rejected';
 	public const FAILED           = 'failed';
@@ -44,20 +49,27 @@ class IfthenpayLpManualRecheck {
 		}
 
 		try {
-			$payment_method = IfthenpayLpTransactionStatus::check( (string) $record->request_id );
+			$confirmation = IfthenpayLpTransactionStatus::check( (string) $record->request_id );
 		} catch ( IfthenpayLpApiException $e ) {
 			return array( 'outcome' => self::FAILED );
 		}
 
-		if ( null === $payment_method ) {
+		if ( null === $confirmation ) {
 			return array( 'outcome' => self::UNCONFIRMED );
 		}
 
-		IfthenpayLpTransactionRepository::set_verified_method( $token, $payment_method );
+		// The txid is real and completed, but for a different Pay By Link than this one — never
+		// settle on it. See the class docblock: this is the check that closes the gap where any
+		// completed txid could otherwise be replayed against an unrelated booking.
+		if ( $confirmation->order_id !== $token ) {
+			return array( 'outcome' => self::MISMATCH );
+		}
+
+		IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
 
 		$result = IfthenpayLpSettlement::settle_payment(
 			(string) $record->request_id,
-			array( 'amount' => $record->amount ),
+			array( 'amount' => $confirmation->amount ),
 			'manual'
 		);
 

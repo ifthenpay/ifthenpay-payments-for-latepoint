@@ -178,10 +178,10 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					return $this->paid_response();
 				}
 
-				$verified_method = '' !== $txid ? self::verify_transaction( $txid ) : null;
-				if ( null !== $verified_method ) {
+				$confirmation = '' !== $txid ? self::verify_transaction( $txid ) : null;
+				if ( null !== $confirmation && $confirmation->order_id === $token ) {
 					IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
-					IfthenpayLpTransactionRepository::set_verified_method( $token, $verified_method );
+					IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
 					IfthenpayLpTransactionRepository::mark_settled( $token );
 
 					return $this->paid_response();
@@ -218,12 +218,14 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * Confirms a txid with ifthenpay directly (IfthenpayLpTransactionStatus). A transport
 		 * failure is treated the same as "not confirmed yet", not a hard error — an ifthenpay
 		 * outage here must fall through to the same 'pending: true' / poll-again behaviour as a
-		 * genuine propagation delay, never a terminal failure for the customer.
+		 * genuine propagation delay, never a terminal failure for the customer. Callers must still
+		 * check the returned order_id against their own token — this only confirms the txid is a
+		 * real, completed payment, not that it belongs to this booking.
 		 *
 		 * @param string $txid ifthenpay's transaction id.
-		 * @return string|null The confirmed payment method, or null if unconfirmed.
+		 * @return object{payment_method:string,amount:string,order_id:string}|null
 		 */
-		private static function verify_transaction( string $txid ): ?string {
+		private static function verify_transaction( string $txid ): ?object {
 			try {
 				return IfthenpayLpTransactionStatus::check( $txid );
 			} catch ( IfthenpayLpApiException $e ) {

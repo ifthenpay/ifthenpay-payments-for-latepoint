@@ -46,16 +46,19 @@ class RealtimePollingTest extends WP_UnitTestCase {
 
 	/**
 	 * Mocks IfthenpayLpTransactionStatus::check()'s own HTTP call — a real, completed transaction
-	 * id answers 200 with {"TransactionId":...,"PaymentMethod":...}; an unrecognised one answers
-	 * 404 with an empty body (VERIFIED live against the real endpoint, not assumed).
+	 * id answers 200 with {"TransactionId":...,"PaymentMethod":...,"Amount":...,"OrderId":...}; an
+	 * unrecognised one answers 404 with an empty body (VERIFIED live against the real endpoint, not
+	 * assumed).
 	 *
 	 * @param bool   $verified What the endpoint should answer.
+	 * @param string $order_id OrderId to echo back, when $verified is true — must match the token
+	 *                         under test for the confirmation to be accepted.
 	 * @param string $method   The confirmed payment method, when $verified is true.
 	 */
-	private function mock_transaction_status( bool $verified, string $method = 'MBWAY' ): void {
+	private function mock_transaction_status( bool $verified, string $order_id = '', string $method = 'MBWAY' ): void {
 		add_filter(
 			'pre_http_request',
-			static function ( $preempt, $args, $url ) use ( $verified, $method ) {
+			static function ( $preempt, $args, $url ) use ( $verified, $order_id, $method ) {
 				if ( false !== strpos( $url, '/gateway/transaction/status/get' ) ) {
 					return $verified
 						? array(
@@ -67,6 +70,8 @@ class RealtimePollingTest extends WP_UnitTestCase {
 								array(
 									'TransactionId' => 'TXID-REAL-001',
 									'PaymentMethod' => $method,
+									'Amount'        => '0.10',
+									'OrderId'       => $order_id,
 								)
 							),
 							'headers'  => array(),
@@ -143,7 +148,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * settled instead of trying to settle it a second time.
 	 */
 	public function test_verified_payment_is_marked_paid_regardless_of_reported_type(): void {
-		$this->mock_transaction_status( true );
+		$this->mock_transaction_status( true, 'tok-verified-despite-cancel' );
 		$this->seed_pending_realtime_row( 'tok-verified-despite-cancel' );
 
 		$result = $this->resolve( 'cancel', 'TXID-REAL-001', 'tok-verified-despite-cancel' );
@@ -157,6 +162,23 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		// The generic PAYBYLINK method the row was inserted with is corrected to what ifthenpay
 		// itself confirms the customer actually used.
 		$this->assertSame( 'MBWAY', $record->method ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * A txid that is real and completed, but for a different Pay By Link's OrderId, must never mark
+	 * this row paid — the same replay this endpoint (public, unauthenticated) would otherwise be
+	 * exposed to: a completed txid from an unrelated payment reused against this booking.
+	 */
+	public function test_verified_payment_with_mismatched_order_id_is_not_marked_paid(): void {
+		$this->mock_transaction_status( true, 'tok-belongs-to-another-booking' );
+		$this->seed_pending_realtime_row( 'tok-mismatch' );
+
+		$result = $this->resolve( 'success', 'TXID-REAL-001', 'tok-mismatch' );
+
+		$this->assertTrue( $result['pending'] );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-mismatch' );
+		$this->assertSame( 'PENDING', $record->status ); // @phpstan-ignore-line property.notFound
+		$this->assertNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**
