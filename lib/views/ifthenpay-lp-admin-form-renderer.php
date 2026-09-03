@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Renders every field on the ifthenpay payment processor's settings section.
  */
-class IfthenpayAdminFormRenderer {
+class IfthenpayLpAdminFormRenderer {
 
 	/**
 	 * The Backoffice Key field, its Connect/Disconnect button, and the Gateway Key row — a Gateway
@@ -322,7 +322,7 @@ class IfthenpayAdminFormRenderer {
 
 	/**
 	 * The method codes currently enabled. Which account each one uses is looked up live from the
-	 * gateway dataset at checkout time (IfthenpayDataFormatter::build_accounts_string()) instead of
+	 * gateway dataset at checkout time (IfthenpayLpDataFormatter::build_accounts_string()) instead of
 	 * being stored here too. Public: checkout-time gating (see the main plugin file's
 	 * is_multibanco_usable()) reads the same saved list this form renders checkboxes from — one
 	 * setting covers both "Pay Now" and "Pay Later Configuration", the split is display-only.
@@ -473,7 +473,7 @@ class IfthenpayAdminFormRenderer {
 	}
 
 	/**
-	 * The order description text sent to PBL (IfthenpayDataFormatter::build_pay_by_link_payload()'s
+	 * The order description text sent to PBL (IfthenpayLpDataFormatter::build_pay_by_link_payload()'s
 	 * `description` field) — a Pay Now concern, not its own section.
 	 */
 	private static function render_description_field(): void {

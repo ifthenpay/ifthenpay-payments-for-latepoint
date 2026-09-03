@@ -1,7 +1,7 @@
 <?php
 /**
  * Pay By Link operation — the realtime flow, unchanged from the customer's point of view. Payload
- * construction stays the caller's job (IfthenpayDataFormatter); this class only owns the call and
+ * construction stays the caller's job (IfthenpayLpDataFormatter); this class only owns the call and
  * the response contract.
  *
  * @package ifthenpay-payments-for-latepoint
@@ -24,7 +24,7 @@ class IfthenpayLpPayByLink {
 	 * Creates a Pay By Link and returns its three fields, or throws.
 	 *
 	 * @param string              $gateway_key The gateway key to create the link under.
-	 * @param array<string,mixed> $payload     Pay By Link payload — see IfthenpayDataFormatter::build_pay_by_link_payload().
+	 * @param array<string,mixed> $payload     Pay By Link payload — see IfthenpayLpDataFormatter::build_pay_by_link_payload().
 	 * @return object{pin_code:string,pinpay_url:string,redirect_url:string}
 	 * @throws IfthenpayLpCredentialException On 401/403.
 	 * @throws IfthenpayLpTransportException  On a network failure, a 5xx, unparseable JSON, or a

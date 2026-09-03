@@ -89,7 +89,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-key-validator.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-backoffice-key-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-data-formatter.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-data-formatter.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-method-catalog.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-enabled-method-gate.php';
@@ -106,10 +106,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-processor.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-method-availability.php';
 
-			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
-			include_once __DIR__ . '/lib/views/ifthenpay-email-helper.php';
+			include_once __DIR__ . '/lib/views/ifthenpay-lp-admin-form-renderer.php';
+			include_once __DIR__ . '/lib/views/ifthenpay-lp-email-helper.php';
 
-			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-transaction-repository.php';
 
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-transaction-status.php';
@@ -356,7 +356,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$localized_vars['ifthenpay_accounts'] = $dataset['accounts'] ?? array();
 			// Toasted once on page load by the admin script — the only place this state is shown at
 			// all, since add_settings_fields() renders nothing else below a missing gateway key.
-			$localized_vars['ifthenpay_connection_notice'] = $backoffice_key ? IfthenpayAdminFormRenderer::get_connection_notice( $dataset ) : null;
+			$localized_vars['ifthenpay_connection_notice'] = $backoffice_key ? IfthenpayLpAdminFormRenderer::get_connection_notice( $dataset ) : null;
 
 			$localized_vars['ifthenpay_translations'] = array(
 				'no_accounts'        => __( 'No accounts.', 'ifthenpay-payments-for-latepoint' ),
@@ -401,15 +401,15 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$backoffice_key       = OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' );
 			$dataset              = $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
 			$gatewaykeys          = $dataset['gatewaykeys'] ?? array();
-			$selected_gateway_key = IfthenpayAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
+			$selected_gateway_key = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
 
-			IfthenpayAdminFormRenderer::render_backoffice_configuration( $backoffice_key, $gatewaykeys, $selected_gateway_key );
+			IfthenpayLpAdminFormRenderer::render_backoffice_configuration( $backoffice_key, $gatewaykeys, $selected_gateway_key );
 
 			// Nothing here below a missing gateway key: a Payment Methods list that can only ever
 			// say "No accounts" has nothing a merchant can act on — the connection notice
 			// (localized_vars_for_admin(), surfaced as a toast) already says why.
 			if ( array() !== $gatewaykeys ) {
-				IfthenpayAdminFormRenderer::render_payments_configuration(
+				IfthenpayLpAdminFormRenderer::render_payments_configuration(
 					$selected_gateway_key,
 					$dataset['accounts'] ?? array(),
 					IfthenpayLpMethodCatalog::get() ?? array()
@@ -420,7 +420,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				// so a merchant sees a failure without re-entering the form.
 				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
 				if ( $gateway_key ) {
-					IfthenpayAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
+					IfthenpayLpAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
 				}
 			}
 		}
@@ -486,7 +486,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// single-purpose ifthenpay_payments table, this also migrates its PENDING rows and
 			// renames it to _legacy — see IfthenpayLpTransactionRepository::migrate_legacy_pending_and_retire().
 			if ( ! class_exists( 'IfthenpayLpTransactionRepository' ) ) {
-				require_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
+				require_once __DIR__ . '/lib/models/ifthenpay-lp-transaction-repository.php';
 			}
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 

@@ -50,7 +50,7 @@ class IfthenpayLpMethodCatalog {
 			return null;
 		}
 
-		$formatted = IfthenpayDataFormatter::format_available_payment_methods( $raw );
+		$formatted = IfthenpayLpDataFormatter::format_available_payment_methods( $raw );
 		set_transient( self::CACHE_KEY, $formatted, self::CACHE_TTL );
 
 		return $formatted;

@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class IfthenpayDataFormatter {
+class IfthenpayLpDataFormatter {
 
 	/**
 	 * Formats the available payment methods array from the ifthenpay API.
@@ -124,7 +124,7 @@ class IfthenpayDataFormatter {
 	 */
 	private static function build_accounts_string(): string {
 		// Drops the settings page's always-present hidden fallback entry (an empty string — see
-		// IfthenpayAdminFormRenderer::render_payments_configuration()), the same as that page's own
+		// IfthenpayLpAdminFormRenderer::render_payments_configuration()), the same as that page's own
 		// read of this setting does.
 		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
 		$enabled_methods = array_values( array_filter( $saved, static fn( $value ) => is_string( $value ) && '' !== $value ) );
