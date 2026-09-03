@@ -153,11 +153,15 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * same, already-proven realtime path. settle_payment() is for the inbound callback route
 		 * (which only ever fires once an order can exist) and the deferred/manual re-check paths.
 		 *
-		 * Using mark_settled() (status PAID + settled_at together) rather than a bare status update,
-		 * and set_request_id() linking $txid onto the row, both matter for the same reason: if ifthenpay
-		 * also sends a real async callback for this same realtime payment (now possible — the
-		 * gateway_key stored at checkout time lets it authenticate), settle_payment() must recognise
-		 * the row as already settled and no-op, not re-run the whole state change a second time.
+		 * Uses mark_settled() (status PAID + settled_at together) rather than a bare status update —
+		 * $txid itself is recorded in method_data, not the request_id column: request_id is
+		 * ifthenpay's own settlement/refund identifier (IfthenpayLpSettlement's idempotency key),
+		 * a genuinely different value from the transaction id, confirmed never interchangeable
+		 * between the two. This row's own request_id therefore stays whatever it already was — null,
+		 * unless a real async callback for this same realtime payment (the gateway_key stored at
+		 * checkout time lets one authenticate) arrives and populates it. Until then, such a callback
+		 * finds no row by request_id and is rejected — safe (this payment is already settled, so
+		 * nothing is lost), just an imprecise acknowledgement back to ifthenpay.
 		 *
 		 * Security fix (FR-13, spec 001): the previous version wrote CANCELLED/FAILED straight from
 		 * the browser's own $type, with no verification at all — anyone holding a payment_token
@@ -199,7 +203,6 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					);
 
 					if ( $confirmation->order_id === $token ) {
-						IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
 						IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
 						IfthenpayLpTransactionRepository::mark_settled( $token );
 

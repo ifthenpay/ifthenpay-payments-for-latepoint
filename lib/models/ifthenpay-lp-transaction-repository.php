@@ -189,22 +189,6 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Sets the request_id column after the fact — the realtime flow's own creation response
-	 * (IfthenpayLpPayByLink::create()) carries no RequestId field at all, unlike the reference
-	 * APIs, so there is nothing to store at insert time. The polling verification step
-	 * (OsPaymentsIfthenpayCheckoutController::update_payment_repo_by_modal_url()) links the
-	 * ifthenpay txid it already has onto the row right as it confirms that payment is real,
-	 * treating it as this row's own settlement identifier — settle_payment()'s idempotency key —
-	 * the same way a reference-API request_id is for deferred methods.
-	 *
-	 * @param string $token      Our correlation handle.
-	 * @param string $request_id ifthenpay's own identifier for this payment.
-	 */
-	public static function set_request_id( string $token, string $request_id ): bool {
-		return self::update_columns( $token, array( 'request_id' => $request_id ) );
-	}
-
-	/**
 	 * Corrects `method` to the value ifthenpay itself confirmed for this payment
 	 * (IfthenpayLpTransactionStatus::check()) — more specific than whatever generic value was
 	 * recorded at checkout time (Pay By Link's own row is inserted before the customer picks a
