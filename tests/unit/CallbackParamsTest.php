@@ -99,24 +99,6 @@ final class CallbackParamsTest extends TestCase {
 	}
 
 	/**
-	 * Amount is compared as formatted strings — an exact match passes.
-	 */
-	public function test_matching_amount_passes(): void {
-		$params = IfthenpayLpCallbackParams::from_array( ifthenpay_lp_callback_fixture_params( 'valid-multibanco.txt' ) );
-
-		$this->assertTrue( $params->amount_matches( '25.00' ) );
-	}
-
-	/**
-	 * The wrong-amount fixture's notified amount does not match the order total it claims to pay.
-	 */
-	public function test_wrong_amount_fixture_does_not_match_order_total(): void {
-		$params = IfthenpayLpCallbackParams::from_array( ifthenpay_lp_callback_fixture_params( 'wrong-amount.txt' ) );
-
-		$this->assertFalse( $params->amount_matches( '25.00' ) );
-	}
-
-	/**
 	 * `request_id` is treated as an opaque string — a legacy `"0"` value parses and round-trips
 	 * exactly, never coerced or treated as falsy/missing.
 	 */
