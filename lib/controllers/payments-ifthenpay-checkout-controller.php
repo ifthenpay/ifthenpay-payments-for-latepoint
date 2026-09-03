@@ -157,8 +157,9 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * same, already-proven realtime path. settle_payment() is for the inbound callback route
 		 * (which only ever fires once an order can exist) and the deferred/manual re-check paths.
 		 *
-		 * Uses mark_settled() (status PAID + settled_at together) rather than a bare status update —
-		 * $txid itself is recorded in method_data, not the request_id column: request_id is
+		 * Uses record_verification($settle=true) (status PAID + settled_at together, in the same
+		 * write as the method_data record and the method correction) rather than a bare status
+		 * update — $txid itself is recorded in method_data, not the request_id column: request_id is
 		 * ifthenpay's own settlement/refund identifier (IfthenpayLpSettlement's idempotency key),
 		 * a genuinely different value from the transaction id, confirmed never interchangeable
 		 * between the two. This row's own request_id therefore stays whatever it already was — null,
@@ -193,12 +194,9 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 				$confirmation = '' !== $txid ? self::verify_transaction( $txid ) : null;
 				if ( null !== $confirmation ) {
-					IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation );
+					IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation, true );
 
 					if ( $confirmation->order_id === $token ) {
-						IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
-						IfthenpayLpTransactionRepository::mark_settled( $token );
-
 						return $this->paid_response();
 					}
 				}
