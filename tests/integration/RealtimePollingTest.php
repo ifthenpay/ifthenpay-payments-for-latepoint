@@ -112,6 +112,54 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Invokes the private locked-decision method directly via Reflection — the re-read-under-lock
+	 * step itself, as if a concurrent writer (the inbound callback route, locked on the same token)
+	 * had already settled the row between the outer pre-lock check and the lock being acquired.
+	 *
+	 * @param string      $type         As apply_polling_outcome().
+	 * @param string      $txid         As apply_polling_outcome().
+	 * @param string      $token        As apply_polling_outcome().
+	 * @param object|null $confirmation As apply_polling_outcome().
+	 * @return array{status:string,message:string,pending:bool}
+	 */
+	private function apply_locked( string $type, string $txid, string $token, ?object $confirmation = null ): array {
+		$method = new ReflectionMethod( OsPaymentsIfthenpayCheckoutController::class, 'apply_polling_outcome' );
+		$method->setAccessible( true );
+
+		return $method->invoke( $this->controller(), $type, $txid, $token, $confirmation );
+	}
+
+	/**
+	 * Proves the concurrency fix: a row the inbound callback route already settled to PAID while
+	 * this call was outside the lock (verify_transaction()'s own outbound HTTP call, or simply lock
+	 * contention) is never downgraded once re-read fresh inside the lock — even though $type here is
+	 * 'cancel', the same input that unconditionally wrote CANCELLED before this row had a lock at
+	 * all. Calls apply_polling_outcome() directly (the locked half of
+	 * resolve_payment_status_from_modal_url()) to exercise exactly that re-read, without needing a
+	 * real concurrent request.
+	 */
+	public function test_row_settled_by_a_concurrent_callback_is_not_downgraded_once_locked(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'      => 'tok-settled-mid-race',
+				'intent_id'  => $fixture->order_intent->id,
+				'kind'       => 'realtime',
+				'method'     => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+				'status'     => 'PAID',
+				'settled_at' => current_time( 'mysql', true ),
+			)
+		);
+
+		$result = $this->apply_locked( 'cancel', '', 'tok-settled-mid-race' );
+
+		$this->assertSame( LATEPOINT_STATUS_SUCCESS, $result['status'] );
+		$this->assertFalse( $result['pending'] );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-settled-mid-race' );
+		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
 	 * A row already PAID is never downgraded — a forged 'cancel', with no real txid at all, cannot
 	 * touch it. This is the core FR-13 regression test: the old code wrote CANCELLED unconditionally.
 	 */
