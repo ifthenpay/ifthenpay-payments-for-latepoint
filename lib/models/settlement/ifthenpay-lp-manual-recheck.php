@@ -58,6 +58,19 @@ class IfthenpayLpManualRecheck {
 			return array( 'outcome' => self::UNCONFIRMED );
 		}
 
+		// Recorded regardless of the order_id check below — this is what lets a mismatch be
+		// explained later (verified_order_id here vs. this row's own token) instead of looking
+		// identical to a genuine "ifthenpay never confirmed it" case.
+		IfthenpayLpTransactionRepository::update_method_data(
+			$token,
+			array(
+				'transaction_id'          => $record->request_id,
+				'verified_payment_method' => $confirmation->payment_method,
+				'verified_amount'         => $confirmation->amount,
+				'verified_order_id'       => $confirmation->order_id,
+			)
+		);
+
 		// The txid is real and completed, but for a different Pay By Link than this one — never
 		// settle on it. See the class docblock: this is the check that closes the gap where any
 		// completed txid could otherwise be replayed against an unrelated booking.
