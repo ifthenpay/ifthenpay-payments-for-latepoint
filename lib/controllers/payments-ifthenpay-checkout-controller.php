@@ -222,6 +222,14 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					);
 				}
 
+				// A txid ifthenpay doesn't recognise at all ($confirmation still null here) —
+				// recorded anyway so a disputed cancel/failure ("I paid, it shows cancelled") has a
+				// starting point to investigate. Skipped when $confirmation is already set: that
+				// branch above already recorded this same transaction_id (plus more).
+				if ( '' !== $txid && null === $confirmation ) {
+					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
+				}
+
 				if ( 'cancel' === $type ) {
 					IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
 
@@ -229,7 +237,6 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				}
 
 				IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
-				IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
 
 				return $this->terminal_error( __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ) );
 			} catch ( Exception $e ) {
