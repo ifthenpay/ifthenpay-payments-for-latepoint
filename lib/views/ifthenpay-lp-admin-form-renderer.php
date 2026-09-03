@@ -241,14 +241,8 @@ class IfthenpayLpAdminFormRenderer {
 					<h3><?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?></h3>
 					<div class="label-desc"><?php echo esc_html__( 'Enable at least one to accept payments.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
-				<div class="os-row os-mb-2">
-					<div class="os-col-12">
-						<div class="ifthenpay-methods-list">
-							<?php self::render_method_checkboxes( $pay_now_catalog, $accounts_for_gateway, $enabled_methods ); ?>
-						</div>
-					</div>
-				</div>
 				<?php
+				self::render_methods_list( $pay_now_catalog, $accounts_for_gateway, $enabled_methods );
 				self::render_default_method_select( $pay_now_catalog, $accounts_for_gateway, $enabled_methods );
 				self::render_description_field();
 				?>
@@ -280,14 +274,10 @@ class IfthenpayLpAdminFormRenderer {
 					<h3><?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?></h3>
 					<div class="label-desc"><?php echo esc_html__( 'Multibanco lets customers pay by reference instead of on the spot. Other methods here are not yet functional.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
-				<div class="os-row os-mb-2">
-					<div class="os-col-12">
-						<div class="ifthenpay-methods-list">
-							<?php self::render_method_checkboxes( $deferred_catalog, $accounts_for_gateway, $enabled_methods ); ?>
-						</div>
-					</div>
-				</div>
-				<?php self::render_multibanco_validity_field(); ?>
+				<?php
+				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
+				self::render_multibanco_validity_field();
+				?>
 			</div>
 		</div>
 		<?php
@@ -369,6 +359,25 @@ class IfthenpayLpAdminFormRenderer {
 				'theme' => 'simple',
 			)
 		);
+	}
+
+	/**
+	 * The method-checkboxes wrapper, shared by Pay Now and Pay Later Configuration.
+	 *
+	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $catalog_subset       Pay Now or Deferred slice of the catalog.
+	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
+	 * @param string[]                                                                   $enabled_methods      Saved enabled method codes.
+	 */
+	private static function render_methods_list( array $catalog_subset, array $accounts_for_gateway, array $enabled_methods ): void {
+		?>
+		<div class="os-row os-mb-2">
+			<div class="os-col-12">
+				<div class="ifthenpay-methods-list">
+					<?php self::render_method_checkboxes( $catalog_subset, $accounts_for_gateway, $enabled_methods ); ?>
+				</div>
+			</div>
+		</div>
+		<?php
 	}
 
 	/**
