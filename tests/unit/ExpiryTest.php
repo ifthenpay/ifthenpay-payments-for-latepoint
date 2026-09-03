@@ -10,7 +10,7 @@
 
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-expiry.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/settlement/ifthenpay-lp-expiry.php';
 
 /**
  * Expiry normalisation proof.

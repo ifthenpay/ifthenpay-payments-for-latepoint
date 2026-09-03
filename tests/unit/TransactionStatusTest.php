@@ -12,9 +12,9 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-exceptions.php';
-require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-api-client.php';
-require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-transaction-status.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-exceptions.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-api-client.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-transaction-status.php';
 require_once __DIR__ . '/../support/class-wp-error-stub.php';
 require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 
