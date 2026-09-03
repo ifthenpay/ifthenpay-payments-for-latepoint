@@ -55,6 +55,10 @@ class IfthenpayLpDataFormatter {
 			'lang'            => self::get_language(),
 			'accounts'        => self::build_accounts_string(),
 			'selected_method' => self::get_selected_method(),
+			// The string "true", not a boolean — one payment per link; each checkout attempt
+			// mints its own (contracts/api.md). Was documented as part of this payload since
+			// spec 003 but never actually sent until now.
+			'otp'             => 'true',
 		);
 
 		$base                   = home_url( '/' );
