@@ -107,6 +107,35 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The email-safe render shows the same details as the browser one while still pending — via
+	 * OsPriceBreakdownHelper's own inline-styled row, not this plugin's CSS classes.
+	 */
+	public function test_render_email_html_shows_details_while_pending(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
+
+		$this->assertStringContainsString( '11990', $html );
+		$this->assertStringContainsString( '123456789', $html );
+		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $html );
+	}
+
+	/**
+	 * Once paid, the email-safe render also stops exposing the reference/entity.
+	 */
+	public function test_render_email_html_hides_details_once_paid(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture, 'PAID' );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
+
+		$this->assertStringNotContainsString( '123456789', $html );
+	}
+
+	/**
 	 * The confirmation-email filter appends the reference box to an order-related email's own
 	 * already-prepared content, without touching anything else about the action.
 	 *
@@ -138,6 +167,9 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'Thanks for your booking.', $result->prepared_data_for_run['content'] );
 		$this->assertStringContainsString( '123456789', $result->prepared_data_for_run['content'] );
+		// Email clients never load this plugin's stylesheet — CSS-class markup would render as
+		// bare, unstyled text (the bug this whole render_email_html() path exists to fix).
+		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $result->prepared_data_for_run['content'] );
 	}
 
 	/**
