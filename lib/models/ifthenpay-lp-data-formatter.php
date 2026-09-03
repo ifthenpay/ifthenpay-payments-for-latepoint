@@ -43,8 +43,8 @@ class IfthenpayLpDataFormatter {
 	/**
 	 * Build payload for Pay-by-Link endpoint.
 	 *
-	 * @param OsOrderIntentModel $intent
-	 * @param string             $token
+	 * @param OsOrderIntentModel|OsTransactionIntentModel $intent
+	 * @param string                                      $token
 	 * @return array
 	 */
 	public static function build_pay_by_link_payload( $intent, $token, $amount ) {
@@ -61,7 +61,11 @@ class IfthenpayLpDataFormatter {
 			'otp'             => 'true',
 		);
 
-		$base                   = home_url( '/' );
+		// Back to the actual booking page with LatePoint's own resume key, not the homepage.
+		$base = (string) $intent->get_page_url_with_intent();
+		if ( ! wp_http_validate_url( $base ) ) {
+			$base = home_url( '/' );
+		}
 		$payload['success_url'] = add_query_arg(
 			array(
 				'ifthenpay_return' => 'success',
@@ -98,13 +102,13 @@ class IfthenpayLpDataFormatter {
 	}
 
 	/**
-	 * Build the description as "Order #{id} - {admin description}".
+	 * Build the description as "Intent #{id} - {admin description}".
 	 */
 	private static function build_description( $intent ): string {
 		$admin_desc = OsSettingsHelper::get_settings_value( 'ifthenpay_description', '' );
 		return sprintf(
-			/* translators: %1$s: order id, %2$s: admin description */
-			__( 'Order #%1$s - %2$s', 'ifthenpay-payments-for-latepoint' ),
+			/* translators: %1$s: intent id, %2$s: admin description */
+			__( 'Intent #%1$s - %2$s', 'ifthenpay-payments-for-latepoint' ),
 			$intent->id,
 			$admin_desc
 		);
