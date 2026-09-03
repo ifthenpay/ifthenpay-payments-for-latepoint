@@ -1,9 +1,10 @@
 <?php
 /**
  * Proves IfthenpayLpTransactionStatus against the two shapes VERIFIED live against the real API:
- * a completed transaction id answers 200 with `{"TransactionId":...,"PaymentMethod":...}`; an
- * unrecognised one answers 404 with an empty body — not valid JSON, and the documented "not
- * found" signal, not a transport error.
+ * a completed transaction id answers 200 with
+ * `{"TransactionId":...,"PaymentMethod":...,"Amount":...,"OrderId":...}`; an unrecognised one
+ * answers 404 with an empty body — not valid JSON, and the documented "not found" signal, not a
+ * transport error.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -49,13 +50,16 @@ final class TransactionStatusTest extends TestCase {
 	}
 
 	/**
-	 * A completed transaction id returns the payment method ifthenpay recorded for it.
+	 * A completed transaction id returns the payment method, amount, and order id ifthenpay
+	 * recorded for it.
 	 */
-	public function test_completed_transaction_returns_payment_method(): void {
+	public function test_completed_transaction_returns_confirmation(): void {
 		$body = wp_json_encode(
 			array(
 				'TransactionId' => 'HWG9lQsKJeLhjYzoCa8U',
 				'PaymentMethod' => 'MBWAY',
+				'Amount'        => '0.10',
+				'OrderId'       => 'lp-a1b2c3d4e5f6',
 			)
 		);
 		Functions\expect( 'wp_remote_request' )->once()->andReturn( ifthenpay_lp_mock_response( 200, $body ) );
@@ -65,7 +69,9 @@ final class TransactionStatusTest extends TestCase {
 
 		$result = IfthenpayLpTransactionStatus::check( 'HWG9lQsKJeLhjYzoCa8U' );
 
-		$this->assertSame( 'MBWAY', $result );
+		$this->assertSame( 'MBWAY', $result->payment_method );
+		$this->assertSame( '0.10', $result->amount );
+		$this->assertSame( 'lp-a1b2c3d4e5f6', $result->order_id );
 	}
 
 	/**
@@ -88,7 +94,34 @@ final class TransactionStatusTest extends TestCase {
 	 * confirmation.
 	 */
 	public function test_response_missing_payment_method_throws(): void {
-		$body = wp_json_encode( array( 'TransactionId' => 'HWG9lQsKJeLhjYzoCa8U' ) );
+		$body = wp_json_encode(
+			array(
+				'TransactionId' => 'HWG9lQsKJeLhjYzoCa8U',
+				'Amount'        => '0.10',
+				'OrderId'       => 'lp-a1b2c3d4e5f6',
+			)
+		);
+		Functions\expect( 'wp_remote_request' )->once()->andReturn( ifthenpay_lp_mock_response( 200, $body ) );
+		Functions\when( 'is_wp_error' )->justReturn( false );
+		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
+		Functions\when( 'wp_remote_retrieve_body' )->justReturn( $body );
+
+		$this->expectException( IfthenpayLpTransportException::class );
+		IfthenpayLpTransactionStatus::check( 'HWG9lQsKJeLhjYzoCa8U' );
+	}
+
+	/**
+	 * A 200 response missing OrderId — the field the authorization check depends on — throws too,
+	 * not just a missing PaymentMethod.
+	 */
+	public function test_response_missing_order_id_throws(): void {
+		$body = wp_json_encode(
+			array(
+				'TransactionId' => 'HWG9lQsKJeLhjYzoCa8U',
+				'PaymentMethod' => 'MBWAY',
+				'Amount'        => '0.10',
+			)
+		);
 		Functions\expect( 'wp_remote_request' )->once()->andReturn( ifthenpay_lp_mock_response( 200, $body ) );
 		Functions\when( 'is_wp_error' )->justReturn( false );
 		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );

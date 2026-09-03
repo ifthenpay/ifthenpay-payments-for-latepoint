@@ -19,12 +19,15 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	 * Mocks IfthenpayLpTransactionStatus::check()'s own HTTP call — see RealtimePollingTest's
 	 * identical helper for the verified response shapes.
 	 *
-	 * @param bool $verified What the endpoint should answer.
+	 * @param bool   $verified What the endpoint should answer.
+	 * @param string $order_id OrderId to echo back — must match the token under test for the
+	 *                         confirmation to be accepted.
+	 * @param string $amount   Amount to echo back.
 	 */
-	private function mock_transaction_status( bool $verified ): void {
+	private function mock_transaction_status( bool $verified, string $order_id = '', string $amount = '25.00' ): void {
 		add_filter(
 			'pre_http_request',
-			static function ( $preempt, $args, $url ) use ( $verified ) {
+			static function ( $preempt, $args, $url ) use ( $verified, $order_id, $amount ) {
 				if ( false !== strpos( $url, '/gateway/transaction/status/get' ) ) {
 					return $verified
 						? array(
@@ -36,6 +39,8 @@ class ManualRecheckTest extends WP_UnitTestCase {
 								array(
 									'TransactionId' => 'ignored-by-check',
 									'PaymentMethod' => 'MB',
+									'Amount'        => $amount,
+									'OrderId'       => $order_id,
 								)
 							),
 							'headers'  => array(),
@@ -100,7 +105,7 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	 * approved, exactly as a real callback would have done.
 	 */
 	public function test_pending_payment_settles(): void {
-		$this->mock_transaction_status( true );
+		$this->mock_transaction_status( true, 'tok-manual-settle' );
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		IfthenpayLpTransactionRepository::insert(
 			array(
@@ -130,7 +135,7 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	 * both settled and already-settled), no second transaction.
 	 */
 	public function test_repeated_call_is_idempotent(): void {
-		$this->mock_transaction_status( true );
+		$this->mock_transaction_status( true, 'tok-manual-repeat' );
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		IfthenpayLpTransactionRepository::insert(
 			array(
@@ -158,7 +163,7 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	 * trust — this is the whole point of the outbound check: settle_payment() is not even reached.
 	 */
 	public function test_unconfirmed_payment_is_not_settled(): void {
-		$this->mock_transaction_status( false );
+		$this->mock_transaction_status( false, 'tok-manual-unconfirmed' );
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		IfthenpayLpTransactionRepository::insert(
 			array(
@@ -181,11 +186,38 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A txid that is real and completed, but for a different Pay By Link's OrderId, is never
+	 * settled — the check that closes the txid-replay gap.
+	 */
+	public function test_mismatched_order_id_is_not_settled(): void {
+		$this->mock_transaction_status( true, 'tok-belongs-to-another-booking' );
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-manual-mismatch',
+				'request_id'  => 'REQ-MANUAL-MISMATCH',
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'MB',
+				'amount'      => '25.00',
+				'gateway_key' => 'TEST-GW-KEY-0001',
+			)
+		);
+
+		$result = IfthenpayLpManualRecheck::run( 'tok-manual-mismatch' );
+
+		$this->assertSame( IfthenpayLpManualRecheck::MISMATCH, $result['outcome'] );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-manual-mismatch' );
+		$this->assertNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
 	 * A cancelled order is not silently re-opened by a manual re-check either — the same guard
 	 * settle_payment() applies to every caller.
 	 */
 	public function test_cancelled_order_is_rejected(): void {
-		$this->mock_transaction_status( true );
+		$this->mock_transaction_status( true, 'tok-manual-cancelled' );
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		$fixture->order->update_attributes( array( 'status' => LATEPOINT_ORDER_STATUS_CANCELLED ) );
 		IfthenpayLpTransactionRepository::insert(
