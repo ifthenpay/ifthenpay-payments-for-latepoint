@@ -130,6 +130,34 @@ class IfthenpayLpPaymentProcessor {
 	}
 
 	/**
+	 * Backfills `notes` on the transaction LatePoint core itself creates for a realtime payment
+	 * (`latepoint_transaction_created`, fired right after its own `$transaction->save()` —
+	 * `lib/models/order_intent_model.php`) — core sets token/method/amount/etc. but never notes,
+	 * unlike IfthenpayLpSettlement::apply_state_change()'s own transaction (deferred/callback/manual),
+	 * which already carries one. Only ever reachable via the realtime polling path: settle_payment()
+	 * needs an already-converted order, and this order is still being converted at the point this
+	 * fires, so a callback settling it first is not possible here.
+	 *
+	 * @param OsTransactionModel $transaction As passed by the hook.
+	 */
+	public static function backfill_realtime_transaction_notes( OsTransactionModel $transaction ): void {
+		if ( self::PROCESSOR_CODE !== $transaction->processor || ! empty( $transaction->notes ) ) {
+			return;
+		}
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( (string) $transaction->token );
+		if ( ! $record || 'realtime' !== $record->kind ) {
+			return;
+		}
+
+		$method_data = $record->method_data ? json_decode( $record->method_data, true ) : array();
+		$txid        = is_array( $method_data ) ? ( $method_data['transaction_id'] ?? '' ) : '';
+
+		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, 'ifthenpay transaction ID', $txid, 'polling' );
+		$transaction->update_attributes( array( 'notes' => $notes ) );
+	}
+
+	/**
 	 * Generates a Multibanco reference for a deferred checkout and persists it. Returns a
 	 * non-success result WITHOUT calling $order_intent->add_error() — see research.md:
 	 * OsOrderIntentModel::convert_to_order() aborts conversion only on $intent->get_error(), a
