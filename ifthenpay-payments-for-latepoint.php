@@ -18,10 +18,9 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly.
+	exit;
 }
 
-// Guards against a fatal redeclaration if this file is ever loaded twice.
 if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 	/**
@@ -59,10 +58,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		/**
 		 * Cache-busting query arg for a public asset: the file's own last-modified time when it can
-		 * be read, falling back to the plugin version. A static version string across many commits
-		 * within the same unreleased version (as during active development) means the browser never
-		 * sees a reason to refetch an edited .css/.js file — this changes on every edit instead, in
-		 * both dev and production, without needing a manual version bump per asset tweak.
+		 * be read, falling back to the plugin version — so an edited .css/.js file is refetched
+		 * immediately, without needing a manual version bump per tweak.
 		 *
 		 * @param string $relative_path Path under the plugin root, e.g. `public/stylesheets/x.css`.
 		 */
@@ -457,21 +454,19 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		public function init() {
-			// Domain Path in the plugin header (see the top of this file) is not itself enough —
-			// nothing loads the compiled .mo files without this call.
+			// Domain Path in the plugin header alone doesn't load the compiled .mo files.
 			load_plugin_textdomain( 'ifthenpay-payments-for-latepoint', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
-			// Cheap on every request when already current; upgrades the schema on an in-place
-			// plugin update, not only on (re)activation.
+			// Cheap when already current; also upgrades the schema on an in-place update, not only
+			// on (re)activation.
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 
-			// Same reasoning as above: a site upgrading from an older version of this plugin has a
-			// Gateway Key that's stale the moment this version is active, not only after the
+			// Same reasoning: an in-place update would otherwise leave a stale Gateway Key until the
 			// merchant next saves settings.
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
-			// Same reasoning again: an in-place update from a version that never scheduled this
-			// cron must still end up with it scheduled, not only a fresh (re)activation.
+			// Same reasoning: an in-place update from a version that never scheduled this cron must
+			// still end up with it scheduled.
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
 			}

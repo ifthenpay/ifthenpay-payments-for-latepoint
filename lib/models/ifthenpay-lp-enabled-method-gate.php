@@ -13,8 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * A saved processor toggle says nothing about whether the Gateway Key behind it still works —
- * this is the one place that checks both together.
+ * See is_usable() for the fail-open behaviour this exists to encode.
  */
 class IfthenpayLpEnabledMethodGate {
 

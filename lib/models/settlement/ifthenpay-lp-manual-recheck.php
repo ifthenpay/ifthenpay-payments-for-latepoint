@@ -13,14 +13,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Settles through the same settle_payment() the callback route and the realtime polling fallback
- * call (invariant 3) — now with a fresh outbound check against ifthenpay first, via
- * IfthenpayLpTransactionStatus::check(). Confirms the request_id is a real, completed payment
- * before ever calling settle_payment(), closing the gap this class originally shipped without (no
- * independently-verified confirmation endpoint existed yet at the time) — and, since that
- * endpoint's response also carries the Pay By Link's own `id` (OrderId) and the confirmed
- * `Amount`, confirms the txid actually belongs to *this* token specifically, not merely that it
- * belongs to some completed payment: a stale or unrelated txid (e.g. one already used, or one
- * from a different booking's own low-value Pay By Link) is rejected outright rather than trusted.
+ * call (invariant 3), but first confirms the request_id with ifthenpay directly via
+ * IfthenpayLpTransactionStatus::check() — closing the gap this class originally shipped without
+ * (no independently-verified confirmation endpoint existed yet). That endpoint's response also
+ * carries the Pay By Link's own `id` (OrderId) and the confirmed `Amount`, so this additionally
+ * confirms the txid belongs to *this* token specifically: a stale or unrelated txid (e.g. one
+ * already used, or one from a different booking's own low-value Pay By Link) is rejected outright
+ * rather than trusted.
  */
 class IfthenpayLpManualRecheck {
 
