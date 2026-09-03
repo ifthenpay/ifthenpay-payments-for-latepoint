@@ -58,6 +58,8 @@ class IfthenpayLpManualRecheck {
 			return array( 'outcome' => self::UNCONFIRMED );
 		}
 
+		// Also corrects `method` to the confirmed value in the same write, whenever order_id
+		// matches — settling itself still happens below, through settle_payment(), not here.
 		IfthenpayLpTransactionRepository::record_verification( $token, (string) $record->request_id, $confirmation );
 
 		// The txid is real and completed, but for a different Pay By Link than this one — never
@@ -66,8 +68,6 @@ class IfthenpayLpManualRecheck {
 		if ( $confirmation->order_id !== $token ) {
 			return array( 'outcome' => self::MISMATCH );
 		}
-
-		IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
 
 		$result = IfthenpayLpSettlement::settle_payment(
 			(string) $record->request_id,
