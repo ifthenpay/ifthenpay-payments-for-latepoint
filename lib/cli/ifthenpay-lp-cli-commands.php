@@ -62,9 +62,9 @@ class IfthenpayLpCliCommands {
 	}
 
 	/**
-	 * Manually settles a payment whose callback was missed or failed (D-5) — see
-	 * IfthenpayLpManualRecheck's own docblock for why this has no fresh outbound verification of
-	 * its own yet: run it only once you've confirmed the payment on ifthenpay's own backoffice.
+	 * Manually settles a payment whose callback was missed or failed (D-5) — confirms the payment
+	 * with ifthenpay directly (IfthenpayLpTransactionStatus::check()) before settling anything, so
+	 * running it against a payment that never actually completed is a safe no-op, not a risk.
 	 *
 	 * ## OPTIONS
 	 *
@@ -92,6 +92,9 @@ class IfthenpayLpCliCommands {
 				return;
 			case IfthenpayLpManualRecheck::NOT_FOUND:
 				WP_CLI::error( __( 'No payment record found for that token.', 'ifthenpay-payments-for-latepoint' ) );
+				return;
+			case IfthenpayLpManualRecheck::UNCONFIRMED:
+				WP_CLI::error( __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' ) );
 				return;
 			case IfthenpayLpManualRecheck::REJECTED:
 				WP_CLI::error( __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' ) );

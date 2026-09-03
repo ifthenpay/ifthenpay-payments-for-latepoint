@@ -87,7 +87,7 @@ The booking still holds the time slot while the reference is pending — nobody 
 
 <details>
 <summary><strong>A customer says they paid a Multibanco reference but the booking still shows pending — what do I do?</strong></summary>
-This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run <code>wp ifthenpay recheck-payment &lt;token&gt;</code> from the server. **Confirm the payment on ifthenpay's own backoffice first** — this command settles the booking on trust, it does not itself call ifthenpay to check the payment status.
+This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run <code>wp ifthenpay recheck-payment &lt;token&gt;</code> from the server — it confirms the payment with ifthenpay directly before settling anything, so it's safe to run even if the payment never actually completed.
 </details>
 
 <details>

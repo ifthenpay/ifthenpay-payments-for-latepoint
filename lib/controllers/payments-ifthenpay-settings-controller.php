@@ -187,6 +187,11 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 						'status'  => LATEPOINT_STATUS_ERROR,
 						'message' => __( 'Payment record not found.', 'ifthenpay-payments-for-latepoint' ),
 					);
+				case IfthenpayLpManualRecheck::UNCONFIRMED:
+					return array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' ),
+					);
 				case IfthenpayLpManualRecheck::REJECTED:
 					return array(
 						'status'  => LATEPOINT_STATUS_ERROR,

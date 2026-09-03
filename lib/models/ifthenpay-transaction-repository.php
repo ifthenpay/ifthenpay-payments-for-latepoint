@@ -205,6 +205,19 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * Corrects `method` to the value ifthenpay itself confirmed for this payment
+	 * (IfthenpayLpTransactionStatus::check()) — more specific than whatever generic value was
+	 * recorded at checkout time (Pay By Link's own row is inserted before the customer picks a
+	 * specific method there).
+	 *
+	 * @param string $token  Our correlation handle.
+	 * @param string $method The confirmed payment method, e.g. `"MBWAY"`.
+	 */
+	public static function set_verified_method( string $token, string $method ): bool {
+		return self::update_columns( $token, array( 'method' => $method ) );
+	}
+
+	/**
 	 * Merges data into the method_data JSON column, preserving keys already there. For anything
 	 * genuinely method-specific that arrives after the initial insert.
 	 *
