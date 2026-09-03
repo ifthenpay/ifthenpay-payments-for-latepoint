@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves two things in IfthenpayAdminFormRenderer:
+ * Proves two things in IfthenpayLpAdminFormRenderer:
  *
  * - get_connection_notice(): `null` for a fully usable key — the "Disconnect" button
  *   already says that — and a toast-ready `{type, message}` for the two states it can't say on
@@ -22,7 +22,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-admin-form-renderer.php';
+require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-lp-admin-form-renderer.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
 
@@ -62,7 +62,7 @@ final class ConnectionStatusTest extends TestCase {
 	 * merchant's problem to fix, but it is worth a heads-up.
 	 */
 	public function test_null_dataset_returns_error_notice(): void {
-		$notice = IfthenpayAdminFormRenderer::get_connection_notice( null );
+		$notice = IfthenpayLpAdminFormRenderer::get_connection_notice( null );
 
 		$this->assertNotNull( $notice );
 		$this->assertSame( 'error', $notice['type'] );
@@ -74,7 +74,7 @@ final class ConnectionStatusTest extends TestCase {
 	 * failure state above.
 	 */
 	public function test_empty_gatewaykeys_returns_notice_with_helpdesk_contact(): void {
-		$notice = IfthenpayAdminFormRenderer::get_connection_notice(
+		$notice = IfthenpayLpAdminFormRenderer::get_connection_notice(
 			array(
 				'gatewaykeys' => array(),
 				'accounts'    => array(),
@@ -91,7 +91,7 @@ final class ConnectionStatusTest extends TestCase {
 	 * that plainly.
 	 */
 	public function test_non_empty_gatewaykeys_returns_null(): void {
-		$notice = IfthenpayAdminFormRenderer::get_connection_notice(
+		$notice = IfthenpayLpAdminFormRenderer::get_connection_notice(
 			array(
 				'gatewaykeys' => array( 'GATEWAY-1' => 'GATEWAY-1' ),
 				'accounts'    => array(),
@@ -106,7 +106,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_empty_backoffice_key_renders_connect_mode(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_backoffice_configuration( '' );
+		IfthenpayLpAdminFormRenderer::render_backoffice_configuration( '' );
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'mode-connect', $html );
@@ -119,7 +119,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_saved_backoffice_key_renders_disconnect_mode(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_backoffice_configuration( '1234-5678-9012-3456' );
+		IfthenpayLpAdminFormRenderer::render_backoffice_configuration( '1234-5678-9012-3456' );
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'mode-disconnect', $html );
@@ -134,7 +134,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_saved_backoffice_key_with_gatewaykeys_renders_gateway_key_row(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_backoffice_configuration(
+		IfthenpayLpAdminFormRenderer::render_backoffice_configuration(
 			'1234-5678-9012-3456',
 			array( 'GATEWAY-1' => 'GATEWAY-1' ),
 			'GATEWAY-1'
@@ -150,7 +150,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_callback_status_null_renders_nothing(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_callback_status( null );
+		IfthenpayLpAdminFormRenderer::render_callback_status( null );
 		$html = (string) ob_get_clean();
 
 		$this->assertSame( '', $html );
@@ -162,7 +162,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_callback_status_success_renders_nothing(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_callback_status(
+		IfthenpayLpAdminFormRenderer::render_callback_status(
 			array(
 				'success'       => true,
 				'message'       => '',
@@ -180,7 +180,7 @@ final class ConnectionStatusTest extends TestCase {
 	 */
 	public function test_callback_status_failure_renders_error_pill_with_reason(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_callback_status(
+		IfthenpayLpAdminFormRenderer::render_callback_status(
 			array(
 				'success'       => false,
 				'message'       => 'ifthenpay did not accept this callback URL.',

@@ -76,7 +76,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 			try {
 				$token      = $intent_model->intent_key;
-				$payload    = IfthenpayDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
+				$payload    = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
 				$api_result = IfthenpayLpPayByLink::create(
 					OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
 					$payload

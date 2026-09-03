@@ -48,17 +48,17 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 			}
 
 			$dataset     = IfthenpayLpGatewayDataset::get( $key );
-			$notice      = IfthenpayAdminFormRenderer::get_connection_notice( $dataset );
+			$notice      = IfthenpayLpAdminFormRenderer::get_connection_notice( $dataset );
 			$gatewaykeys = $dataset['gatewaykeys'] ?? array();
 
 			// Nothing to configure without a gateway key — same as the page's own render, an empty
 			// Gateway Key row and an all-"No accounts" method list would only repeat what the
 			// notice above already says.
 			$html                 = '';
-			$selected_gateway_key = IfthenpayAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
+			$selected_gateway_key = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
 			if ( array() !== $gatewaykeys ) {
 				ob_start();
-				IfthenpayAdminFormRenderer::render_payments_configuration(
+				IfthenpayLpAdminFormRenderer::render_payments_configuration(
 					$selected_gateway_key,
 					$dataset['accounts'] ?? array(),
 					IfthenpayLpMethodCatalog::get() ?? array()
@@ -73,7 +73,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 					// The Gateway Key row lives inside the Backoffice Configuration section this
 					// response never otherwise touches — sent separately so the admin script can
 					// refresh just that row instead of the whole section.
-					'gateway_key_html' => IfthenpayAdminFormRenderer::render_gateway_key_row( $gatewaykeys, $selected_gateway_key ),
+					'gateway_key_html' => IfthenpayLpAdminFormRenderer::render_gateway_key_row( $gatewaykeys, $selected_gateway_key ),
 					'notice'           => $notice,
 					'inline_data'      => array(
 						'accounts' => $dataset['accounts'] ?? array(),
@@ -130,7 +130,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 				'plugin_version'    => IFTHENPAY_PLUGIN_VERSION,
 			);
 
-			$sent = IfthenpayEmailHelper::send_activation_email( $payload );
+			$sent = IfthenpayLpEmailHelper::send_activation_email( $payload );
 
 			if ( $sent ) {
 				$this->send_json(

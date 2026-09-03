@@ -124,7 +124,7 @@ class IfthenpayLpPaymentMethodAvailability {
 
 	/**
 	 * Multibanco needs more than a usable gateway key: the merchant must have checked "MB" in
-	 * Payment Methods (IfthenpayAdminFormRenderer::get_saved_enabled_methods() — one setting
+	 * Payment Methods (IfthenpayLpAdminFormRenderer::get_saved_enabled_methods() — one setting
 	 * covers both the "Pay Now" and "Pay Later" sections, the split there is display-only), and
 	 * the selected gateway must actually carry an MB account. Otherwise the method would be
 	 * offered at checkout only to fail at reference-creation time with a confusing error.
@@ -135,7 +135,7 @@ class IfthenpayLpPaymentMethodAvailability {
 	 * attempt gracefully instead.
 	 */
 	private static function is_multibanco_usable(): bool {
-		if ( ! in_array( 'MB', IfthenpayAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
+		if ( ! in_array( 'MB', IfthenpayLpAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
 			return false;
 		}
 

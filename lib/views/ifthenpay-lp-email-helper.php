@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-class IfthenpayEmailHelper {
+class IfthenpayLpEmailHelper {
 
 	const SUPPORT_EMAIL = 'suporte@ifthenpay.com';
 
