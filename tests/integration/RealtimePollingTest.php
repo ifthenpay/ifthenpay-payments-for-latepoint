@@ -222,6 +222,9 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$this->assertFalse( $result['pending'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-real-cancel' );
 		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
+
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'TXID-NOT-PAID', $method_data['transaction_id'] );
 	}
 
 	/**
@@ -237,6 +240,25 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-real-failure' );
 		$this->assertSame( 'FAILED', $record->status ); // @phpstan-ignore-line property.notFound
+
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'TXID-NOT-PAID', $method_data['transaction_id'] );
+	}
+
+	/**
+	 * A genuine cancel with no txid at all (the customer backed out before any payment attempt
+	 * got one) writes nothing to method_data — there is nothing to record, and no ifthenpay call
+	 * is made either (verify_transaction() is only reached with a non-empty txid).
+	 */
+	public function test_cancel_with_no_txid_writes_nothing_to_method_data(): void {
+		$this->seed_pending_realtime_row( 'tok-cancel-no-txid' );
+
+		$result = $this->resolve( 'cancel', '', 'tok-cancel-no-txid' );
+
+		$this->assertFalse( $result['pending'] );
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-cancel-no-txid' );
+		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
+		$this->assertNull( $record->method_data ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**
