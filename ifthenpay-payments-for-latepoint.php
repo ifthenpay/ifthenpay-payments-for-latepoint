@@ -342,7 +342,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			if ( $record ) {
-				$action->prepared_data_for_run['content'] .= IfthenpayLpReferenceDisplay::render_html( $record );
+				$action->prepared_data_for_run['content'] .= IfthenpayLpReferenceDisplay::render_email_html( $record );
 			}
 
 			return $action;
