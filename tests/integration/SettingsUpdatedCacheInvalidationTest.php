@@ -7,6 +7,9 @@
  * @package ifthenpay-payments-for-latepoint
  */
 
+// phpcs:ignore Squiz.Commenting.FileComment.Missing -- docblock above is the file comment; the sniff misclassifies it when a require is the first statement.
+require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
+
 /**
  * Settings-save cache invalidation proof.
  */
@@ -20,6 +23,16 @@ class SettingsUpdatedCacheInvalidationTest extends WP_UnitTestCase {
 	private int $gateway_get_calls = 0;
 
 	/**
+	 * Resets IfthenpayLpMethodCatalog's own per-request in-memory cache — it has no key dimension
+	 * to keep it isolated between tests by construction (see
+	 * ifthenpay_lp_reset_method_catalog_cache()'s own docblock).
+	 */
+	protected function setUp(): void {
+		parent::setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
+	}
+
+	/**
 	 * Mocks gateway/methods/available (a fixed catalog, needed by IfthenpayLpGatewayDataset's own
 	 * fetch) and gateway/get — the first call returns the fixture's two gateways, every call after
 	 * returns a single, differently-named one, so the test can tell a fresh fetch from a stale
@@ -30,12 +43,12 @@ class SettingsUpdatedCacheInvalidationTest extends WP_UnitTestCase {
 			'pre_http_request',
 			function ( $preempt, $args, $url ) {
 				if ( false !== strpos( $url, 'gateway/methods/available' ) ) {
-					return $this->fixture_response( 'method-catalog.json' );
+					return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'method-catalog.json' ) );
 				}
 				if ( false !== strpos( $url, 'gateway/get' ) ) {
 					++$this->gateway_get_calls;
 					if ( 1 === $this->gateway_get_calls ) {
-						return $this->fixture_response( 'gateway-dataset.json' );
+						return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'gateway-dataset.json' ) );
 					}
 					return array(
 						'response' => array(
@@ -58,26 +71,6 @@ class SettingsUpdatedCacheInvalidationTest extends WP_UnitTestCase {
 			},
 			10,
 			3
-		);
-	}
-
-	/**
-	 * Loads a fixture file into a `wp_remote_request()`-shaped 200 response.
-	 *
-	 * @param string $name Fixture file name under tests/fixtures/ifthenpay/.
-	 * @return array{response: array{code:int,message:string}, body:string, headers: array<empty>}
-	 */
-	private function fixture_response( string $name ): array {
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local fixture file, not a remote URL.
-		$body = (string) file_get_contents( __DIR__ . '/../fixtures/ifthenpay/' . $name );
-
-		return array(
-			'response' => array(
-				'code'    => 200,
-				'message' => '',
-			),
-			'body'     => $body,
-			'headers'  => array(),
 		);
 	}
 

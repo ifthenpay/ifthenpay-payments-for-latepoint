@@ -2,8 +2,8 @@
 /**
  * Renders the ifthenpay section of LatePoint's Payments settings tab.
  *
- * Plugin Reviewer Note: the OsFormHelper::*_field() and toggler_field() methods are part of the
- * LatePoint framework and escape their own output internally (esc_html()/esc_attr()). A review
+ * Plugin Reviewer Note: the OsFormHelper::*_field() methods are part of the LatePoint framework and
+ * escape their own output internally (esc_html()/esc_attr()). A review
  * scanner that can't see inside those methods may flag calls to them as unescaped output; every
  * call here is preceded by `echo` as required, and the escaping happens inside the helper. No
  * wp_kses_post() is used because it is disallowed in this context.

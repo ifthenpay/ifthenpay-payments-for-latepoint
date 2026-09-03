@@ -26,11 +26,14 @@ require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 final class EnabledMethodGateTest extends TestCase {
 
 	/**
-	 * Boots Brain Monkey and stubs the WP functions the client/catalog/dataset always touch.
+	 * Boots Brain Monkey and stubs the WP functions the client/catalog/dataset always touch. Also
+	 * resets IfthenpayLpMethodCatalog's own per-request in-memory cache — see
+	 * ifthenpay_lp_reset_method_catalog_cache()'s own docblock for why this is needed here too.
 	 */
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
 
 		Functions\stubs(
 			array(
@@ -50,23 +53,6 @@ final class EnabledMethodGateTest extends TestCase {
 	protected function tearDown(): void {
 		Monkey\tearDown();
 		parent::tearDown();
-	}
-
-	/**
-	 * Stubs the transport for a catalog fetch followed by a gateway-dataset fetch, in that order —
-	 * the two real network calls IfthenpayLpGatewayDataset::get() makes underneath the gate.
-	 */
-	private function mock_catalog_then_gateway_responses(): void {
-		Functions\when( 'is_wp_error' )->justReturn( false );
-
-		Functions\expect( 'wp_remote_request' )
-			->twice()
-			->andReturn(
-				ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'method-catalog.json' ) ),
-				ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'gateway-dataset.json' ) )
-			);
-		Functions\when( 'wp_remote_retrieve_response_code' )->alias( static fn( $response ) => $response['response']['code'] );
-		Functions\when( 'wp_remote_retrieve_body' )->alias( static fn( $response ) => $response['body'] );
 	}
 
 	/**
@@ -91,7 +77,7 @@ final class EnabledMethodGateTest extends TestCase {
 	 * A Gateway Key that still appears in the live dataset is usable.
 	 */
 	public function test_gateway_key_present_in_dataset_is_usable(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$this->assertTrue( IfthenpayLpEnabledMethodGate::is_usable( 'MODERN-GATEWAY', 'TEST-KEY-USABLE' ) );
 	}
@@ -101,7 +87,7 @@ final class EnabledMethodGateTest extends TestCase {
 	 * is not usable, even though both settings are non-empty.
 	 */
 	public function test_gateway_key_absent_from_dataset_is_not_usable(): void {
-		$this->mock_catalog_then_gateway_responses();
+		ifthenpay_lp_mock_catalog_then_gateway_responses();
 
 		$this->assertFalse( IfthenpayLpEnabledMethodGate::is_usable( 'REVOKED-GATEWAY', 'TEST-KEY-REVOKED' ) );
 	}

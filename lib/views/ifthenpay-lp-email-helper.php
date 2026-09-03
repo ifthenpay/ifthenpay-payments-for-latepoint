@@ -29,18 +29,17 @@ class IfthenpayLpEmailHelper {
 			strtoupper( sanitize_text_field( $data['entity'] ) )
 		);
 
+		// Raw values only — escaped exactly once, at output, in the render loop below (same
+		// single-escape pattern as IfthenpayLpAdminFormRenderer::render_callback_status()). Escaping
+		// here too would double-encode entities (an "&" would reach the inbox as "&amp;amp;").
 		$items = array(
-			'Chave de acesso ao backoffice:' => esc_html( $data['backoffice_key'] ),
-			'Gateway Key:'                   => esc_html( $data['gateway_key'] ),
-			'Email Cliente:'                 => esc_html( $data['customer_email'] ),
-			'Método a ativar:'               => esc_html( strtoupper( $data['entity'] ) ),
-			'Loja online:'                   => esc_url( $data['site_url'] ),
-			'Plataforma ecommerce:'          => sprintf(
-				'WordPress %s / LatePoint v%s',
-				esc_html( $data['wp_version'] ),
-				esc_html( $data['latepoint_version'] )
-			),
-			'Versão do Módulo ifthenpay:'    => esc_html( $data['plugin_version'] ),
+			'Chave de acesso ao backoffice:' => $data['backoffice_key'],
+			'Gateway Key:'                   => $data['gateway_key'],
+			'Email Cliente:'                 => $data['customer_email'],
+			'Método a ativar:'               => strtoupper( $data['entity'] ),
+			'Loja online:'                   => $data['site_url'],
+			'Plataforma ecommerce:'          => sprintf( 'WordPress %s / LatePoint v%s', $data['wp_version'], $data['latepoint_version'] ),
+			'Versão do Módulo ifthenpay:'    => $data['plugin_version'],
 			'Atualizar Conta Cliente:'       => 'Após adicionar o método não precisa tomar mais nenhuma ação, este método ficará disponível para seleção na página de configuração da extensão.',
 		);
 
@@ -102,7 +101,10 @@ class IfthenpayLpEmailHelper {
 		$host    = wp_parse_url( $data['site_url'], PHP_URL_HOST );
 		$headers = array(
 			'Content-Type: text/html; charset=UTF-8',
-			'From: ' . esc_html( $data['site_name'] ) . ' <no-reply@' . $host . '>',
+			// A raw header value, not HTML — esc_html() would leave literal "&amp;" in a mail
+			// client's From column instead of encoding anything meaningful; sanitize_text_field()
+			// is what actually matters here, stripping the tags/line breaks a header can't contain.
+			'From: ' . sanitize_text_field( $data['site_name'] ) . ' <no-reply@' . $host . '>',
 		);
 
 		return wp_mail( self::SUPPORT_EMAIL, $subject, $body, $headers );

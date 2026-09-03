@@ -12,6 +12,7 @@
 
 // phpcs:ignore Squiz.Commenting.FileComment.Missing -- docblock above is the file comment; the sniff misclassifies it when a require is the first statement.
 require_once __DIR__ . '/../support/class-latepoint-order-fixture.php';
+require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 
 /**
  * Realtime polling proof.
@@ -44,53 +45,6 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		return $method->invoke( $this->controller(), $type, $txid, $token );
 	}
 
-	/**
-	 * Mocks IfthenpayLpTransactionStatus::check()'s own HTTP call — a real, completed transaction
-	 * id answers 200 with {"TransactionId":...,"PaymentMethod":...,"Amount":...,"OrderId":...}; an
-	 * unrecognised one answers 404 with an empty body (VERIFIED live against the real endpoint, not
-	 * assumed).
-	 *
-	 * @param bool   $verified What the endpoint should answer.
-	 * @param string $order_id OrderId to echo back, when $verified is true — must match the token
-	 *                         under test for the confirmation to be accepted.
-	 * @param string $method   The confirmed payment method, when $verified is true.
-	 */
-	private function mock_transaction_status( bool $verified, string $order_id = '', string $method = 'MBWAY' ): void {
-		add_filter(
-			'pre_http_request',
-			static function ( $preempt, $args, $url ) use ( $verified, $order_id, $method ) {
-				if ( false !== strpos( $url, '/gateway/transaction/status/get' ) ) {
-					return $verified
-						? array(
-							'response' => array(
-								'code'    => 200,
-								'message' => '',
-							),
-							'body'     => wp_json_encode(
-								array(
-									'TransactionId' => 'TXID-REAL-001',
-									'PaymentMethod' => $method,
-									'Amount'        => '0.10',
-									'OrderId'       => $order_id,
-								)
-							),
-							'headers'  => array(),
-						)
-						: array(
-							'response' => array(
-								'code'    => 404,
-								'message' => '',
-							),
-							'body'     => '',
-							'headers'  => array(),
-						);
-				}
-				return $preempt;
-			},
-			10,
-			3
-		);
-	}
 
 	/**
 	 * Inserts a realtime-kind, still-PENDING repository row for a real order fixture — the shape
@@ -197,7 +151,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * method_data instead.
 	 */
 	public function test_verified_payment_is_marked_paid_regardless_of_reported_type(): void {
-		$this->mock_transaction_status( true, 'tok-verified-despite-cancel' );
+		ifthenpay_lp_mock_transaction_status( true, 'tok-verified-despite-cancel' );
 		$this->seed_pending_realtime_row( 'tok-verified-despite-cancel' );
 
 		$result = $this->resolve( 'cancel', 'TXID-REAL-001', 'tok-verified-despite-cancel' );
@@ -226,7 +180,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * inspection, not identically to a genuinely unconfirmed payment.
 	 */
 	public function test_verified_payment_with_mismatched_order_id_is_not_marked_paid(): void {
-		$this->mock_transaction_status( true, 'tok-belongs-to-another-booking' );
+		ifthenpay_lp_mock_transaction_status( true, 'tok-belongs-to-another-booking' );
 		$this->seed_pending_realtime_row( 'tok-mismatch' );
 
 		$result = $this->resolve( 'success', 'TXID-REAL-001', 'tok-mismatch' );
@@ -247,7 +201,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * browser (front.js's pollPaymentStatus()) asks again instead of giving up.
 	 */
 	public function test_unconfirmed_success_is_reported_as_pending_not_failed(): void {
-		$this->mock_transaction_status( false );
+		ifthenpay_lp_mock_transaction_status( false );
 		$this->seed_pending_realtime_row( 'tok-still-processing' );
 
 		$result = $this->resolve( 'success', 'TXID-NOT-YET-CONFIRMED', 'tok-still-processing' );
@@ -261,7 +215,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * An unverified 'cancel' is recorded as CANCELLED — the legitimate case this branch exists for.
 	 */
 	public function test_unverified_cancel_is_recorded(): void {
-		$this->mock_transaction_status( false );
+		ifthenpay_lp_mock_transaction_status( false );
 		$this->seed_pending_realtime_row( 'tok-real-cancel' );
 
 		$result = $this->resolve( 'cancel', 'TXID-NOT-PAID', 'tok-real-cancel' );
@@ -280,7 +234,7 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	 * recorded as FAILED, with the attempted txid kept in method_data for support/debugging.
 	 */
 	public function test_unverified_other_type_is_marked_failed(): void {
-		$this->mock_transaction_status( false );
+		ifthenpay_lp_mock_transaction_status( false );
 		$this->seed_pending_realtime_row( 'tok-real-failure' );
 
 		$result = $this->resolve( 'error', 'TXID-NOT-PAID', 'tok-real-failure' );
