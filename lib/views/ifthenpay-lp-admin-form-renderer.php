@@ -227,14 +227,13 @@ class IfthenpayLpAdminFormRenderer {
 				<?php
 				// Unchecking every method leaves this field entirely absent from the submitted
 				// form — no checkbox means no `[]` entry — and LatePoint's own
-				// SettingsController::update() only saves setting names actually present in the
-				// request, so the previous value would silently survive. This always-present
-				// entry keeps the field's key in the request even then;
-				// get_saved_enabled_methods() filters its empty value back out on read. Kept
-				// inside a `.sub-section-row` rather than as a bare sibling of one: LatePoint's
-				// own `.os-togglable-item-body:has(> :not(.sub-section-row))` rule pads every
-				// side of the whole card the moment any direct child isn't a `.sub-section-row`,
-				// insetting every section divider from the card's edges.
+				// SettingsController::update() only saves settings actually present in the
+				// request, so the previous value would silently survive. This hidden field keeps
+				// the key present regardless; get_saved_enabled_methods() filters its empty value
+				// back out on read. It's wrapped in a `.sub-section-row` rather than left as a
+				// bare sibling: LatePoint's own
+				// `.os-togglable-item-body:has(> :not(.sub-section-row))` rule pads the whole
+				// card the moment any direct child isn't a `.sub-section-row`.
 				echo '<input type="hidden" name="settings[ifthenpay_payment_methods_configuration][]" value="" />';
 				?>
 				<div class="label-with-description">

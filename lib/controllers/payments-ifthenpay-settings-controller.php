@@ -17,9 +17,9 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 		/**
 		 * Preview a Backoffice Key before it is saved: format-check, remote verification, then
 		 * render the gateway/method config exactly as it would look once saved. Saves nothing —
-		 * the real, authoritative save runs through the settings page's own save, validated by
-		 * `validate_backoffice_key_on_save()` in the main plugin file. This is why there is no
-		 * failure-path settings cleanup here: nothing was written, so there is nothing to unwind.
+		 * the authoritative save runs through the settings page's own save, validated by
+		 * `validate_backoffice_key_on_save()` in the main plugin file, so there is no failure-path
+		 * cleanup to do here.
 		 *
 		 * @return void Sends JSON with status, message, and form HTML.
 		 */

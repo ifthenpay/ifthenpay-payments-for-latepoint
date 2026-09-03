@@ -6,12 +6,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class IfthenpayLpDataFormatter {
 
 	/**
-	 * Formats the available payment methods array from the ifthenpay API.
+	 * Formats the ifthenpay methods-available response, keyed by method code with
+	 * `IsVisible: false` entries dropped and the rest sorted by position.
 	 *
-	 * Each entry is indexed by the lowercase method name, and contains its
-	 * position, image, and description/tooltip.
-	 *
-	 * @param array $raw Raw data array returned from get_available_payment_methods().
+	 * @param array $raw Raw data array from the ifthenpay API.
 	 * @return array Formatted array with cleaned method information.
 	 */
 	public static function format_available_payment_methods( array $raw ): array {
@@ -56,8 +54,7 @@ class IfthenpayLpDataFormatter {
 			'accounts'        => self::build_accounts_string(),
 			'selected_method' => self::get_selected_method(),
 			// The string "true", not a boolean — one payment per link; each checkout attempt
-			// mints its own (contracts/api.md). Was documented as part of this payload since
-			// spec 003 but never actually sent until now.
+			// mints its own (contracts/api.md).
 			'otp'             => 'true',
 		);
 
@@ -105,7 +102,8 @@ class IfthenpayLpDataFormatter {
 	}
 
 	/**
-	 * Default to 'pt', accept en/es/fr.
+	 * Maps the site locale to one of Pay By Link's supported language codes, defaulting to
+	 * Portuguese.
 	 */
 	private static function get_language(): string {
 		$lang = substr( get_locale(), 0, 2 );
