@@ -84,7 +84,21 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				$token       = $intent_model->intent_key;
 				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
 				$payload     = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
-				$api_result  = IfthenpayLpPayByLink::create( $gateway_key, $payload );
+
+				// An empty accounts field doesn't reject the link — ifthenpay creates it anyway and
+				// its hosted page falls back to every method configured on the gateway, silently
+				// ignoring this merchant's own Payment Methods selection. Must never reach that call.
+				if ( '' === $payload['accounts'] ) {
+					$this->send_json(
+						array(
+							'status'  => LATEPOINT_STATUS_ERROR,
+							'message' => __( 'No payment methods are currently enabled. Please contact the site owner.', 'ifthenpay-payments-for-latepoint' ),
+						)
+					);
+					return;
+				}
+
+				$api_result = IfthenpayLpPayByLink::create( $gateway_key, $payload );
 
 				IfthenpayLpTransactionRepository::insert(
 					array(
