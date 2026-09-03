@@ -162,12 +162,19 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		// The generic PAYBYLINK method the row was inserted with is corrected to what ifthenpay
 		// itself confirms the customer actually used.
 		$this->assertSame( 'MBWAY', $record->method ); // @phpstan-ignore-line property.notFound
+
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'TXID-REAL-001', $method_data['transaction_id'] );
+		$this->assertSame( 'MBWAY', $method_data['verified_payment_method'] );
+		$this->assertSame( 'tok-verified-despite-cancel', $method_data['verified_order_id'] );
 	}
 
 	/**
 	 * A txid that is real and completed, but for a different Pay By Link's OrderId, must never mark
 	 * this row paid — the same replay this endpoint (public, unauthenticated) would otherwise be
-	 * exposed to: a completed txid from an unrelated payment reused against this booking.
+	 * exposed to: a completed txid from an unrelated payment reused against this booking. The
+	 * mismatch is still recorded in method_data, so it reads as "verified for someone else" on
+	 * inspection, not identically to a genuinely unconfirmed payment.
 	 */
 	public function test_verified_payment_with_mismatched_order_id_is_not_marked_paid(): void {
 		$this->mock_transaction_status( true, 'tok-belongs-to-another-booking' );
@@ -179,6 +186,10 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-mismatch' );
 		$this->assertSame( 'PENDING', $record->status ); // @phpstan-ignore-line property.notFound
 		$this->assertNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'TXID-REAL-001', $method_data['transaction_id'] );
+		$this->assertSame( 'tok-belongs-to-another-booking', $method_data['verified_order_id'] );
 	}
 
 	/**

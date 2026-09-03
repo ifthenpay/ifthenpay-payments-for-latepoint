@@ -184,12 +184,27 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				}
 
 				$confirmation = '' !== $txid ? self::verify_transaction( $txid ) : null;
-				if ( null !== $confirmation && $confirmation->order_id === $token ) {
-					IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
-					IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
-					IfthenpayLpTransactionRepository::mark_settled( $token );
+				if ( null !== $confirmation ) {
+					// Recorded regardless of the order_id check below — this is what lets a mismatch
+					// be explained later (verified_order_id here vs. this row's own token) instead of
+					// looking identical to a genuine "ifthenpay never confirmed it" case.
+					IfthenpayLpTransactionRepository::update_method_data(
+						$token,
+						array(
+							'transaction_id'          => $txid,
+							'verified_payment_method' => $confirmation->payment_method,
+							'verified_amount'         => $confirmation->amount,
+							'verified_order_id'       => $confirmation->order_id,
+						)
+					);
 
-					return $this->paid_response();
+					if ( $confirmation->order_id === $token ) {
+						IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
+						IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );
+						IfthenpayLpTransactionRepository::mark_settled( $token );
+
+						return $this->paid_response();
+					}
 				}
 
 				if ( 'success' === $type ) {

@@ -128,6 +128,11 @@ class ManualRecheckTest extends WP_UnitTestCase {
 
 		$booking = new OsBookingModel( $fixture->booking->id );
 		$this->assertSame( LATEPOINT_BOOKING_STATUS_APPROVED, $booking->status );
+
+		$record      = IfthenpayLpTransactionRepository::find_by_token( 'tok-manual-settle' );
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'REQ-MANUAL-001', $method_data['transaction_id'] );
+		$this->assertSame( 'tok-manual-settle', $method_data['verified_order_id'] );
 	}
 
 	/**
@@ -210,6 +215,10 @@ class ManualRecheckTest extends WP_UnitTestCase {
 
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-manual-mismatch' );
 		$this->assertNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+
+		$method_data = json_decode( $record->method_data, true ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'REQ-MANUAL-MISMATCH', $method_data['transaction_id'] );
+		$this->assertSame( 'tok-belongs-to-another-booking', $method_data['verified_order_id'] );
 	}
 
 	/**
