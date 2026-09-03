@@ -142,7 +142,7 @@ class IfthenpayLpSettlement {
 		$transaction->processor       = 'ifthenpay';
 		$transaction->kind            = LATEPOINT_TRANSACTION_KIND_CAPTURE;
 		$transaction->status          = LATEPOINT_TRANSACTION_STATUS_SUCCEEDED;
-		$transaction->notes           = self::build_transaction_notes( $record, $request_id, $source );
+		$transaction->notes           = self::build_transaction_notes( $record, 'ifthenpay request ID', $request_id, $source );
 
 		$invoice = OsInvoicesHelper::get_matching_invoice_for_transaction( $transaction );
 		if ( ! $invoice->is_new_record() ) {
@@ -169,19 +169,28 @@ class IfthenpayLpSettlement {
 
 	/**
 	 * Everything about this payment that isn't already the transaction's own token/amount/method —
-	 * ifthenpay's own request id (our token is what LatePoint shows as "Confirmation Code",
-	 * consistent with the realtime flow's own convention; request_id would only confuse a merchant
-	 * reconciling by the token they already see everywhere else), the Multibanco entity/reference
-	 * when this was a deferred payment, and which of the three settle_payment() call sites settled
-	 * it — all otherwise invisible once the row leaves the plugin's own table.
+	 * ifthenpay's own identifier for it (our token is what LatePoint shows as "Confirmation Code",
+	 * consistent with the realtime flow's own convention; ifthenpay's identifier would only confuse
+	 * a merchant reconciling by the token they already see everywhere else), the Multibanco
+	 * entity/reference when this was a deferred payment, and how it was settled — all otherwise
+	 * invisible once the row leaves the plugin's own table. Shared with
+	 * IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes(): the only real difference
+	 * between a deferred/callback/manual settlement and a realtime one is which identifier ifthenpay
+	 * gave it — a request_id for the former, a transaction id for the latter, never
+	 * interchangeable (see IfthenpayLpTransactionStatus's own docblock) — everything else about
+	 * assembling the note is identical.
 	 *
-	 * @param object $record     The repository row.
-	 * @param string $request_id ifthenpay's identifier for this payment.
-	 * @param string $source     'callback' | 'polling' | 'manual'.
+	 * @param object $record           The repository row.
+	 * @param string $identifier_label What kind of identifier follows, e.g. "ifthenpay request ID"
+	 *                                 or "ifthenpay transaction ID".
+	 * @param string $identifier_value The identifier itself; the line is omitted when empty.
+	 * @param string $source           'callback' | 'polling' | 'manual'.
 	 */
-	private static function build_transaction_notes( object $record, string $request_id, string $source ): string {
-		$lines   = array();
-		$lines[] = 'ifthenpay request ID: ' . $request_id;
+	public static function build_transaction_notes( object $record, string $identifier_label, string $identifier_value, string $source ): string {
+		$lines = array();
+		if ( '' !== $identifier_value ) {
+			$lines[] = $identifier_label . ': ' . $identifier_value;
+		}
 
 		if ( ! empty( $record->entity ) && ! empty( $record->reference ) ) {
 			$lines[] = 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;

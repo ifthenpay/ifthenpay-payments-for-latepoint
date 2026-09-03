@@ -152,6 +152,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			add_filter( 'latepoint_process_payment_for_order_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payments_for_order_intent' ), 10, 2 );
 			add_filter( 'latepoint_process_payment_for_transaction_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payment_for_transaction_intent' ), 10, 2 );
+			add_action( 'latepoint_transaction_created', array( 'IfthenpayLpPaymentProcessor', 'backfill_realtime_transaction_notes' ) );
 
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
 			// Not IfthenpayLpExpirySweep::HOOK here — that class doesn't exist yet at this point
