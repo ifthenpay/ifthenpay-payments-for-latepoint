@@ -13,18 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Settles through the same settle_payment() the callback route and the realtime polling fallback
- * call (invariant 3) — but, unlike those, with no fresh outbound check against ifthenpay first.
- * The verified reference-listing endpoint for a single request_id lookup (ifthenpay's own
- * "payments_list") has no independently-verified raw HTTP shape in this add-on's own research yet
- * (unlike every other operation it depends on) — using it here blind would risk asserting a
- * payment is confirmed when it is not. Until that spike is done, this is a considered,
- * capability-gated override: whoever can call this (settings__edit for the controller action, WP
- * shell access for the CLI command) is trusted to have confirmed the payment on ifthenpay's own
- * backoffice first.
+ * call (invariant 3) — now with a fresh outbound check against ifthenpay first, via
+ * IfthenpayLpTransactionStatus::check(). Confirms the request_id is a real, completed payment
+ * before ever calling settle_payment(), closing the gap this class originally shipped without (no
+ * independently-verified confirmation endpoint existed yet at the time).
  */
 class IfthenpayLpManualRecheck {
 
 	public const NOT_FOUND        = 'not_found';
+	public const UNCONFIRMED      = 'unconfirmed';
 	public const SETTLED          = 'settled';
 	public const REJECTED         = 'rejected';
 	public const FAILED           = 'failed';
@@ -45,6 +42,18 @@ class IfthenpayLpManualRecheck {
 		if ( ! $record || null === $record->request_id ) {
 			return array( 'outcome' => self::NOT_FOUND );
 		}
+
+		try {
+			$payment_method = IfthenpayLpTransactionStatus::check( (string) $record->request_id );
+		} catch ( IfthenpayLpApiException $e ) {
+			return array( 'outcome' => self::FAILED );
+		}
+
+		if ( null === $payment_method ) {
+			return array( 'outcome' => self::UNCONFIRMED );
+		}
+
+		IfthenpayLpTransactionRepository::set_verified_method( $token, $payment_method );
 
 		$result = IfthenpayLpSettlement::settle_payment(
 			(string) $record->request_id,

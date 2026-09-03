@@ -2,7 +2,7 @@
 /**
  * Proves OsPaymentsIfthenpayCheckoutController::resolve_payment_status_from_modal_url() — the
  * polling fallback's own decision logic, invoked directly via Reflection (no real HTTP/AJAX round
- * trip needed; only IfthenpayAPIClient's own outbound call is mocked). One test per FR-13
+ * trip needed; only IfthenpayLpTransactionStatus's own outbound call is mocked). One test per FR-13
  * guarantee: a PAID row is never downgraded, and ifthenpay's own verification — never the
  * browser's self-reported $type — decides whether to mark the row paid; plus the 'pending' signal
  * that tells the browser (front.js) to keep polling instead of giving up.
@@ -45,23 +45,40 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Mocks IfthenpayAPIClient::get_payment_status_by_transaction_id()'s own HTTP call.
+	 * Mocks IfthenpayLpTransactionStatus::check()'s own HTTP call — a real, completed transaction
+	 * id answers 200 with {"TransactionId":...,"PaymentMethod":...}; an unrecognised one answers
+	 * 404 with an empty body (VERIFIED live against the real endpoint, not assumed).
 	 *
-	 * @param bool $verified What the endpoint should answer.
+	 * @param bool   $verified What the endpoint should answer.
+	 * @param string $method   The confirmed payment method, when $verified is true.
 	 */
-	private function mock_transaction_status( bool $verified ): void {
+	private function mock_transaction_status( bool $verified, string $method = 'MBWAY' ): void {
 		add_filter(
 			'pre_http_request',
-			static function ( $preempt, $args, $url ) use ( $verified ) {
-				if ( false !== strpos( $url, '/gateway/transaction/status' ) ) {
-					return array(
-						'response' => array(
-							'code'    => 200,
-							'message' => '',
-						),
-						'body'     => $verified ? 'true' : 'false',
-						'headers'  => array(),
-					);
+			static function ( $preempt, $args, $url ) use ( $verified, $method ) {
+				if ( false !== strpos( $url, '/gateway/transaction/status/get' ) ) {
+					return $verified
+						? array(
+							'response' => array(
+								'code'    => 200,
+								'message' => '',
+							),
+							'body'     => wp_json_encode(
+								array(
+									'TransactionId' => 'TXID-REAL-001',
+									'PaymentMethod' => $method,
+								)
+							),
+							'headers'  => array(),
+						)
+						: array(
+							'response' => array(
+								'code'    => 404,
+								'message' => '',
+							),
+							'body'     => '',
+							'headers'  => array(),
+						);
 				}
 				return $preempt;
 			},
@@ -137,6 +154,9 @@ class RealtimePollingTest extends WP_UnitTestCase {
 		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
 		$this->assertSame( 'TXID-REAL-001', $record->request_id ); // @phpstan-ignore-line property.notFound
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+		// The generic PAYBYLINK method the row was inserted with is corrected to what ifthenpay
+		// itself confirms the customer actually used.
+		$this->assertSame( 'MBWAY', $record->method ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**

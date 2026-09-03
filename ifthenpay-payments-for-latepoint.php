@@ -91,7 +91,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-callback-rest-controller.php';
 
-			include_once __DIR__ . '/lib/helpers/ifthenpay-api-client.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-api-exception.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-credential-exception.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-transport-exception.php';
@@ -121,6 +120,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-settlement.php';
+			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-transaction-status.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-reference-display.php';
 			include_once __DIR__ . '/lib/helpers/ifthenpay-lp-expiry-sweep.php';

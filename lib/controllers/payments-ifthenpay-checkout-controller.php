@@ -178,9 +178,10 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					return $this->paid_response();
 				}
 
-				if ( '' !== $txid && IfthenpayAPIClient::get_payment_status_by_transaction_id( $txid ) ) {
-					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
+				$verified_method = '' !== $txid ? self::verify_transaction( $txid ) : null;
+				if ( null !== $verified_method ) {
 					IfthenpayLpTransactionRepository::set_request_id( $token, $txid );
+					IfthenpayLpTransactionRepository::set_verified_method( $token, $verified_method );
 					IfthenpayLpTransactionRepository::mark_settled( $token );
 
 					return $this->paid_response();
@@ -210,6 +211,23 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				return $this->terminal_error( __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ) );
 			} catch ( Exception $e ) {
 				return $this->terminal_error( $e->getMessage() );
+			}
+		}
+
+		/**
+		 * Confirms a txid with ifthenpay directly (IfthenpayLpTransactionStatus). A transport
+		 * failure is treated the same as "not confirmed yet", not a hard error — an ifthenpay
+		 * outage here must fall through to the same 'pending: true' / poll-again behaviour as a
+		 * genuine propagation delay, never a terminal failure for the customer.
+		 *
+		 * @param string $txid ifthenpay's transaction id.
+		 * @return string|null The confirmed payment method, or null if unconfirmed.
+		 */
+		private static function verify_transaction( string $txid ): ?string {
+			try {
+				return IfthenpayLpTransactionStatus::check( $txid );
+			} catch ( IfthenpayLpApiException $e ) {
+				return null;
 			}
 		}
 

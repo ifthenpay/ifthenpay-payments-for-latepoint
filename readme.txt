@@ -77,7 +77,7 @@ Multibanco is deferred, not instant: at checkout the customer gets an Entity/Ref
 The booking still holds the time slot while the reference is pending — nobody else can book it in the meantime, so an unpaid reference blocks that slot until it expires. An hourly job cancels bookings whose reference has passed its validity window, releasing the slot back for others to book. Set how many days a reference stays valid under **LatePoint → Settings → Payments → Pay Later Configuration → Reference Validity (days)**; a payment that arrives after expiry is not accepted automatically and needs a manual re-check (see below).
 
 = A customer says they paid a Multibanco reference but the booking still shows pending — what do I do? =
-This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run `wp ifthenpay recheck-payment <token>` from the server. **Confirm the payment on ifthenpay's own backoffice first** — this command settles the booking on trust, it does not itself call ifthenpay to check the payment status.
+This is rare (network hiccup between ifthenpay and your site), but recoverable without touching the database. There is no button for it yet in the LatePoint admin UI; ask whoever manages the site (or our support) to run `wp ifthenpay recheck-payment <token>` from the server — it confirms the payment with ifthenpay directly before settling anything, so it's safe to run even if the payment never actually completed.
 
 = Are payment details stored? =
 No. The plugin does not store card numbers or full bank details. Only small references needed for matching payments are kept.
