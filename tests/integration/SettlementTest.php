@@ -18,20 +18,26 @@ class SettlementTest extends WP_UnitTestCase {
 
 	/**
 	 * A valid first notification settles: transaction recorded, invoice paid, order fully paid,
-	 * booking approved, and the repository row stamped PAID + settled_at.
+	 * booking approved, and the repository row stamped PAID + settled_at. The LatePoint
+	 * transaction's own token is our own repository token — not ifthenpay's request_id — matching
+	 * the realtime flow's own convention (2.1.1: "payment charge reference is now the payment token
+	 * ... so merchants can reconcile payments more easily") so a merchant sees one consistent
+	 * identifier regardless of payment method; request_id/entity/reference go in `notes` instead.
 	 */
 	public function test_settles_a_valid_first_notification(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
-		ifthenpay_lp_insert_pending_transaction_row( $fixture, 'REQ-SETTLE-001' );
+		ifthenpay_lp_insert_pending_transaction_row( $fixture, 'REQ-SETTLE-001', array( 'token' => 'TOK-SETTLE-001' ) );
 
 		$result = IfthenpayLpSettlement::settle_payment( 'REQ-SETTLE-001', array( 'amount' => '25.00' ), 'callback' );
 
 		$this->assertSame( IfthenpayLpSettlementResult::SETTLED, $result->status() );
 
-		$transaction = ( new OsTransactionModel() )->where( array( 'token' => 'REQ-SETTLE-001' ) )->set_limit( 1 )->get_results_as_models();
+		$transaction = ( new OsTransactionModel() )->where( array( 'token' => 'TOK-SETTLE-001' ) )->set_limit( 1 )->get_results_as_models();
 		$this->assertNotFalse( $transaction );
 		$this->assertSame( LATEPOINT_TRANSACTION_STATUS_SUCCEEDED, $transaction->status );
 		$this->assertSame( $fixture->order->id, (int) $transaction->order_id );
+		$this->assertStringContainsString( 'REQ-SETTLE-001', $transaction->notes );
+		$this->assertStringContainsString( 'callback', $transaction->notes );
 
 		$invoice = new OsInvoiceModel( $fixture->invoice->id );
 		$this->assertSame( LATEPOINT_INVOICE_STATUS_PAID, $invoice->status );

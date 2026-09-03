@@ -91,7 +91,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$this->assertSame( 200, $first->get_status() );
 		$this->assertSame( 200, $second->get_status() );
 
-		$transactions = ( new OsTransactionModel() )->where( array( 'token' => 'REQ-VALID-0001' ) )->get_results_as_models();
+		$transactions = ( new OsTransactionModel() )->where( array( 'token' => 'lp-order-tok-abc123' ) )->get_results_as_models();
 		$this->assertCount( 1, is_array( $transactions ) ? $transactions : array( $transactions ) );
 	}
 
