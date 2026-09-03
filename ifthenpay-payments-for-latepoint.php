@@ -91,24 +91,24 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-callback-rest-controller.php';
 
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-exceptions.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-api-client.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-key-validator.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-backoffice-key-validation.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-multibanco-validity-validation.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-exceptions.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-api-client.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-key-validator.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-backoffice-key-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-data-formatter.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-method-catalog.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-gateway-dataset.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-method-catalog.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-enabled-method-gate.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-pay-by-link.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-pay-by-link-method-eligibility.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-multibanco-reference.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-expiry.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-multibanco-reference.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-times.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-callback-registration.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-callback-registration.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-callback-params.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-settlement-lock.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-settlement-result.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-lock.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
 
 			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
@@ -116,11 +116,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			include_once __DIR__ . '/lib/models/ifthenpay-transaction-repository.php';
 
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-settlement.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-transaction-status.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-manual-recheck.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-transaction-status.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/views/ifthenpay-lp-reference-display.php';
-			include_once __DIR__ . '/lib/models/ifthenpay-lp-expiry-sweep.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/controllers/ifthenpay-lp-cli-commands.php';
@@ -759,7 +759,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		public function on_deactivate() {
 			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
-				require_once __DIR__ . '/lib/models/ifthenpay-lp-expiry-sweep.php';
+				require_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 			}
 			wp_clear_scheduled_hook( IfthenpayLpExpirySweep::HOOK );
 		}
@@ -781,7 +781,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
 			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
-				require_once __DIR__ . '/lib/models/ifthenpay-lp-expiry-sweep.php';
+				require_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 			}
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
