@@ -481,10 +481,21 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			LatePoint\Cerber\Router::init_addon();
 		}
 
-		public function on_deactivate() {
-			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
-				require_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
+		/**
+		 * Loads a class this plugin owns, if it isn't already — activation/deactivation hooks can
+		 * fire before includes() has run, unlike everything else in this file.
+		 *
+		 * @param string $class_name    The class this call needs.
+		 * @param string $relative_path Its file, relative to this file's own directory.
+		 */
+		private function ensure_loaded( string $class_name, string $relative_path ): void {
+			if ( ! class_exists( $class_name ) ) {
+				require_once __DIR__ . $relative_path;
 			}
+		}
+
+		public function on_deactivate() {
+			$this->ensure_loaded( 'IfthenpayLpExpirySweep', '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php' );
 			wp_clear_scheduled_hook( IfthenpayLpExpirySweep::HOOK );
 		}
 
@@ -494,19 +505,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Create/upgrade the ifthenpay_transactions table. On a site still running the old
 			// single-purpose ifthenpay_payments table, this also migrates its PENDING rows and
 			// renames it to _legacy — see IfthenpayLpTransactionRepository::migrate_legacy_pending_and_retire().
-			if ( ! class_exists( 'IfthenpayLpTransactionRepository' ) ) {
-				require_once __DIR__ . '/lib/models/ifthenpay-lp-transaction-repository.php';
-			}
+			$this->ensure_loaded( 'IfthenpayLpTransactionRepository', '/lib/models/ifthenpay-lp-transaction-repository.php' );
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
 
-			if ( ! class_exists( 'IfthenpayLpLegacySettingsCleanup' ) ) {
-				require_once __DIR__ . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
-			}
+			$this->ensure_loaded( 'IfthenpayLpLegacySettingsCleanup', '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php' );
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
-			if ( ! class_exists( 'IfthenpayLpExpirySweep' ) ) {
-				require_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
-			}
+			$this->ensure_loaded( 'IfthenpayLpExpirySweep', '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php' );
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
 			}
