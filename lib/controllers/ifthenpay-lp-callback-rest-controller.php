@@ -94,11 +94,47 @@ class IfthenpayLpCallbackRestController {
 	 * row's own status, not request_id (a realtime row is looked up by token here, same as
 	 * polling — request_id was never stored at creation for this kind either way).
 	 *
+	 * Locked on the token (a realtime row has no request_id to lock on) — the same key the browser
+	 * polling path (OsPaymentsIfthenpayCheckoutController::resolve_payment_status_from_modal_url())
+	 * now also locks on, since the callback genuinely can arrive while the browser's own polling
+	 * round-trip for the same payment is still in flight. Without a shared lock, both could read
+	 * PENDING before either writes — harmless when both agree the payment succeeded, but a real risk
+	 * when the browser's own poll reports 'cancel' at the very moment a legitimate callback confirms
+	 * payment, which could silently downgrade an already-paid row to CANCELLED.
+	 *
 	 * @param object                    $record As found by token; already gateway-key authenticated.
 	 * @param IfthenpayLpCallbackParams $params As parsed from the request.
 	 * @return int HTTP status.
 	 */
 	private static function settle_realtime( object $record, IfthenpayLpCallbackParams $params ): int {
+		try {
+			return IfthenpayLpSettlementLock::with_lock(
+				(string) $record->token,
+				static function () use ( $params ) {
+					return self::settle_realtime_locked( $params );
+				}
+			);
+		} catch ( IfthenpayLpLockUnavailableException $e ) {
+			// Our own side, not a verdict on the payment — same as the deferred path's own
+			// lock_unavailable handling (IfthenpayLpSettlement::settle_payment()); ifthenpay retries.
+			return 500;
+		}
+	}
+
+	/**
+	 * Runs with the lock for the token already held — re-reads the record fresh, since $record as
+	 * passed into settle_realtime() was read before the lock and may already be stale (e.g. the
+	 * browser's own polling settled this same row in between).
+	 *
+	 * @param IfthenpayLpCallbackParams $params As passed to settle_realtime().
+	 * @return int HTTP status.
+	 */
+	private static function settle_realtime_locked( IfthenpayLpCallbackParams $params ): int {
+		$record = IfthenpayLpTransactionRepository::find_by_token( $params->reference );
+		if ( ! $record ) {
+			return 404;
+		}
+
 		if ( 'PAID' === $record->status ) {
 			return 200;
 		}

@@ -189,6 +189,15 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * already PAID is never downgraded, and ifthenpay's own verification — never the browser's
 		 * self-reported $type — decides whether to settle, for every $type, not only 'success'.
 		 *
+		 * Locked on the token once a decision is ready to write (apply_polling_outcome()) — the same
+		 * key IfthenpayLpCallbackRestController::settle_realtime() also locks on, since the inbound
+		 * callback for this same realtime payment can genuinely arrive mid-poll. Without a shared
+		 * lock, this browser call and that callback could both read the row before either writes —
+		 * harmless when both agree the payment succeeded, but a real risk if this call is about to
+		 * write CANCELLED/FAILED at the exact moment the callback is confirming payment. The outbound
+		 * verify_transaction() call itself stays outside the lock — an HTTP round trip must never be
+		 * held while blocking that other writer for the same token.
+		 *
 		 * @param string $type  The browser's own report: 'success' | 'cancel' | anything else. Not
 		 *                      trusted on its own — see above.
 		 * @param string $txid  ifthenpay's transaction id, from the redirect return URL.
@@ -207,46 +216,87 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				}
 
 				$confirmation = '' !== $txid ? self::verify_transaction( $txid ) : null;
-				if ( null !== $confirmation ) {
-					IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation, true );
 
-					if ( $confirmation->order_id === $token ) {
-						return $this->paid_response();
+				return IfthenpayLpSettlementLock::with_lock(
+					$token,
+					function () use ( $type, $txid, $token, $confirmation ) {
+						return $this->apply_polling_outcome( $type, $txid, $token, $confirmation );
 					}
-				}
-
-				if ( 'success' === $type ) {
-					// The redirect says success, but ifthenpay doesn't confirm it yet — a real,
-					// if narrow, propagation delay (MBWAY via SIBS in particular can take a while
-					// to report back; this is why the old blocking retry loop ran up to 45s). Ask
-					// the browser to poll again rather than declaring failure outright.
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => '',
-						'pending' => true,
-					);
-				}
-
-				// A txid ifthenpay doesn't recognise at all ($confirmation still null here) —
-				// recorded anyway so a disputed cancel/failure ("I paid, it shows cancelled") has a
-				// starting point to investigate. Skipped when $confirmation is already set: that
-				// branch above already recorded this same transaction_id (plus more).
-				if ( '' !== $txid && null === $confirmation ) {
-					IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
-				}
-
-				if ( 'cancel' === $type ) {
-					IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
-
-					return $this->terminal_error( __( 'Payment cancelled', 'ifthenpay-payments-for-latepoint' ) );
-				}
-
-				IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
-
-				return $this->terminal_error( __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ) );
+				);
+			} catch ( IfthenpayLpLockUnavailableException $e ) {
+				// A concurrent write for this same token — most likely the inbound callback route
+				// settling it right now. Ask the browser to poll again rather than guessing.
+				return array(
+					'status'  => LATEPOINT_STATUS_ERROR,
+					'message' => '',
+					'pending' => true,
+				);
 			} catch ( Exception $e ) {
 				return $this->terminal_error( $e->getMessage() );
 			}
+		}
+
+		/**
+		 * Runs with the lock for $token already held — re-reads the record fresh, since the pre-lock
+		 * checks in resolve_payment_status_from_modal_url() (and $confirmation's own outbound call)
+		 * may already be stale by the time this runs, e.g. the callback route settling this same row
+		 * in between.
+		 *
+		 * @param string      $type         As passed to resolve_payment_status_from_modal_url().
+		 * @param string      $txid         As passed to resolve_payment_status_from_modal_url().
+		 * @param string      $token        As passed to resolve_payment_status_from_modal_url().
+		 * @param object|null $confirmation As returned by verify_transaction(), resolved before the
+		 *                                  lock was acquired.
+		 * @phpstan-param object{payment_method:string,amount:string,order_id:string}|null $confirmation
+		 * @return array{status:string,message:string,pending:bool}
+		 */
+		private function apply_polling_outcome( string $type, string $txid, string $token, ?object $confirmation ): array {
+			$record = IfthenpayLpTransactionRepository::find_by_token( $token );
+			if ( ! $record ) {
+				return $this->terminal_error( __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' ) );
+			}
+
+			if ( 'PAID' === $record->status ) {
+				return $this->paid_response();
+			}
+
+			if ( null !== $confirmation ) {
+				IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation, true );
+
+				if ( $confirmation->order_id === $token ) {
+					return $this->paid_response();
+				}
+			}
+
+			if ( 'success' === $type ) {
+				// The redirect says success, but ifthenpay doesn't confirm it yet — a real,
+				// if narrow, propagation delay (MBWAY via SIBS in particular can take a while
+				// to report back; this is why the old blocking retry loop ran up to 45s). Ask
+				// the browser to poll again rather than declaring failure outright.
+				return array(
+					'status'  => LATEPOINT_STATUS_ERROR,
+					'message' => '',
+					'pending' => true,
+				);
+			}
+
+			// A txid ifthenpay doesn't recognise at all ($confirmation still null here) —
+			// recorded anyway so a disputed cancel/failure ("I paid, it shows cancelled") has a
+			// starting point to investigate. Skipped when $confirmation is already set: that
+			// branch above already recorded this same transaction_id (plus more).
+			if ( '' !== $txid && null === $confirmation ) {
+				IfthenpayLpTransactionRepository::update_method_data( $token, array( 'transaction_id' => $txid ) );
+			}
+
+			if ( 'cancel' === $type ) {
+				IfthenpayLpTransactionRepository::update_status( $token, 'CANCELLED' );
+
+				return $this->terminal_error( __( 'Payment cancelled', 'ifthenpay-payments-for-latepoint' ) );
+			}
+
+			IfthenpayLpTransactionRepository::update_status( $token, 'FAILED' );
+
+			return $this->terminal_error( __( 'Payment failed due to payment verification error', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		/**
