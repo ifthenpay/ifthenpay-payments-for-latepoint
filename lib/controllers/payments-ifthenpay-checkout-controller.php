@@ -43,7 +43,13 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 */
 		public function get_transaction_ifthenpay_options() {
 			if ( ! filter_var( $this->params['invoice_id'], FILTER_VALIDATE_INT ) ) {
-				wp_send_json_error( __( 'Invalid invoice ID', 'ifthenpay-payments-for-latepoint' ) );
+				$this->send_json(
+					array(
+						'status'  => LATEPOINT_STATUS_ERROR,
+						'message' => __( 'Invalid invoice ID', 'ifthenpay-payments-for-latepoint' ),
+					)
+				);
+				return;
 			}
 			$invoice = new OsInvoiceModel( $this->params['invoice_id'] );
 
@@ -75,12 +81,10 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 			}
 
 			try {
-				$token      = $intent_model->intent_key;
-				$payload    = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
-				$api_result = IfthenpayLpPayByLink::create(
-					OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
-					$payload
-				);
+				$token       = $intent_model->intent_key;
+				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
+				$payload     = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
+				$api_result  = IfthenpayLpPayByLink::create( $gateway_key, $payload );
 
 				IfthenpayLpTransactionRepository::insert(
 					array(
@@ -99,7 +103,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						// authenticate a real async notification for this payment, on gateways
 						// where ifthenpay also sends one for realtime methods — without this, every
 						// such callback would fail anti-phishing verification against an empty key.
-						'gateway_key'   => OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' ),
+						'gateway_key'   => $gateway_key,
 					)
 				);
 
@@ -189,18 +193,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 				$confirmation = '' !== $txid ? self::verify_transaction( $txid ) : null;
 				if ( null !== $confirmation ) {
-					// Recorded regardless of the order_id check below — this is what lets a mismatch
-					// be explained later (verified_order_id here vs. this row's own token) instead of
-					// looking identical to a genuine "ifthenpay never confirmed it" case.
-					IfthenpayLpTransactionRepository::update_method_data(
-						$token,
-						array(
-							'transaction_id'          => $txid,
-							'verified_payment_method' => $confirmation->payment_method,
-							'verified_amount'         => $confirmation->amount,
-							'verified_order_id'       => $confirmation->order_id,
-						)
-					);
+					IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation );
 
 					if ( $confirmation->order_id === $token ) {
 						IfthenpayLpTransactionRepository::set_verified_method( $token, $confirmation->payment_method );

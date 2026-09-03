@@ -214,6 +214,6 @@ class IfthenpayLpSettlement {
 			return false;
 		}
 
-		return number_format( (float) $expected_amount, 2, '.', '' ) === number_format( (float) $paid_amount, 2, '.', '' );
+		return IfthenpayLpDataFormatter::format_amount( $expected_amount ) === IfthenpayLpDataFormatter::format_amount( $paid_amount );
 	}
 }

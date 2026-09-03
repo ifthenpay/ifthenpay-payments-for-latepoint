@@ -58,18 +58,7 @@ class IfthenpayLpManualRecheck {
 			return array( 'outcome' => self::UNCONFIRMED );
 		}
 
-		// Recorded regardless of the order_id check below — this is what lets a mismatch be
-		// explained later (verified_order_id here vs. this row's own token) instead of looking
-		// identical to a genuine "ifthenpay never confirmed it" case.
-		IfthenpayLpTransactionRepository::update_method_data(
-			$token,
-			array(
-				'transaction_id'          => $record->request_id,
-				'verified_payment_method' => $confirmation->payment_method,
-				'verified_amount'         => $confirmation->amount,
-				'verified_order_id'       => $confirmation->order_id,
-			)
-		);
+		IfthenpayLpTransactionRepository::record_verification( $token, (string) $record->request_id, $confirmation );
 
 		// The txid is real and completed, but for a different Pay By Link than this one — never
 		// settle on it. See the class docblock: this is the check that closes the gap where any
@@ -95,5 +84,32 @@ class IfthenpayLpManualRecheck {
 		}
 
 		return array( 'outcome' => self::FAILED );
+	}
+
+	/**
+	 * A merchant-facing message for a run() outcome — shared by the admin controller action and
+	 * the WP-CLI command, which both surface the same wording except for MISSING_ARGUMENT and
+	 * NOT_FOUND (a CLI-specific usage hint is more useful there than the admin UI's generic
+	 * message), which they keep their own text for instead of calling this.
+	 *
+	 * @param string $outcome One of this class's own constants.
+	 */
+	public static function default_message_for( string $outcome ): string {
+		switch ( $outcome ) {
+			case self::SETTLED:
+				return __( 'Payment confirmed and settled.', 'ifthenpay-payments-for-latepoint' );
+			case self::MISSING_ARGUMENT:
+				return __( 'Missing payment reference.', 'ifthenpay-payments-for-latepoint' );
+			case self::NOT_FOUND:
+				return __( 'Payment record not found.', 'ifthenpay-payments-for-latepoint' );
+			case self::UNCONFIRMED:
+				return __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' );
+			case self::MISMATCH:
+				return __( 'ifthenpay confirms this transaction, but it belongs to a different booking — nothing was settled.', 'ifthenpay-payments-for-latepoint' );
+			case self::REJECTED:
+				return __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' );
+			default:
+				return __( 'Could not settle this payment right now. Please try again shortly.', 'ifthenpay-payments-for-latepoint' );
+		}
 	}
 }
