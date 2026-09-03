@@ -10,7 +10,7 @@
 
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-payment-times.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-payment-times.php';
 
 if ( ! defined( 'LATEPOINT_PAYMENT_TIME_NOW' ) ) {
 	define( 'LATEPOINT_PAYMENT_TIME_NOW', 'now' );

@@ -9,7 +9,7 @@
 
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-pay-by-link-method-eligibility.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-pay-by-link-method-eligibility.php';
 
 /**
  * Method eligibility proof.

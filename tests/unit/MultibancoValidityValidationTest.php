@@ -11,7 +11,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-multibanco-validity-validation.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-multibanco-validity-validation.php';
 
 /**
  * Save-time validation decision proof.
