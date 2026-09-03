@@ -88,6 +88,11 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						'intent_id'     => $intent_model->id,
 						'kind'          => 'realtime',
 						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+						// Same formatted value already sent to ifthenpay in $payload — lets
+						// IfthenpayLpSettlement::settle_locked() actually run its amount-mismatch
+						// guard for a realtime payment, same as it already does for a deferred one;
+						// that guard is a no-op whenever a record's own amount is null.
+						'amount'        => $payload['amount'],
 						'paybylink_url' => $api_result->redirect_url,
 						'pin_code'      => $api_result->pin_code,
 						// Needed so the inbound callback route (ifthenpay-lp/v1/callback) can
