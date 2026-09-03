@@ -1,9 +1,12 @@
 <?php
 /**
- * Surfaces a deferred payment's own entity/reference/amount/deadline to the customer — on the
- * booking confirmation step, in the confirmation email, and in the customer dashboard (T-13, spec
- * 001), so a customer who loses the email can still recover the reference. One lookup, one render,
- * reused by every surface's own hook callback in the main plugin file.
+ * Surfaces a deferred payment's own entity/reference/amount/deadline/token to the customer — on
+ * the booking confirmation step, in the confirmation email, and in the customer dashboard (T-13,
+ * spec 001), so a customer who loses the email can still recover the reference. The token is
+ * shown too (both states, not just pending): it's our own correlation handle, but also what
+ * ifthenpay itself was given as the order id (Pay By Link's `id`, the Multibanco reference's
+ * `orderId`) — the identifier ifthenpay support would recognise for either flow. One lookup, one
+ * render, reused by every surface's own hook callback in the main plugin file.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -90,6 +93,10 @@ class IfthenpayLpReferenceDisplay {
 					: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
 				?>
 			</div>
+			<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-order-id">
+				<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'ifthenpay Order ID', 'ifthenpay-payments-for-latepoint' ); ?></span>
+				<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->token ); ?></span>
+			</div>
 			<?php if ( $is_paid ) : ?>
 				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
 			<?php else : ?>
@@ -158,6 +165,15 @@ class IfthenpayLpReferenceDisplay {
 					: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
 				?>
 			</h4>
+			<?php
+			OsPriceBreakdownHelper::output_price_breakdown_row(
+				array(
+					'label' => __( 'ifthenpay Order ID', 'ifthenpay-payments-for-latepoint' ),
+					'value' => (string) $record->token,
+				),
+				true
+			);
+			?>
 			<?php if ( $is_paid ) : ?>
 				<p><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
 			<?php else : ?>

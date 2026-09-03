@@ -79,7 +79,7 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The rendered box shows entity, reference and amount while still pending.
+	 * The rendered box shows entity, reference, amount, and the token while still pending.
 	 */
 	public function test_render_html_shows_details_while_pending(): void {
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
@@ -90,11 +90,13 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( '11990', $html );
 		$this->assertStringContainsString( '123456789', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 	}
 
 	/**
 	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
-	 * customer who already paid doesn't need to be told the entity/reference again.
+	 * customer who already paid doesn't need to be told the entity/reference again. The token
+	 * stays: unlike entity/reference, it's still useful after payment (support, reconciliation).
 	 */
 	public function test_render_html_hides_details_once_paid(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -104,6 +106,7 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
 
 		$this->assertStringNotContainsString( '123456789', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 	}
 
 	/**
@@ -119,11 +122,13 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( '11990', $html );
 		$this->assertStringContainsString( '123456789', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $html );
 	}
 
 	/**
-	 * Once paid, the email-safe render also stops exposing the reference/entity.
+	 * Once paid, the email-safe render also stops exposing the reference/entity, but keeps the
+	 * token.
 	 */
 	public function test_render_email_html_hides_details_once_paid(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -133,6 +138,7 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
 
 		$this->assertStringNotContainsString( '123456789', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 	}
 
 	/**
