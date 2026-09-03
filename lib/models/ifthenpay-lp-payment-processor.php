@@ -153,9 +153,9 @@ class IfthenpayLpPaymentProcessor {
 
 		$validity_days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days', self::DEFAULT_MULTIBANCO_VALIDITY_DAYS );
 		if ( $validity_days <= 0 ) {
-			// A missing or zero setting must never mean "no expiry" (D-2) — 0 is a valid
-			// *return* from IfthenpayLpExpiry (expires today) but not a valid merchant setting
-			// to send as-is; fall back rather than holding a slot forever.
+			// IfthenpayLpMultibancoValidityValidation blocks a save below its own MIN_DAYS (1), so
+			// this only catches a value saved before that floor existed, or written outside the
+			// validator — a missing or zero setting must never mean "no expiry" (D-2).
 			$validity_days = self::DEFAULT_MULTIBANCO_VALIDITY_DAYS;
 		}
 

@@ -13,15 +13,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Range verified against the Multibanco reference API's own accepted `expiryDays` values (003
- * contracts/api.md): 0, or one of 1-31, 45, 60, 90, 120, 180, 365, 730 — an unlisted value in
- * between rounds up to the next one, so any whole number in this range is safe to send, not only
- * the exact listed steps. Public: also the settings field's own min/max
- * (IfthenpayLpAdminFormRenderer::render_multibanco_validity_field()), so the two never drift.
+ * The Multibanco reference API's own `expiryDays` accepts 0 (expires the same day, per
+ * IfthenpayLpExpiry::to_multibanco_days()) up to 730 (003 contracts/api.md) — but this merchant
+ * setting starts at 1: same-day expiry is too easy for a customer to miss (see a reference, close
+ * the tab, come back a few hours later to find it dead) and nothing in this plugin offers it as a
+ * deliberate choice. IfthenpayLpPaymentProcessor's own `<= 0` fallback exists only for a value
+ * saved before this floor existed, or written outside this validator. Public: also the settings
+ * field's own min/max (IfthenpayLpAdminFormRenderer::render_multibanco_validity_field()), so the
+ * two never drift.
  */
 class IfthenpayLpMultibancoValidityValidation {
 
-	public const MIN_DAYS = 0;
+	public const MIN_DAYS = 1;
 	public const MAX_DAYS = 730;
 
 	/**

@@ -1,8 +1,9 @@
 <?php
 /**
  * Proves IfthenpayLpMultibancoValidityValidation::check(): empty is allowed (falls back to a
- * default at payment time), non-numeric is rejected, and the accepted range matches the Multibanco
- * reference API's own verified `expiryDays` bounds (003 contracts/api.md).
+ * default at payment time), non-numeric is rejected, 0 is rejected even though ifthenpay's own API
+ * accepts it (same-day expiry is deliberately never offered here), and the top of the range
+ * matches the Multibanco reference API's own verified `expiryDays` bound (003 contracts/api.md).
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -56,10 +57,11 @@ final class MultibancoValidityValidationTest extends TestCase {
 	}
 
 	/**
-	 * Zero is a real, valid value — "expires today" — not rejected as falsy/missing.
+	 * Zero is rejected — same-day expiry is never an offerable choice here, even though
+	 * ifthenpay's own API accepts it (IfthenpayLpExpiry::to_multibanco_days()'s own docblock).
 	 */
-	public function test_zero_is_allowed(): void {
-		$this->assertNull( IfthenpayLpMultibancoValidityValidation::check( '0' ) );
+	public function test_zero_is_rejected(): void {
+		$this->assertNotNull( IfthenpayLpMultibancoValidityValidation::check( '0' ) );
 	}
 
 	/**
