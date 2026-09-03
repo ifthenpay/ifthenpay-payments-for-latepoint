@@ -27,7 +27,7 @@ class IfthenpayLpMultibancoValidityValidation {
 	 * Decides whether a Reference Validity value should block the save it came from.
 	 *
 	 * @param string $value Raw setting value; empty means "not set" (a sane default is used at
-	 *                      payment time — see IfthenpayPaymentsForLatepoint::DEFAULT_MULTIBANCO_VALIDITY_DAYS).
+	 *                      payment time — see IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS).
 	 * @return string|null An error message to reject the save with, or null to allow it.
 	 */
 	public static function check( string $value ): ?string {

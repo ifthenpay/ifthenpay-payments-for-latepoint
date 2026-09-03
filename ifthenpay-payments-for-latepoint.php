@@ -35,13 +35,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		public $processor_code = 'ifthenpay';
 
-		/**
-		 * Used whenever the merchant's own validity setting (T-14, not yet built) is missing or
-		 * zero — D-2 requires a validity value is always sent to ifthenpay, since its own API
-		 * default is no expiry at all, which would hold a booking slot forever.
-		 */
-		private const DEFAULT_MULTIBANCO_VALIDITY_DAYS = 3;
-
 		public function __construct() {
 			$this->define_constants();
 			$this->init_hooks();
@@ -110,6 +103,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-lock.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-processor.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-method-availability.php';
 
 			include_once __DIR__ . '/lib/views/ifthenpay-admin-form-renderer.php';
 			include_once __DIR__ . '/lib/views/ifthenpay-email-helper.php';
@@ -141,9 +136,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_clean_layout_js_files', array( $this, 'add_scripts_to_clean_layout' ), 10 );
 			add_filter( 'latepoint_clean_layout_css_files', array( $this, 'add_styles_to_clean_layout' ), 10 );
 
-			add_filter( 'latepoint_payment_processors', array( $this, 'register_payment_processor' ), 10, 2 );
-			add_filter( 'latepoint_all_payment_methods', array( $this, 'register_payment_methods' ) );
-			add_filter( 'latepoint_enabled_payment_methods', array( $this, 'register_enabled_payment_methods' ) );
+			add_filter( 'latepoint_payment_processors', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_processor' ), 10, 2 );
+			add_filter( 'latepoint_all_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_methods' ) );
+			add_filter( 'latepoint_enabled_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_enabled_payment_methods' ) );
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
 			// Fires for every OsModel save — see validate_backoffice_key_on_save()'s own docblock.
@@ -152,11 +147,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
 
-			add_filter( 'latepoint_get_all_payment_times', array( $this, 'add_all_payment_methods_to_payment_times' ) );
-			add_filter( 'latepoint_get_enabled_payment_times', array( $this, 'add_enabled_payment_methods_to_payment_times' ) );
+			add_filter( 'latepoint_get_all_payment_times', array( 'IfthenpayLpPaymentMethodAvailability', 'add_all_payment_methods_to_payment_times' ) );
+			add_filter( 'latepoint_get_enabled_payment_times', array( 'IfthenpayLpPaymentMethodAvailability', 'add_enabled_payment_methods_to_payment_times' ) );
 
-			add_filter( 'latepoint_process_payment_for_order_intent', array( $this, 'process_payments_for_order_intent' ), 10, 2 );
-			add_filter( 'latepoint_process_payment_for_transaction_intent', array( $this, 'process_payment_for_transaction_intent' ), 10, 2 );
+			add_filter( 'latepoint_process_payment_for_order_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payments_for_order_intent' ), 10, 2 );
+			add_filter( 'latepoint_process_payment_for_transaction_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payment_for_transaction_intent' ), 10, 2 );
 
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
 			// Not IfthenpayLpExpirySweep::HOOK here — that class doesn't exist yet at this point
@@ -177,243 +172,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			register_activation_hook( __FILE__, array( $this, 'on_activate' ) );
 			register_deactivation_hook( __FILE__, array( $this, 'on_deactivate' ) );
-		}
-
-		public function process_payments_for_order_intent( array $result, OsOrderIntentModel $order_intent ): array {
-			if ( ! OsPaymentsHelper::should_processor_handle_payment_for_order_intent( $this->processor_code, $order_intent ) ) {
-				return $result;
-			}
-
-			$method = $order_intent->get_payment_data_value( 'method' );
-			if ( 'ifthenpay_multibanco' === $method ) {
-				return $this->process_deferred_payment_by_intent( $order_intent );
-			}
-			if ( 'ifthenpay_gateway' !== $method ) {
-				return $result;
-			}
-			return $this->process_payment_by_intent( $order_intent );
-		}
-
-		/**
-		 * Deferred methods cannot be offered here. Paying an existing invoice directly
-		 * (OsTransactionIntentModel::convert_to_transaction(), verified against LatePoint 5.6.10
-		 * source) requires an immediately-successful payment result and aborts the whole conversion
-		 * otherwise — unlike the order path, there is no "commit unpaid, settle later" contract to
-		 * rely on. See IfthenpayLpSettlement's own file-level scope note.
-		 */
-		public function process_payment_for_transaction_intent( array $result, OsTransactionIntentModel $transaction_intent ): array {
-			if ( ! OsPaymentsHelper::should_processor_handle_payment_for_transaction_intent( $this->processor_code, $transaction_intent ) ) {
-				return $result;
-			}
-
-			$method = $transaction_intent->get_payment_data_value( 'method' );
-			if ( 'ifthenpay_multibanco' === $method ) {
-				$msg = __( 'Multibanco is not available for this payment. Please choose another method.', 'ifthenpay-payments-for-latepoint' );
-				$transaction_intent->add_error( 'payment_error', $msg );
-				return array(
-					'status'  => LATEPOINT_STATUS_ERROR,
-					'message' => $msg,
-				);
-			}
-			if ( 'ifthenpay_gateway' !== $method ) {
-				return $result;
-			}
-			return $this->process_payment_by_intent( $transaction_intent );
-		}
-
-		/**
-		 * Shared intent‐processing logic for both ORDER and TRANSACTION.
-		 *
-		 * @param OsOrderIntentModel|OsTransactionIntentModel $intent
-		 * @return array
-		 */
-		private function process_payment_by_intent( $intent_model ): array {
-			$token = $intent_model->get_payment_data_value( 'token' );
-			if ( ! $token ) {
-				$msg = __( 'Missing payment token', 'ifthenpay-payments-for-latepoint' );
-				$intent_model->add_error( 'payment_error', $msg );
-				return array(
-					'status'  => LATEPOINT_STATUS_ERROR,
-					'message' => $msg,
-				);
-			}
-
-			$payment = IfthenpayLpTransactionRepository::find_by_token( $token );
-			if ( ! $payment ) {
-				$msg = __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' );
-				$intent_model->add_error( 'payment_error', $msg );
-				return array(
-					'status'  => LATEPOINT_STATUS_ERROR,
-					'message' => $msg,
-				);
-			}
-
-			if ( $payment->status === 'PAID' ) {
-				return array(
-					'status'    => LATEPOINT_STATUS_SUCCESS,
-					'processor' => $this->processor_code,
-					'charge_id' => $token,
-					'kind'      => LATEPOINT_TRANSACTION_KIND_CAPTURE,
-				);
-			}
-
-			$msg = $payment->status === 'CANCELLED'
-				? __( 'Payment was cancelled', 'ifthenpay-payments-for-latepoint' )
-				: __( 'Payment failed', 'ifthenpay-payments-for-latepoint' );
-
-			$intent_model->add_error( 'payment_error', $msg );
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => $msg,
-			);
-		}
-
-		/**
-		 * Generates a Multibanco reference for a deferred checkout and persists it. Returns a
-		 * non-success result WITHOUT calling $order_intent->add_error() — see research.md:
-		 * OsOrderIntentModel::convert_to_order() aborts conversion only on $intent->get_error(), a
-		 * falsy $transaction does not stop it, so this is exactly how native "Pay Later" behaves.
-		 * Adding an error here would fail the whole booking instead of committing it unpaid.
-		 *
-		 * @param OsOrderIntentModel $order_intent The order intent being converted.
-		 */
-		private function process_deferred_payment_by_intent( OsOrderIntentModel $order_intent ): array {
-			$amount = number_format( (float) $order_intent->charge_amount, 2, '.', '' );
-
-			$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
-			$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
-			$dataset        = '' !== $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
-			$mb_key         = $dataset['accounts'][ $gateway_key ]['MB'] ?? '';
-
-			if ( '' === $mb_key ) {
-				return $this->deferred_payment_failed( $order_intent, __( 'Multibanco is not currently available. Please choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
-			}
-
-			$validity_days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days', self::DEFAULT_MULTIBANCO_VALIDITY_DAYS );
-			if ( $validity_days <= 0 ) {
-				// A missing or zero setting must never mean "no expiry" (D-2) — 0 is a valid
-				// *return* from IfthenpayLpExpiry (expires today) but not a valid merchant setting
-				// to send as-is; fall back rather than holding a slot forever.
-				$validity_days = self::DEFAULT_MULTIBANCO_VALIDITY_DAYS;
-			}
-
-			try {
-				$reference = IfthenpayLpMultibancoReference::create( $mb_key, $order_intent->intent_key, $amount, IfthenpayLpExpiry::to_multibanco_days( $validity_days ) );
-			} catch ( IfthenpayLpApiException $e ) {
-				return $this->deferred_payment_failed( $order_intent, __( 'Could not generate a Multibanco reference right now. Please try again or choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
-			}
-
-			IfthenpayLpTransactionRepository::insert(
-				array(
-					'token'       => $order_intent->intent_key,
-					'request_id'  => $reference->request_id,
-					'intent_id'   => $order_intent->id,
-					'kind'        => 'deferred',
-					'method'      => 'MB',
-					'status'      => 'PENDING',
-					'amount'      => $amount,
-					'gateway_key' => $gateway_key,
-					'entity'      => $reference->entity,
-					'reference'   => $reference->reference,
-					'expires_at'  => IfthenpayLpExpiry::to_expires_at_datetime( $reference->expiry_date ),
-				)
-			);
-
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => '',
-			);
-		}
-
-		/**
-		 * Shared failure path for process_deferred_payment_by_intent(): unlike a successful deferred
-		 * result, a failure to even generate a reference must stop the booking — the customer needs
-		 * to pick another method, not commit to a payment that was never created.
-		 *
-		 * @param OsOrderIntentModel $order_intent The order intent being converted.
-		 * @param string             $message      Already-translated, customer-facing message.
-		 */
-		private function deferred_payment_failed( OsOrderIntentModel $order_intent, string $message ): array {
-			$order_intent->add_error( 'payment_error', $message );
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => $message,
-			);
-		}
-
-		public function add_all_payment_methods_to_payment_times( array $payment_times ): array {
-			return IfthenpayLpPaymentTimes::add_methods( $payment_times, $this->get_supported_payment_methods(), $this->processor_code );
-		}
-
-		public function add_enabled_payment_methods_to_payment_times( array $payment_times ): array {
-			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) ) {
-				$payment_times = IfthenpayLpPaymentTimes::add_methods( $payment_times, $this->usable_supported_payment_methods(), $this->processor_code );
-			}
-
-			return $payment_times;
-		}
-
-		/**
-		 * The processor toggle alone is not enough — the saved Gateway Key must still be a
-		 * real, live one for the current Backoffice Key, checked fresh every time (no caching of
-		 * its own; IfthenpayLpGatewayDataset::get() already caches per request).
-		 */
-		private function is_gateway_key_usable(): bool {
-			return IfthenpayLpEnabledMethodGate::is_usable(
-				(string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' ),
-				(string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' )
-			);
-		}
-
-		/**
-		 * Multibanco needs more than a usable gateway key: the merchant must have checked "MB" in
-		 * Payment Methods (IfthenpayAdminFormRenderer::get_saved_enabled_methods() — one setting
-		 * covers both the "Pay Now" and "Pay Later" sections, the split there is display-only), and
-		 * the selected gateway must actually carry an MB account. Otherwise the method would be
-		 * offered at checkout only to fail at reference-creation time with a confusing error.
-		 *
-		 * A dataset fetch failure fails open, same reasoning as is_gateway_key_usable(): an outage
-		 * must not take checkout down for an otherwise valid setup. If it recurs at the moment of
-		 * checkout, process_deferred_payment_by_intent() fails that one attempt gracefully instead.
-		 */
-		private function is_multibanco_usable(): bool {
-			if ( ! in_array( 'MB', IfthenpayAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
-				return false;
-			}
-
-			$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
-			$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
-			if ( '' === $backoffice_key || '' === $gateway_key ) {
-				return false;
-			}
-
-			$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
-			if ( null === $dataset ) {
-				return true;
-			}
-
-			return isset( $dataset['accounts'][ $gateway_key ]['MB'] );
-		}
-
-		/**
-		 * This add-on's supported methods, filtered down to the ones actually usable right now —
-		 * ifthenpay_gateway needs only a usable gateway key; ifthenpay_multibanco additionally needs
-		 * is_multibanco_usable(). Shared by both the payment-times filter and the enabled-methods
-		 * filter so the two can never disagree about which methods are currently offered.
-		 *
-		 * @return array<string,array<string,mixed>>
-		 */
-		private function usable_supported_payment_methods(): array {
-			if ( ! $this->is_gateway_key_usable() ) {
-				return array();
-			}
-
-			$methods = $this->get_supported_payment_methods();
-			if ( isset( $methods['ifthenpay_multibanco'] ) && ! $this->is_multibanco_usable() ) {
-				unset( $methods['ifthenpay_multibanco'] );
-			}
-
-			return $methods;
 		}
 
 		public function add_encrypted_settings( $encrypted_settings ) {
@@ -629,49 +387,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				$localized_vars['is_ifthenpay_active'] = false;
 			}
 			return $localized_vars;
-		}
-
-		public function get_supported_payment_methods() {
-			return array(
-				// Pay By Link, paid during checkout — 'now' is correct here; see
-				// IfthenpayLpPaymentTimes for why this value has to be right, not just present.
-				'ifthenpay_gateway'    => array(
-					'name'      => 'ifthenpay Gateway',
-					'label'     => 'ifthenpay Gateway',
-					'image_url' => $this->images_url() . 'ifthenpay_simbolo.png',
-					'code'      => 'ifthenpay_checkout',
-					'time_type' => 'now',
-				),
-				'ifthenpay_multibanco' => array(
-					'name'      => __( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
-					'label'     => __( 'Multibanco reference', 'ifthenpay-payments-for-latepoint' ),
-					// No dedicated Multibanco asset shipped yet; reuses the processor's own symbol.
-					'image_url' => $this->images_url() . 'ifthenpay_simbolo.png',
-					'code'      => 'ifthenpay_multibanco',
-					'time_type' => 'later',
-				),
-			);
-		}
-
-		public function register_payment_processor( $payment_processors ) {
-			$payment_processors[ $this->processor_code ] = array(
-				'code'      => $this->processor_code,
-				'name'      => __( 'ifthenpay', 'ifthenpay-payments-for-latepoint' ),
-				'image_url' => $this->images_url() . 'processor-logo.png',
-			);
-			return $payment_processors;
-		}
-
-		public function register_payment_methods( $payment_methods ) {
-			$payment_methods = array_merge( $payment_methods, $this->get_supported_payment_methods() );
-			return $payment_methods;
-		}
-
-		public function register_enabled_payment_methods( $enabled_payment_methods ) {
-			if ( OsPaymentsHelper::is_payment_processor_enabled( $this->processor_code ) ) {
-				$enabled_payment_methods = array_merge( $enabled_payment_methods, $this->usable_supported_payment_methods() );
-			}
-			return $enabled_payment_methods;
 		}
 
 		public function add_settings_fields( $processor_code ) {
