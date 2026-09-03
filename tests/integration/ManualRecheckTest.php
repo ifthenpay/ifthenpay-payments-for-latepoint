@@ -80,24 +80,26 @@ class ManualRecheckTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A record with no request_id at all (nothing to settle by) is treated the same as not found —
-	 * there is no idempotency key to hand settle_payment().
+	 * A real, existing record with no request_id at all (a realtime row, in practice — it settles
+	 * via the browser's own polling or the inbound callback instead, both keyed by token) is told
+	 * apart from a token that matches no record: this action just doesn't apply to it, which reads
+	 * very differently to a merchant or support agent than "this payment doesn't exist".
 	 */
-	public function test_record_with_no_request_id_is_reported_as_not_found(): void {
+	public function test_record_with_no_request_id_is_reported_as_unsupported(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
 		IfthenpayLpTransactionRepository::insert(
 			array(
 				'token'     => 'tok-no-request-id',
 				'intent_id' => $fixture->order_intent->id,
-				'kind'      => 'deferred',
-				'method'    => 'MB',
+				'kind'      => 'realtime',
+				'method'    => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
 				'amount'    => $fixture->invoice->charge_amount,
 			)
 		);
 
 		$result = IfthenpayLpManualRecheck::run( 'tok-no-request-id' );
 
-		$this->assertSame( IfthenpayLpManualRecheck::NOT_FOUND, $result['outcome'] );
+		$this->assertSame( IfthenpayLpManualRecheck::UNSUPPORTED_FOR_KIND, $result['outcome'] );
 	}
 
 	/**
