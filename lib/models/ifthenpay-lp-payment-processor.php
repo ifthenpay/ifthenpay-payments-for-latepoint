@@ -69,12 +69,7 @@ class IfthenpayLpPaymentProcessor {
 
 		$method = $transaction_intent->get_payment_data_value( 'method' );
 		if ( 'ifthenpay_multibanco' === $method ) {
-			$msg = __( 'Multibanco is not available for this payment. Please choose another method.', 'ifthenpay-payments-for-latepoint' );
-			$transaction_intent->add_error( 'payment_error', $msg );
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => $msg,
-			);
+			return self::intent_error( $transaction_intent, __( 'Multibanco is not available for this payment. Please choose another method.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 		if ( 'ifthenpay_gateway' !== $method ) {
 			return $result;
@@ -91,22 +86,12 @@ class IfthenpayLpPaymentProcessor {
 	private static function process_payment_by_intent( $intent_model ): array {
 		$token = $intent_model->get_payment_data_value( 'token' );
 		if ( ! $token ) {
-			$msg = __( 'Missing payment token', 'ifthenpay-payments-for-latepoint' );
-			$intent_model->add_error( 'payment_error', $msg );
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => $msg,
-			);
+			return self::intent_error( $intent_model, __( 'Missing payment token', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		$payment = IfthenpayLpTransactionRepository::find_by_token( $token );
 		if ( ! $payment ) {
-			$msg = __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' );
-			$intent_model->add_error( 'payment_error', $msg );
-			return array(
-				'status'  => LATEPOINT_STATUS_ERROR,
-				'message' => $msg,
-			);
+			return self::intent_error( $intent_model, __( 'Payment record not found', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		if ( $payment->status === 'PAID' ) {
@@ -122,11 +107,7 @@ class IfthenpayLpPaymentProcessor {
 			? __( 'Payment was cancelled', 'ifthenpay-payments-for-latepoint' )
 			: __( 'Payment failed', 'ifthenpay-payments-for-latepoint' );
 
-		$intent_model->add_error( 'payment_error', $msg );
-		return array(
-			'status'  => LATEPOINT_STATUS_ERROR,
-			'message' => $msg,
-		);
+		return self::intent_error( $intent_model, $msg );
 	}
 
 	/**
@@ -150,8 +131,7 @@ class IfthenpayLpPaymentProcessor {
 			return;
 		}
 
-		$method_data = $record->method_data ? json_decode( $record->method_data, true ) : array();
-		$txid        = is_array( $method_data ) ? ( $method_data['transaction_id'] ?? '' ) : '';
+		$txid = IfthenpayLpTransactionRepository::decode_method_data( $record )['transaction_id'] ?? '';
 
 		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, 'ifthenpay transaction ID', $txid, 'polling' );
 		$transaction->update_attributes( array( 'notes' => $notes ) );
@@ -168,7 +148,7 @@ class IfthenpayLpPaymentProcessor {
 	 * @return array<string,mixed>
 	 */
 	private static function process_deferred_payment_by_intent( OsOrderIntentModel $order_intent ): array {
-		$amount = number_format( (float) $order_intent->charge_amount, 2, '.', '' );
+		$amount = IfthenpayLpDataFormatter::format_amount( $order_intent->charge_amount );
 
 		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 		$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
@@ -176,7 +156,7 @@ class IfthenpayLpPaymentProcessor {
 		$mb_key         = $dataset['accounts'][ $gateway_key ]['MB'] ?? '';
 
 		if ( '' === $mb_key ) {
-			return self::deferred_payment_failed( $order_intent, __( 'Multibanco is not currently available. Please choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
+			return self::intent_error( $order_intent, __( 'Multibanco is not currently available. Please choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		$validity_days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days', self::DEFAULT_MULTIBANCO_VALIDITY_DAYS );
@@ -190,7 +170,7 @@ class IfthenpayLpPaymentProcessor {
 		try {
 			$reference = IfthenpayLpMultibancoReference::create( $mb_key, $order_intent->intent_key, $amount, IfthenpayLpExpiry::to_multibanco_days( $validity_days ) );
 		} catch ( IfthenpayLpApiException $e ) {
-			return self::deferred_payment_failed( $order_intent, __( 'Could not generate a Multibanco reference right now. Please try again or choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
+			return self::intent_error( $order_intent, __( 'Could not generate a Multibanco reference right now. Please try again or choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		IfthenpayLpTransactionRepository::insert(
@@ -216,16 +196,17 @@ class IfthenpayLpPaymentProcessor {
 	}
 
 	/**
-	 * Shared failure path for process_deferred_payment_by_intent(): unlike a successful deferred
-	 * result, a failure to even generate a reference must stop the booking — the customer needs
-	 * to pick another method, not commit to a payment that was never created.
+	 * Shared failure path — every non-success result across this class adds the same error to the
+	 * intent and returns the same shape. For the deferred flow specifically, this must stop the
+	 * booking — the customer needs to pick another method, not commit to a payment that was never
+	 * created.
 	 *
-	 * @param OsOrderIntentModel $order_intent The order intent being converted.
-	 * @param string             $message      Already-translated, customer-facing message.
+	 * @param OsOrderIntentModel|OsTransactionIntentModel $intent_model The intent being converted.
+	 * @param string                                      $message      Already-translated, customer-facing message.
 	 * @return array<string,mixed>
 	 */
-	private static function deferred_payment_failed( OsOrderIntentModel $order_intent, string $message ): array {
-		$order_intent->add_error( 'payment_error', $message );
+	private static function intent_error( $intent_model, string $message ): array {
+		$intent_model->add_error( 'payment_error', $message );
 		return array(
 			'status'  => LATEPOINT_STATUS_ERROR,
 			'message' => $message,

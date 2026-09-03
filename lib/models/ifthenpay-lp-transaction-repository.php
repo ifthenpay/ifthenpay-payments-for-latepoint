@@ -53,7 +53,7 @@ class IfthenpayLpTransactionRepository {
 	/**
 	 * Idempotent: dbDelta only ever adds/adjusts columns and indexes, never drops data.
 	 */
-	public static function create_table(): void {
+	private static function create_table(): void {
 		global $wpdb;
 		$table   = self::table_name();
 		$collate = $wpdb->get_charset_collate();
@@ -214,10 +214,54 @@ class IfthenpayLpTransactionRepository {
 			return false;
 		}
 
-		$existing = $record->method_data ? json_decode( $record->method_data, true ) : array();
-		$merged   = array_merge( is_array( $existing ) ? $existing : array(), $data );
+		$merged = array_merge( self::decode_method_data( $record ), $data );
 
 		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ) );
+	}
+
+	/**
+	 * Decodes a record's method_data column, null-safe — the column is empty on every row until
+	 * something calls update_method_data(), and json_decode(null) is itself deprecated as of PHP
+	 * 8.1.
+	 *
+	 * @param object $record As returned by find_by_token()/find_by_request_id().
+	 * @return array<string,mixed>
+	 */
+	public static function decode_method_data( object $record ): array {
+		if ( empty( $record->method_data ) ) {
+			return array();
+		}
+
+		$decoded = json_decode( $record->method_data, true );
+
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Records an IfthenpayLpTransactionStatus::check() confirmation into method_data — shared by
+	 * the realtime polling path and the manual re-check, both of which need this recorded
+	 * regardless of whether $confirmation->order_id ends up matching this row's own token, so a
+	 * mismatch is explainable later (verified_order_id here vs. token) instead of looking
+	 * identical to a genuine "ifthenpay never confirmed it" case.
+	 *
+	 * @param string $token          Our correlation handle.
+	 * @param string $transaction_id The identifier checked with ifthenpay — a txid for a realtime
+	 *                                payment, this row's own request_id for a deferred one (see
+	 *                                IfthenpayLpTransactionStatus's own docblock on why the two
+	 *                                sometimes coincide and sometimes don't).
+	 * @param object $confirmation   As returned by IfthenpayLpTransactionStatus::check().
+	 * @phpstan-param object{payment_method:string,amount:string,order_id:string} $confirmation
+	 */
+	public static function record_verification( string $token, string $transaction_id, object $confirmation ): bool {
+		return self::update_method_data(
+			$token,
+			array(
+				'transaction_id'          => $transaction_id,
+				'verified_payment_method' => $confirmation->payment_method,
+				'verified_amount'         => $confirmation->amount,
+				'verified_order_id'       => $confirmation->order_id,
+			)
+		);
 	}
 
 	/**

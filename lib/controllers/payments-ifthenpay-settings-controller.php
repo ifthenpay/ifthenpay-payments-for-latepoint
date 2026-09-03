@@ -171,43 +171,10 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 		 * @return array{status:string,message:string}
 		 */
 		private static function recheck_response_for( string $outcome ): array {
-			switch ( $outcome ) {
-				case IfthenpayLpManualRecheck::SETTLED:
-					return array(
-						'status'  => LATEPOINT_STATUS_SUCCESS,
-						'message' => __( 'Payment confirmed and settled.', 'ifthenpay-payments-for-latepoint' ),
-					);
-				case IfthenpayLpManualRecheck::MISSING_ARGUMENT:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Missing payment reference.', 'ifthenpay-payments-for-latepoint' ),
-					);
-				case IfthenpayLpManualRecheck::NOT_FOUND:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Payment record not found.', 'ifthenpay-payments-for-latepoint' ),
-					);
-				case IfthenpayLpManualRecheck::UNCONFIRMED:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' ),
-					);
-				case IfthenpayLpManualRecheck::MISMATCH:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'ifthenpay confirms this transaction, but it belongs to a different booking — nothing was settled.', 'ifthenpay-payments-for-latepoint' ),
-					);
-				case IfthenpayLpManualRecheck::REJECTED:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' ),
-					);
-				default:
-					return array(
-						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Could not settle this payment right now. Please try again shortly.', 'ifthenpay-payments-for-latepoint' ),
-					);
-			}
+			return array(
+				'status'  => IfthenpayLpManualRecheck::SETTLED === $outcome ? LATEPOINT_STATUS_SUCCESS : LATEPOINT_STATUS_ERROR,
+				'message' => IfthenpayLpManualRecheck::default_message_for( $outcome ),
+			);
 		}
 	}
 

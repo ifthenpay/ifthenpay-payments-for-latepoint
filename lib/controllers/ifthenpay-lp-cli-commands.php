@@ -85,25 +85,17 @@ class IfthenpayLpCliCommands {
 
 		switch ( $outcome['outcome'] ) {
 			case IfthenpayLpManualRecheck::SETTLED:
-				WP_CLI::success( __( 'Payment confirmed and settled.', 'ifthenpay-payments-for-latepoint' ) );
+				WP_CLI::success( IfthenpayLpManualRecheck::default_message_for( $outcome['outcome'] ) );
 				return;
+			// A CLI-specific usage hint is more useful here than the admin UI's generic message.
 			case IfthenpayLpManualRecheck::MISSING_ARGUMENT:
 				WP_CLI::error( __( 'Usage: wp ifthenpay recheck-payment <token>', 'ifthenpay-payments-for-latepoint' ) );
 				return;
 			case IfthenpayLpManualRecheck::NOT_FOUND:
 				WP_CLI::error( __( 'No payment record found for that token.', 'ifthenpay-payments-for-latepoint' ) );
 				return;
-			case IfthenpayLpManualRecheck::UNCONFIRMED:
-				WP_CLI::error( __( 'ifthenpay does not recognise this payment as completed — nothing was settled.', 'ifthenpay-payments-for-latepoint' ) );
-				return;
-			case IfthenpayLpManualRecheck::MISMATCH:
-				WP_CLI::error( __( 'ifthenpay confirms this transaction, but it belongs to a different booking — nothing was settled.', 'ifthenpay-payments-for-latepoint' ) );
-				return;
-			case IfthenpayLpManualRecheck::REJECTED:
-				WP_CLI::error( __( 'This payment could not be settled — the stored details no longer match (amount, or the order is no longer open).', 'ifthenpay-payments-for-latepoint' ) );
-				return;
 			default:
-				WP_CLI::error( __( 'Could not settle this payment right now. Please try again shortly.', 'ifthenpay-payments-for-latepoint' ) );
+				WP_CLI::error( IfthenpayLpManualRecheck::default_message_for( $outcome['outcome'] ) );
 		}
 	}
 }

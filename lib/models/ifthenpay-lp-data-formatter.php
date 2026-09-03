@@ -66,39 +66,29 @@ class IfthenpayLpDataFormatter {
 		if ( ! wp_http_validate_url( $base ) ) {
 			$base = home_url( '/' );
 		}
-		$payload['success_url'] = add_query_arg(
-			array(
-				'ifthenpay_return' => 'success',
-				'token'            => $token,
-				'txid'             => '[TRANSACTIONID]',
-			),
-			$base
-		);
-		$payload['cancel_url']  = add_query_arg(
-			array(
-				'ifthenpay_return' => 'cancel',
-				'token'            => $token,
-				'txid'             => '[TRANSACTIONID]',
-			),
-			$base
-		);
-		$payload['error_url']   = add_query_arg(
-			array(
-				'ifthenpay_return' => 'error',
-				'token'            => $token,
-				'txid'             => '[TRANSACTIONID]',
-			),
-			$base
-		);
+		foreach ( array( 'success', 'cancel', 'error' ) as $type ) {
+			$payload[ $type . '_url' ] = add_query_arg(
+				array(
+					'ifthenpay_return' => $type,
+					'token'            => $token,
+					'txid'             => '[TRANSACTIONID]',
+				),
+				$base
+			);
+		}
 
 		return $payload;
 	}
 
 	/**
-	 * Format amount to two-decimal string.
+	 * Formats an amount to the two-decimal string every ifthenpay API expects — shared with
+	 * IfthenpayLpPaymentProcessor and IfthenpayLpSettlement, so the one formula
+	 * (number_format($x, 2, '.', '')) isn't reimplemented in three places.
+	 *
+	 * @param float|int|string $raw
 	 */
-	private static function format_amount( $raw ): string {
-		return number_format( $raw, 2, '.', '' );
+	public static function format_amount( $raw ): string {
+		return number_format( (float) $raw, 2, '.', '' );
 	}
 
 	/**
