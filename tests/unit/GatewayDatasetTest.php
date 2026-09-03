@@ -172,6 +172,75 @@ final class GatewayDatasetTest extends TestCase {
 	}
 
 	/**
+	 * A successful fetch is also written to a short transient — so the next *request* (a
+	 * separate checkout step, not just a second call within this one) doesn't re-fetch either.
+	 * Captures every set_transient() call rather than asserting a single exact call, since
+	 * IfthenpayLpMethodCatalog::get() (fetched internally along the way) writes its own transient
+	 * too, under its own key.
+	 */
+	public function test_successful_fetch_is_written_to_a_transient(): void {
+		$this->mock_catalog_then_gateway_responses();
+		$calls = array();
+		Functions\when( 'set_transient' )->alias(
+			static function ( $key, $value, $ttl ) use ( &$calls ) {
+				$calls[] = array( $key, $value, $ttl );
+				return true;
+			}
+		);
+
+		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-TRANSIENT' );
+
+		$expected_key = 'ifthenpay_lp_gateway_dataset_' . md5( 'TEST-KEY-TRANSIENT' );
+		$matching     = array_values( array_filter( $calls, static fn( $call ) => $call[0] === $expected_key ) );
+		$this->assertCount( 1, $matching );
+		$this->assertSame( $dataset, $matching[0][1] );
+		$this->assertSame( MINUTE_IN_SECONDS, $matching[0][2] );
+	}
+
+	/**
+	 * A transient hit skips the network entirely — this is the cross-request saving.
+	 */
+	public function test_transient_hit_skips_the_network_call(): void {
+		$cached = array(
+			'gatewaykeys' => array( 'CACHED-GATEWAY' => 'CACHED-GATEWAY' ),
+			'accounts'    => array(),
+		);
+		Functions\when( 'get_transient' )
+			->justReturn( $cached );
+		Functions\expect( 'wp_remote_request' )->never();
+
+		$dataset = IfthenpayLpGatewayDataset::get( 'TEST-KEY-FROM-TRANSIENT' );
+
+		$this->assertSame( $cached, $dataset );
+	}
+
+	/**
+	 * A failed fetch is never cached — a transient outage must self-heal on the very next call,
+	 * not get pinned as "no gateway keys" for a full TTL.
+	 */
+	public function test_failed_fetch_is_never_cached(): void {
+		Functions\when( 'wp_remote_request' )->justReturn( new WP_Error( 'http_request_failed', 'timeout' ) );
+		Functions\when( 'is_wp_error' )->justReturn( true );
+		Functions\expect( 'set_transient' )->never();
+
+		IfthenpayLpGatewayDataset::get( 'TEST-KEY-FAIL-NO-CACHE' );
+		$this->addToAssertionCount( 1 ); // The Mockery ->never() expectation above is the real assertion.
+	}
+
+	/**
+	 * invalidate() clears the transient — the mechanism register_callback_on_settings_updated()
+	 * relies on so a merchant editing settings never waits out the TTL.
+	 */
+	public function test_invalidate_clears_the_transient(): void {
+		Functions\expect( 'delete_transient' )
+			->once()
+			->with( 'ifthenpay_lp_gateway_dataset_' . md5( 'TEST-KEY-INVALIDATE' ) );
+
+		IfthenpayLpGatewayDataset::invalidate( 'TEST-KEY-INVALIDATE' );
+		$this->addToAssertionCount( 1 ); // The Mockery ->once()->with() expectation above is the real assertion.
+	}
+
+	/**
 	 * A catalog fetch failure propagates as null — "could not find out", not an empty dataset.
 	 */
 	public function test_catalog_failure_propagates_as_null(): void {

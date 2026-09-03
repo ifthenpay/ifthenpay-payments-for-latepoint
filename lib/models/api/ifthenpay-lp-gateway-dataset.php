@@ -13,13 +13,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Per-request only, keyed by Backoffice Key — deliberately not a transient. This reflects the
- * merchant's own backoffice configuration; they change it there and expect to see it here
- * immediately, and a single settings-page render asks for it more than once.
+ * Cached two ways: an in-memory per-request layer (so one render asking for it several times
+ * never re-fetches), plus a short transient underneath it (so the checkout render and the
+ * checkout submit moments later — two separate requests — don't each pay for their own network
+ * round trip to the same data). The transient is deliberately short (CACHE_TTL) rather than
+ * IfthenpayLpMethodCatalog's 12 hours: this reflects the merchant's own backoffice configuration,
+ * and invalidate() clears it immediately on save, so a merchant editing settings never actually
+ * waits out the TTL — it exists only to absorb the request-to-request gap within one checkout.
  */
 class IfthenpayLpGatewayDataset {
 
 	private const URL = 'https://api.ifthenpay.com/gateway/get';
+
+	/**
+	 * Short on purpose — see the class docblock. invalidate() is what actually keeps the settings
+	 * page fresh; this is just a ceiling.
+	 */
+	private const CACHE_TTL = MINUTE_IN_SECONDS;
 
 	/**
 	 * The one `Entity` code that doesn't match its gateway-record field name — confirmed against
@@ -50,10 +60,43 @@ class IfthenpayLpGatewayDataset {
 			return self::$cache[ $backoffice_key ];
 		}
 
+		$cached = get_transient( self::transient_key( $backoffice_key ) );
+		if ( is_array( $cached ) ) {
+			// Shape is only known to phpstan by convention: nothing but self::get() itself ever
+			// writes this transient, always with exactly this shape.
+			/** @var array{gatewaykeys:array<string,string>,accounts:array<string,array<string,string>>} $cached */
+			self::$cache[ $backoffice_key ] = $cached;
+			return $cached;
+		}
+
 		$dataset                        = self::fetch( $backoffice_key );
 		self::$cache[ $backoffice_key ] = $dataset;
 
+		// Failures are never cached — a transient outage must self-heal on the very next call,
+		// not get pinned for a full TTL.
+		if ( null !== $dataset ) {
+			set_transient( self::transient_key( $backoffice_key ), $dataset, self::CACHE_TTL );
+		}
+
 		return $dataset;
+	}
+
+	/**
+	 * Clears both cache layers for a Backoffice Key — call right after saving one, so the
+	 * settings page never has to wait out CACHE_TTL to see its own change.
+	 *
+	 * @param string $backoffice_key The merchant's Backoffice Key.
+	 */
+	public static function invalidate( string $backoffice_key ): void {
+		unset( self::$cache[ $backoffice_key ] );
+		delete_transient( self::transient_key( $backoffice_key ) );
+	}
+
+	/**
+	 * @param string $backoffice_key The merchant's Backoffice Key.
+	 */
+	private static function transient_key( string $backoffice_key ): string {
+		return 'ifthenpay_lp_gateway_dataset_' . md5( $backoffice_key );
 	}
 
 	/**
