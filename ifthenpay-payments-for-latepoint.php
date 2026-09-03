@@ -545,14 +545,23 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 * `prepared_data_for_run['content']` from the merchant's own template (process_action.php),
 		 * so this only ever adds to it, never replaces it.
 		 *
+		 * Deliberately does not gate on `$action->event->type`: verified live that LatePoint never
+		 * actually sets `ProcessAction::$event` on the real objects this filter receives — every
+		 * real caller (OsProcessJobsHelper::create_jobs_for_process(), OsProcessJobModel::get_actions())
+		 * constructs ProcessAction with only type/id/status/settings/prepared_data_for_run, never
+		 * `event`. Reading the typed, uninitialized property via `?? ''` doesn't throw (PHP treats
+		 * an uninitialized typed property as unset for `??`/`isset()`), so the original event-type
+		 * check silently evaluated to '' and always failed closed — the whole callback was a
+		 * no-op in production despite passing tests (the tests construct ProcessEvent by hand,
+		 * which nothing in real LatePoint code does). `selected_data_objects` alone already scopes
+		 * this correctly: it's reliably populated on every real ProcessAction, and for_order()/
+		 * for_booking() already return null for anything that isn't a deferred Multibanco payment.
+		 *
 		 * @param \LatePoint\Misc\ProcessAction $action The action about to run.
 		 * @return \LatePoint\Misc\ProcessAction
 		 */
 		public function append_reference_to_email_content( $action ) {
 			if ( ! ( $action instanceof \LatePoint\Misc\ProcessAction ) || 'send_email' !== $action->type ) {
-				return $action;
-			}
-			if ( ! in_array( $action->event->type ?? '', array( 'order_created', 'booking_created' ), true ) ) {
 				return $action;
 			}
 			if ( ! isset( $action->prepared_data_for_run['content'] ) ) {

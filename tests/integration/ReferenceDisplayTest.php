@@ -107,10 +107,18 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The confirmation-email filter appends the reference box to an order_created email's own
+	 * The confirmation-email filter appends the reference box to an order-related email's own
 	 * already-prepared content, without touching anything else about the action.
+	 *
+	 * Deliberately does NOT set `$action->event` — a real ProcessAction built by LatePoint's own
+	 * OsProcessJobsHelper::create_jobs_for_process() / OsProcessJobModel::get_actions() never sets
+	 * it (verified live: only type/id/status/settings/prepared_data_for_run are ever assigned), so
+	 * a test that sets it exercises a shape that cannot occur in production. An earlier version of
+	 * both this test and the production code gated on `$action->event->type`, which passed here
+	 * (because the test supplied one) while being a silent no-op against every real email, since
+	 * `?? ''` against the real, always-uninitialized property evaluates to '' rather than throwing.
 	 */
-	public function test_email_filter_appends_reference_for_order_created(): void {
+	public function test_email_filter_appends_reference_for_order_related_email(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
 		$this->seed_deferred_row( $fixture );
 
@@ -118,7 +126,6 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$action                        = new \LatePoint\Misc\ProcessAction();
 		$action->type                  = 'send_email';
-		$action->event                 = new \LatePoint\Misc\ProcessEvent( array( 'type' => 'order_created' ) );
 		$action->selected_data_objects = array(
 			array(
 				'model' => 'order',
@@ -141,11 +148,33 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$action                        = new \LatePoint\Misc\ProcessAction();
 		$action->type                  = 'send_sms';
-		$action->event                 = new \LatePoint\Misc\ProcessEvent( array( 'type' => 'order_created' ) );
 		$action->prepared_data_for_run = array( 'content' => 'Thanks!' );
 
 		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
 
 		$this->assertSame( 'Thanks!', $result->prepared_data_for_run['content'] );
+	}
+
+	/**
+	 * An email unrelated to any order/booking (e.g. a "customer_created" welcome email) is left
+	 * untouched — selected_data_objects alone is enough to scope this correctly, with no need for
+	 * (the never-actually-set) $action->event.
+	 */
+	public function test_email_filter_ignores_emails_with_no_order_or_booking_data_object(): void {
+		global $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY;
+
+		$action                        = new \LatePoint\Misc\ProcessAction();
+		$action->type                  = 'send_email';
+		$action->selected_data_objects = array(
+			array(
+				'model' => 'customer',
+				'id'    => 1,
+			),
+		);
+		$action->prepared_data_for_run = array( 'content' => 'Welcome!' );
+
+		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
+
+		$this->assertSame( 'Welcome!', $result->prepared_data_for_run['content'] );
 	}
 }
