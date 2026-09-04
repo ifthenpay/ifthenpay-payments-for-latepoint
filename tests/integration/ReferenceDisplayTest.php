@@ -42,6 +42,32 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A real, real-looking Payshop row for a converted order — no entity, unlike Multibanco's.
+	 *
+	 * @phpstan-param object{customer: OsCustomerModel, order_intent: OsOrderIntentModel, order: OsOrderModel, order_item: OsOrderItemModel, booking: OsBookingModel, invoice: OsInvoiceModel} $fixture
+	 *
+	 * @param object $fixture As returned by ifthenpay_lp_create_order_fixture().
+	 * @param string $status  Repository row status; defaults to still-PENDING.
+	 */
+	private function seed_deferred_payshop_row( object $fixture, string $status = 'PENDING' ): void {
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-display-' . $fixture->order->id,
+				'request_id'  => 'REQ-DISPLAY-' . $fixture->order->id,
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'PAYSHOP',
+				'status'      => $status,
+				'amount'      => $fixture->invoice->charge_amount,
+				'gateway_key' => 'TEST-GW-KEY-0001',
+				'entity'      => null,
+				'reference'   => '987654321',
+				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+			)
+		);
+	}
+
+	/**
 	 * Finds the deferred record for a real order.
 	 */
 	public function test_for_order_finds_the_deferred_record(): void {
@@ -94,6 +120,41 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A Multibanco record's own copy — its title and instructions mention Multibanco/ATM/Entity,
+	 * proving this isn't a single template shared with Payshop.
+	 */
+	public function test_render_html_uses_multibancos_own_copy(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringContainsString( 'Pay by Multibanco reference', $html );
+		$this->assertStringContainsString( 'Multibanco ATM', $html );
+		$this->assertStringContainsString( 'ifthenpay-reference-box-row-entity', $html );
+	}
+
+	/**
+	 * A Payshop record's own copy: no Entity row at all (Payshop references stand alone), and
+	 * instructions naming a Payshop agent or CTT rather than an ATM.
+	 */
+	public function test_render_html_shows_payshops_own_copy_without_an_entity_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_payshop_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringContainsString( 'Pay by Payshop reference', $html );
+		$this->assertStringContainsString( 'Payshop agent or CTT', $html );
+		$this->assertStringContainsString( '987654321', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringNotContainsString( 'ifthenpay-reference-box-row-entity', $html );
+		$this->assertStringNotContainsString( 'Multibanco', $html );
+	}
+
+	/**
 	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
 	 * customer who already paid doesn't need to be told the entity/reference again. The token
 	 * stays: unlike entity/reference, it's still useful after payment (support, reconciliation).
@@ -124,6 +185,25 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $html );
+	}
+
+	/**
+	 * The email-safe render also shows Payshop's own copy — no Entity row, and instructions
+	 * naming a Payshop agent or CTT.
+	 */
+	public function test_render_email_html_shows_payshops_own_copy_without_an_entity_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_payshop_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
+
+		$this->assertStringContainsString( 'Pay by Payshop reference', $html );
+		$this->assertStringContainsString( 'Payshop agent or CTT', $html );
+		$this->assertStringContainsString( '987654321', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringNotContainsString( 'Entity', $html );
+		$this->assertStringNotContainsString( 'Multibanco', $html );
 	}
 
 	/**

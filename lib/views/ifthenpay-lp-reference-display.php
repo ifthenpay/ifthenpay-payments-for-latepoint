@@ -74,12 +74,22 @@ class IfthenpayLpReferenceDisplay {
 	/**
 	 * Every string both renderers show, in one place — a wording change here reaches the
 	 * confirmation step, the email, and the dashboard tile together, rather than risking one
-	 * surface being edited and the other forgotten.
+	 * surface being edited and the other forgotten. Multibanco and Payshop each get their own
+	 * strings rather than one templated with the method name swapped in: "pay at any Multibanco
+	 * ATM" and "pay at a Payshop agent or CTT" don't share a sentence shape, and forcing them to
+	 * would read like a translation of a translation in pt_PT.
 	 *
-	 * @param bool $is_paid Whether $record is PAID (vs. still pending).
+	 * @param bool   $is_paid Whether $record is PAID (vs. still pending).
+	 * @param string $method  $record->method — 'MB' or 'PAYSHOP'.
 	 * @return string
 	 */
-	private static function title_for( bool $is_paid ): string {
+	private static function title_for( bool $is_paid, string $method ): string {
+		if ( 'PAYSHOP' === $method ) {
+			return $is_paid
+				? __( 'Payshop payment', 'ifthenpay-payments-for-latepoint' )
+				: __( 'Pay by Payshop reference', 'ifthenpay-payments-for-latepoint' );
+		}
+
 		return $is_paid
 			? __( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
 			: __( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
@@ -104,18 +114,26 @@ class IfthenpayLpReferenceDisplay {
 	}
 
 	/**
-	 * Shown while a record is still pending, above the entity/reference/amount details.
+	 * Shown while a record is still pending, above the reference/amount details. Payshop has no
+	 * entity — a reference stands alone at any Payshop agent or CTT counter — so its own copy
+	 * doesn't mention one, rather than reusing Multibanco's sentence with "Entity and" removed.
 	 *
+	 * @param string $method $record->method — 'MB' or 'PAYSHOP'.
 	 * @return string
 	 */
-	private static function payment_instructions(): string {
+	private static function payment_instructions( string $method ): string {
+		if ( 'PAYSHOP' === $method ) {
+			return __( 'Pay at a Payshop agent or CTT, using the Reference below.', 'ifthenpay-payments-for-latepoint' );
+		}
+
 		return __( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' );
 	}
 
 	/**
-	 * The Entity/Reference/Amount/Pay-by rows — only shown while pending (render_html()'s own
-	 * $is_paid branch already hides all of this once paid, same as render_email_html()). Each
-	 * carries its own `key`, so render_html() can build its per-row CSS class
+	 * The Reference/Amount/Pay-by rows (Multibanco also gets an Entity row; Payshop's own
+	 * reference stands alone) — only shown while pending (render_html()'s own $is_paid branch
+	 * already hides all of this once paid, same as render_email_html()). Each carries its own
+	 * `key`, so render_html() can build its per-row CSS class
 	 * (`ifthenpay-reference-box-row-{key}`) from the same data instead of hardcoding it once per
 	 * field on top of the field's own label/value.
 	 *
@@ -123,22 +141,25 @@ class IfthenpayLpReferenceDisplay {
 	 * @return array<int,array{key:string,label:string,value:string}>
 	 */
 	private static function detail_rows( object $record ): array {
-		$rows = array(
-			array(
+		$rows = array();
+
+		if ( 'PAYSHOP' !== $record->method ) {
+			$rows[] = array(
 				'key'   => 'entity',
 				'label' => __( 'Entity', 'ifthenpay-payments-for-latepoint' ),
 				'value' => (string) $record->entity,
-			),
-			array(
-				'key'   => 'reference',
-				'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
-				'value' => (string) $record->reference,
-			),
-			array(
-				'key'   => 'amount',
-				'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
-				'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
-			),
+			);
+		}
+
+		$rows[] = array(
+			'key'   => 'reference',
+			'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
+			'value' => (string) $record->reference,
+		);
+		$rows[] = array(
+			'key'   => 'amount',
+			'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+			'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
 		);
 
 		$deadline = self::deadline_for( $record );
@@ -168,7 +189,7 @@ class IfthenpayLpReferenceDisplay {
 		?>
 		<div class="ifthenpay-reference-box <?php echo $is_paid ? 'is-paid' : 'is-pending'; ?>">
 			<div class="ifthenpay-reference-box-title">
-				<?php echo esc_html( self::title_for( $is_paid ) ); ?>
+				<?php echo esc_html( self::title_for( $is_paid, $record->method ) ); ?>
 			</div>
 			<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-order-id">
 				<span class="ifthenpay-reference-box-label"><?php echo esc_html( self::order_id_label() ); ?></span>
@@ -178,7 +199,7 @@ class IfthenpayLpReferenceDisplay {
 				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html( self::paid_message() ); ?></p>
 			<?php else : ?>
 				<p class="ifthenpay-reference-box-instructions">
-					<?php echo esc_html( self::payment_instructions() ); ?>
+					<?php echo esc_html( self::payment_instructions( $record->method ) ); ?>
 				</p>
 				<div class="ifthenpay-reference-box-details">
 					<?php foreach ( self::detail_rows( $record ) as $row ) : ?>
@@ -231,7 +252,7 @@ class IfthenpayLpReferenceDisplay {
 		<div style="padding: 20px; background-color: #f0f0f0; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
 			<div style="background-color: #fff; padding: 30px; margin: 0px auto; max-width: 450px; box-shadow: 0px 2px 6px -1px rgba(0,0,0,0.2); border-radius: 6px; font-size: 16px; line-height: 1.5;">
 				<h4 style="margin-bottom: 10px; margin-top: 0; font-size: 16px; font-weight: bold;">
-					<?php echo esc_html( self::title_for( $is_paid ) ); ?>
+					<?php echo esc_html( self::title_for( $is_paid, $record->method ) ); ?>
 				</h4>
 				<?php
 				OsPriceBreakdownHelper::output_price_breakdown_row(
@@ -245,7 +266,7 @@ class IfthenpayLpReferenceDisplay {
 				<?php if ( $is_paid ) : ?>
 					<p><?php echo esc_html( self::paid_message() ); ?></p>
 				<?php else : ?>
-					<p><?php echo esc_html( self::payment_instructions() ); ?></p>
+					<p><?php echo esc_html( self::payment_instructions( $record->method ) ); ?></p>
 					<?php
 					foreach ( self::detail_rows( $record ) as $row ) {
 						// Matches LatePoint's own "Balance Due" treatment in the same email: the thick
