@@ -147,6 +147,42 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
+	 * PayByLink needs more than a usable gateway key: at least one of the merchant's enabled Pay Now
+	 * methods must actually carry a live account on the selected gateway. Without this, ifthenpay
+	 * would still create a link, but with an empty accounts field — its hosted page then falls back
+	 * to every method configured on the gateway account itself, silently ignoring this merchant's
+	 * own Payment Methods selection (IfthenpayLpDataFormatter::build_accounts_string()'s own
+	 * docblock). Offering the method at checkout only to reject it once the customer picks it is the
+	 * same failure mode is_multibanco_usable() exists to avoid, so this mirrors it: gate list
+	 * membership on the same live account data, rather than surfacing the failure only once the
+	 * customer has already committed to this method.
+	 *
+	 * A dataset fetch failure fails open, same reasoning as is_gateway_key_usable(): an outage must
+	 * not take checkout down for an otherwise valid setup.
+	 */
+	private static function is_pay_by_link_usable(): bool {
+		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
+		$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		if ( '' === $backoffice_key || '' === $gateway_key ) {
+			return false;
+		}
+
+		$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
+		if ( null === $dataset ) {
+			return true;
+		}
+
+		$accounts_for_gateway = $dataset['accounts'][ $gateway_key ] ?? array();
+		foreach ( IfthenpayLpAdminFormRenderer::get_saved_enabled_methods() as $method_code ) {
+			if ( IfthenpayLpPayByLinkMethodEligibility::is_listed_in_pay_by_link( $method_code ) && isset( $accounts_for_gateway[ $method_code ] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Below the merchant's own minimum lead time, Multibanco is not offered at checkout at all — a
 	 * reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock on why
 	 * "days" is a calendar distance, not a rolling 24h window).
@@ -185,9 +221,11 @@ class IfthenpayLpPaymentMethodAvailability {
 
 	/**
 	 * This add-on's supported methods, filtered down to the ones actually usable right now —
-	 * ifthenpay_gateway needs only a usable gateway key; ifthenpay_multibanco additionally needs
-	 * is_multibanco_usable(). Shared by both the payment-times filter and the enabled-methods
-	 * filter so the two can never disagree about which methods are currently offered.
+	 * ifthenpay_gateway additionally needs is_pay_by_link_usable(), ifthenpay_multibanco
+	 * additionally needs is_multibanco_usable(). Both fail the same way for the same reason: no
+	 * live account behind the merchant's own selection means neither should reach checkout only to
+	 * fail once picked. Shared by both the payment-times filter and the enabled-methods filter so
+	 * the two can never disagree about which methods are currently offered.
 	 *
 	 * @return array<string,array<string,mixed>>
 	 */
@@ -197,6 +235,9 @@ class IfthenpayLpPaymentMethodAvailability {
 		}
 
 		$methods = self::get_supported_payment_methods();
+		if ( isset( $methods['ifthenpay_gateway'] ) && ! self::is_pay_by_link_usable() ) {
+			unset( $methods['ifthenpay_gateway'] );
+		}
 		if ( isset( $methods['ifthenpay_multibanco'] ) && ! self::is_multibanco_usable() ) {
 			unset( $methods['ifthenpay_multibanco'] );
 		}
