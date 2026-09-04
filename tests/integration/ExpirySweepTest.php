@@ -1,8 +1,8 @@
 <?php
 /**
- * Proves IfthenpayLpExpirySweep — the hourly cron that cancels deferred payments (Multibanco)
- * whose reference expired unpaid, releasing the slot. One test per guarantee this job makes about
- * its interaction with settlement.
+ * Proves IfthenpayLpExpirySweep — the hourly cron that cancels deferred payments (Multibanco,
+ * Payshop) whose reference expired unpaid, releasing the slot. One test per guarantee this job
+ * makes about its interaction with settlement.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -55,6 +55,36 @@ class ExpirySweepTest extends WP_UnitTestCase {
 		$this->assertSame( LATEPOINT_BOOKING_STATUS_CANCELLED, $booking->status );
 
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-EXPIRED-001' );
+		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The repository's own expired-lookup filters only on status/kind/expires_at — no method
+	 * column involved — so a genuinely unpaid, expired Payshop reference is cancelled exactly like
+	 * Multibanco's own, with no method-specific code anywhere in this class.
+	 */
+	public function test_expires_a_genuinely_unpaid_payshop_reference(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'booking_status' => LATEPOINT_BOOKING_STATUS_PAYMENT_PENDING ) );
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-expired-payshop-001',
+				'request_id'  => 'REQ-EXPIRED-PAYSHOP-001',
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'PAYSHOP',
+				'amount'      => $fixture->invoice->charge_amount,
+				'gateway_key' => 'TEST-GW-KEY-0001',
+				'entity'      => null,
+				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ),
+			)
+		);
+
+		IfthenpayLpExpirySweep::run();
+
+		$booking = new OsBookingModel( $fixture->booking->id );
+		$this->assertSame( LATEPOINT_BOOKING_STATUS_CANCELLED, $booking->status );
+
+		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-EXPIRED-PAYSHOP-001' );
 		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
 	}
 
