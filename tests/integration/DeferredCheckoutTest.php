@@ -293,7 +293,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	 * excluded — a no-op, the same as any other unhandled method/processor combination.
 	 * OsPaymentsHelper::should_processor_handle_payment_for_transaction_intent() checks the method
 	 * under LATEPOINT_PAYMENT_TIME_NOW specifically, and Multibanco is (correctly) registered under
-	 * LATEPOINT_PAYMENT_TIME_LATER (T-07) — so this add-on's own explicit
+	 * LATEPOINT_PAYMENT_TIME_LATER — so this add-on's own explicit
 	 * process_payment_for_transaction_intent() guard for 'ifthenpay_multibanco' (see its own
 	 * docblock) can never actually be reached through the real filter chain today. It stays as a
 	 * defensive, self-documenting safety net rather than dead code to delete: nothing guarantees

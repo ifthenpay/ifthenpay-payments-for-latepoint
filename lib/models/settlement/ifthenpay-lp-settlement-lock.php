@@ -1,8 +1,7 @@
 <?php
 /**
- * Cross-request mutex for settle_payment() (specs/001-multibanco-deferred/contracts/settlement.md,
- * guarantee #2) and, later, the expiry job — both must serialise on the same key so a payment and
- * an expiry sweep landing at the same moment cannot race.
+ * Cross-request mutex for settle_payment() and, later, the expiry job — both must serialise on
+ * the same key so a payment and an expiry sweep landing at the same moment cannot race.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -26,7 +25,7 @@ class IfthenpayLpSettlementLock {
 
 	/**
 	 * How long GET_LOCK() waits for a lock already held by another process before giving up.
-	 * Comfortably inside ifthenpay's own callback tolerance (NFR-1).
+	 * Comfortably inside ifthenpay's own callback tolerance.
 	 */
 	private const LOCK_TIMEOUT_SECONDS = 10;
 

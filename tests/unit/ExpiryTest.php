@@ -65,8 +65,8 @@ final class ExpiryTest extends TestCase {
 	/**
 	 * The reverse direction: the reference API's own returned expiry date becomes end-of-day in
 	 * `expires_at`, plus the margin — never a straight "now + N days" recomputation. The most
-	 * likely correctness bug in the whole feature (plan.md §7): a reference created in the morning
-	 * with a one-day window must still be payable that evening.
+	 * likely correctness bug in the whole feature: a reference created in the morning with a
+	 * one-day window must still be payable that evening.
 	 */
 	public function test_expires_at_is_end_of_the_returned_day_plus_margin(): void {
 		$result = IfthenpayLpExpiry::to_expires_at_datetime( '18-01-2026', 24 );

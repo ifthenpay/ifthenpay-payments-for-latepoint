@@ -187,7 +187,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * finds no row by request_id and is rejected — safe (this payment is already settled, so
 		 * nothing is lost), just an imprecise acknowledgement back to ifthenpay.
 		 *
-		 * Security fix (FR-13, spec 001): the previous version wrote CANCELLED/FAILED straight from
+		 * Security fix: the previous version wrote CANCELLED/FAILED straight from
 		 * the browser's own $type, with no verification at all — anyone holding a payment_token
 		 * could cancel another customer's in-flight payment, and a customer who closed the modal
 		 * right after paying could have their own successful payment marked FAILED. Now: a row

@@ -2,10 +2,10 @@
 /**
  * Proves OsPaymentsIfthenpayCheckoutController::resolve_payment_status_from_modal_url() — the
  * polling fallback's own decision logic, invoked directly via Reflection (no real HTTP/AJAX round
- * trip needed; only IfthenpayLpTransactionStatus's own outbound call is mocked). One test per FR-13
- * guarantee: a PAID row is never downgraded, and ifthenpay's own verification — never the
- * browser's self-reported $type — decides whether to mark the row paid; plus the 'pending' signal
- * that tells the browser (front.js) to keep polling instead of giving up.
+ * trip needed; only IfthenpayLpTransactionStatus's own outbound call is mocked). One test per
+ * guarantee this logic makes: a PAID row is never downgraded, and ifthenpay's own verification —
+ * never the browser's self-reported $type — decides whether to mark the row paid; plus the
+ * 'pending' signal that tells the browser (front.js) to keep polling instead of giving up.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -115,7 +115,8 @@ class RealtimePollingTest extends WP_UnitTestCase {
 
 	/**
 	 * A row already PAID is never downgraded — a forged 'cancel', with no real txid at all, cannot
-	 * touch it. This is the core FR-13 regression test: the old code wrote CANCELLED unconditionally.
+	 * touch it. This is the core regression test for that guarantee: the old code wrote CANCELLED
+	 * unconditionally.
 	 */
 	public function test_paid_row_is_never_downgraded_by_a_forged_cancel(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -139,9 +140,9 @@ class RealtimePollingTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Verification marks the row PAID even though the browser itself reported 'cancel' — the
-	 * exact scenario research.md warns about: a customer who closes the modal right after paying
-	 * must not have their own successful payment marked failed/cancelled. Not routed through
+	 * Verification marks the row PAID even though the browser itself reported 'cancel' — a customer
+	 * who closes the modal right after paying must not have their own successful payment marked
+	 * failed/cancelled. Not routed through
 	 * settle_payment() here: the order does not exist yet at this point in the realtime flow (the
 	 * browser only submits the booking form after seeing this response), so settle_payment() would
 	 * always fail with "order not ready". settled_at is still stamped (mark_settled(), not a bare

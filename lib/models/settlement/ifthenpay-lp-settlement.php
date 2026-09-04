@@ -2,9 +2,12 @@
 /**
  * The single point at which an ifthenpay payment becomes real in LatePoint — the callback, the
  * realtime polling fallback, and the manual re-check action all call settle_payment() and only
- * settle_payment(). See specs/001-multibanco-deferred/contracts/settlement.md; state-change order
- * follows that contract's §"Guarantees it must provide" and the Moodle-plugin precedent recorded
- * in research.md (resumable two-phase, not atomic).
+ * settle_payment(). The state change below is deliberately resumable two-phase, not atomic —
+ * record the transaction first, then confirm the booking — following the same approach
+ * ifthenpay's own Moodle payment plugin uses for this exact problem: an atomic rollback would
+ * discard the record of already-captured money, while marking the transaction paid before the
+ * booking is actually confirmed would make a retry short-circuit on a booking nobody ever
+ * approved.
  *
  * Scope note: resolves the order behind a record via OsOrderIntentHelper::is_converted(), which
  * only makes sense for a record created from an *order* intent (a booking checkout). LatePoint's
@@ -48,11 +51,9 @@ class IfthenpayLpSettlement {
 	 *                                              authenticated against a specific record's
 	 *                                              gateway key before this is ever called). Two
 	 *                                              identifiers that don't refer to the same row is
-	 *                                              rejected outright, per contracts/callback.md's
-	 *                                              own note that this cross-check is "a signal worth
-	 *                                              rejecting on" — without it, a request_id for an
-	 *                                              unrelated record would still settle, no matter
-	 *                                              which reference/token accompanied it.
+	 *                                              rejected outright — without it, a request_id for
+	 *                                              an unrelated record would still settle, no
+	 *                                              matter which reference/token accompanied it.
 	 */
 	public static function settle_payment( string $request_id, array $payload, string $source, ?string $expected_token = null ): IfthenpayLpSettlementResult {
 		try {
@@ -122,7 +123,7 @@ class IfthenpayLpSettlement {
 
 	/**
 	 * True when the order is in a state that must never be re-opened by an incoming payment —
-	 * cancelled, or already refunded (guarantee #7).
+	 * cancelled, or already refunded.
 	 *
 	 * @param OsOrderModel $order The order to check.
 	 */
@@ -135,12 +136,12 @@ class IfthenpayLpSettlement {
 	}
 
 	/**
-	 * The resumable two-phase state change from contracts/settlement.md: record the transaction
-	 * first (so captured money is never un-tracked by a later failure), then approve the booking(s)
-	 * and let core recompute the order's payment status — never assigned directly, see
-	 * research.md's note on OsOrdersHelper::check_if_order_invoices_paid_full_balance(). Only the
-	 * repository's own settled_at is stamped by the caller, and only once every step here has
-	 * actually succeeded.
+	 * The resumable two-phase state change: record the transaction first (so captured money is
+	 * never un-tracked by a later failure), then approve the booking(s) and let core recompute the
+	 * order's payment status via OsOrdersHelper::check_if_order_invoices_paid_full_balance() — never
+	 * assigned directly, since that would skip LatePoint's own invoice bookkeeping, leave the order
+	 * inconsistent, and fire no event (so no notifications). Only the repository's own settled_at is
+	 * stamped by the caller, and only once every step here has actually succeeded.
 	 *
 	 * @param object       $record     The repository row (see IfthenpayLpTransactionRepository).
 	 * @param OsOrderModel $order      The already-loaded, already-validated order.
@@ -220,9 +221,9 @@ class IfthenpayLpSettlement {
 	}
 
 	/**
-	 * Compares as formatted strings, never as floats (contracts/callback.md step 5) — a stray
-	 * float comparison is exactly the kind of bug that silently accepts a wrong amount on some PHP
-	 * builds and rejects a correct one on others.
+	 * Compares as formatted strings, never as floats — a stray float comparison is exactly the
+	 * kind of bug that silently accepts a wrong amount on some PHP builds and rejects a correct one
+	 * on others.
 	 *
 	 * @param string      $expected_amount The record's own stored `amount` column.
 	 * @param string|null $paid_amount     The payload's `amount`, or null if the caller omitted it.

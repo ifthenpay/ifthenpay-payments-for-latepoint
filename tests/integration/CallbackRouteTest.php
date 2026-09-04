@@ -3,7 +3,7 @@
  * Proves the `GET /wp-json/ifthenpay-lp/v1/callback` route end to end, dispatched through WordPress's
  * own REST server (not calling the handler directly) — against the real saved fixtures under
  * tests/fixtures/callbacks/, so a change to those fixtures is caught here too. One test per outcome
- * in contracts/callback.md's own response table.
+ * this route can return.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -79,8 +79,8 @@ class CallbackRouteTest extends WP_UnitTestCase {
 
 	/**
 	 * The duplicate fixture — a retried delivery of the same notification — still returns 200 and
-	 * settles nothing a second time (contracts/callback.md's retry-behaviour note: any non-200
-	 * would make ifthenpay retry a payment already recorded).
+	 * settles nothing a second time. Any non-200 response would make ifthenpay retry a payment
+	 * that's already recorded.
 	 */
 	public function test_duplicate_notification_still_returns_200_and_settles_once(): void {
 		$this->seed_record_for_fixture( 'lp-order-tok-abc123', 'REQ-VALID-0001', '25.00' );
@@ -111,7 +111,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 
 	/**
 	 * A notified amount that doesn't match the record's own stored amount is rejected with 409 —
-	 * the one rejection reason contracts/callback.md gives its own status code.
+	 * the one rejection reason that gets a status code of its own, distinct from the others.
 	 */
 	public function test_wrong_amount_returns_409(): void {
 		$this->seed_record_for_fixture( 'lp-order-tok-abc123', 'REQ-WRONGAMOUNT-0004', '25.00' );
@@ -124,9 +124,9 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	/**
 	 * A `reference` that matches one record, paired with a `request_id` that belongs to a
 	 * different one — `apk` still passes, since it's checked against the reference's own record's
-	 * gateway key, but the two identifiers don't refer to the same payment. Rejected outright, per
-	 * contracts/callback.md's own note that this cross-check is "a signal worth rejecting on" —
-	 * without it, the request_id's own record would settle regardless of which reference/apk
+	 * gateway key, but the two identifiers don't refer to the same payment. Rejected outright — a
+	 * mismatched reference/request_id pairing is a signal worth rejecting on: without this
+	 * cross-check, the request_id's own record would settle regardless of which reference/apk
 	 * accompanied it.
 	 */
 	public function test_request_id_belonging_to_a_different_record_is_rejected(): void {
@@ -255,7 +255,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 
 	/**
 	 * A reference with no matching record at all is rejected with 404 — nothing is revealed about
-	 * whether a record with a different reference exists (NFR-6).
+	 * whether a record with a different reference exists.
 	 */
 	public function test_unknown_reference_returns_404(): void {
 		$response = $this->dispatch( 'unknown-reference.txt' );
@@ -266,7 +266,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	/**
 	 * A request shaped for the old, per-method Payshop registration has none of our required
 	 * parameters and is rejected the same way an unmatched reference is — 404, no per-method
-	 * branching needed (contracts/callback.md).
+	 * branching needed.
 	 */
 	public function test_payshop_shaped_request_returns_404(): void {
 		$response = $this->dispatch( 'payshop-shaped.txt' );
@@ -275,8 +275,8 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * `request_id` of `"0"` — a real value seen in production data (research.md) — is handled as
-	 * an ordinary opaque string, not treated as falsy/missing.
+	 * `request_id` of `"0"` — a real value seen in production data — is handled as an ordinary
+	 * opaque string, not treated as falsy/missing.
 	 */
 	public function test_legacy_zero_request_id_settles_normally(): void {
 		$this->seed_record_for_fixture( 'lp-order-tok-legacy001', '0', '10.00' );
@@ -289,7 +289,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * No response body in any case (contracts/callback.md) — only the status code carries meaning.
+	 * No response body in any case — only the status code carries meaning.
 	 */
 	public function test_response_never_carries_a_body(): void {
 		$response = $this->dispatch( 'unknown-reference.txt' );

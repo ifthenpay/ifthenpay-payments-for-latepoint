@@ -1,6 +1,6 @@
 <?php
 /**
- * The manual re-check action's own logic (D-5, spec 001) — shared by the admin-only controller
+ * The manual re-check action's own logic — shared by the admin-only controller
  * action (OsPaymentsIfthenpaySettingsController::recheck_payment()) and the WP-CLI command
  * (IfthenpayLpCliCommands::recheck_payment()), the two ways to trigger it.
  *
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Settles through the same settle_payment() the callback route and the realtime polling fallback
- * call (invariant 3), but first confirms the request_id with ifthenpay directly via
+ * call, but first confirms the request_id with ifthenpay directly via
  * IfthenpayLpTransactionStatus::check() — closing the gap this class originally shipped without
  * (no independently-verified confirmation endpoint existed yet). That endpoint's response also
  * carries the Pay By Link's own `id` (OrderId) and the confirmed `Amount`, so this additionally

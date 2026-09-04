@@ -1,7 +1,7 @@
 <?php
 /**
- * Proves IfthenpayLpManualRecheck::run() — the manual re-check action's own logic (D-5, spec 001),
- * shared by the admin controller action and the WP-CLI command. Settles through the real
+ * Proves IfthenpayLpManualRecheck::run() — the manual re-check action's own logic, shared by the
+ * admin controller action and the WP-CLI command. Settles through the real
  * settle_payment() against a real order+booking fixture, same as the callback route would.
  *
  * @package ifthenpay-payments-for-latepoint

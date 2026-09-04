@@ -150,7 +150,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 		}
 
 		/**
-		 * Manual recovery for a missed or failed inbound callback (D-5, spec 001) — not in
+		 * Manual recovery for a missed or failed inbound callback — not in
 		 * `action_access['public']`, so this keeps this controller's own default (LatePoint's
 		 * `settings__edit` capability), same as every other action here. The actual decision is
 		 * IfthenpayLpManualRecheck::run() — shared with the WP-CLI equivalent — this method only

@@ -2,9 +2,9 @@
 /**
  * Shared save-time validation for every "whole number of days, within a range" setting this add-on
  * has — reference validity (IfthenpayLpMultibancoValidityValidation) and minimum lead time
- * (IfthenpayLpMultibancoLeadTimeValidation) today, and the natural reuse point for a future deferred
- * method's own equivalent settings (Payshop, spec 002 — not built yet, but the range-check logic
- * itself has nothing method-specific about it).
+ * (IfthenpayLpMultibancoLeadTimeValidation) today, and the natural reuse point for a future
+ * deferred method's own equivalent settings (a Payshop expiry setting, not built yet, but the
+ * range-check logic itself has nothing method-specific about it).
  *
  * @package ifthenpay-payments-for-latepoint
  */

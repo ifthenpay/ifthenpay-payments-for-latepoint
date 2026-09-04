@@ -1,8 +1,8 @@
 <?php
 /**
  * Proves IfthenpayLpReferenceDisplay — the shared lookup+render behind every customer-facing
- * surface for a deferred payment's own reference (T-13, spec 001) — plus the email-content
- * injection hook that reuses it.
+ * surface for a deferred payment's own reference — plus the email-content injection hook that
+ * reuses it.
  *
  * @package ifthenpay-payments-for-latepoint
  */

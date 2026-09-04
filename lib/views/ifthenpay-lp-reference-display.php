@@ -1,8 +1,8 @@
 <?php
 /**
  * Surfaces a deferred payment's own entity/reference/amount/deadline/token to the customer — on
- * the booking confirmation step, in the confirmation email, and in the customer dashboard (T-13,
- * spec 001), so a customer who loses the email can still recover the reference. The token is
+ * the booking confirmation step, in the confirmation email, and in the customer dashboard, so a
+ * customer who loses the email can still recover the reference. The token is
  * shown too (both states, not just pending): it's our own correlation handle, but also what
  * ifthenpay itself was given as the order id (Pay By Link's `id`, the Multibanco reference's
  * `orderId`) — the identifier ifthenpay support would recognise for either flow. One lookup, one
