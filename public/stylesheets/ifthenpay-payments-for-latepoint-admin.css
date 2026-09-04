@@ -65,6 +65,29 @@
 	display: inline;
 }
 
+/* Each method's own Timing block repeats the same icon shown for it in .ifthenpay-methods-list
+   above, inline with the heading text, so which block belongs to which method reads at a glance
+   instead of two identically-worded "Timing" headings in a row. A top border plus extra spacing
+   (beyond .label-with-description's own native margin) keeps a method's own Timing block visually
+   grouped with itself and separated from the previous method's, rather than the two runs of fields
+   reading as one continuous list. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading {
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #e3e6ea;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading h3 {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading .ifthenpay-method-icon {
+	height: 1.1rem;
+	width: auto;
+}
+
 /* The Default Method note's own muted caption — matches `.label-with-description .label-desc`'s
    colour/size, but that native class only applies under its own heading, which this note doesn't
    have. */
