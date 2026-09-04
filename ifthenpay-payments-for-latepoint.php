@@ -116,6 +116,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/views/ifthenpay-lp-reference-display.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php';
 
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/controllers/ifthenpay-lp-cli-commands.php';
@@ -159,6 +160,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// any lib/ file; see this method's own callable-array registrations above, which are
 			// resolved lazily when their hooks actually fire, unlike a class constant reference).
 			add_action( 'ifthenpay_lp_expiry_sweep', array( 'IfthenpayLpExpirySweep', 'run' ) );
+			// Same reasoning: IfthenpayLpLapsedAppointmentDigest::HOOK isn't loaded yet either.
+			add_action( 'ifthenpay_lp_lapsed_appointment_digest', array( 'IfthenpayLpLapsedAppointmentDigest', 'run' ) );
 
 			// Customer-facing surfaces for a deferred payment's own reference — see
 			// IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
@@ -486,6 +489,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
 			}
+			if ( ! wp_next_scheduled( IfthenpayLpLapsedAppointmentDigest::HOOK ) ) {
+				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
+			}
 		}
 
 		public function latepoint_init() {
@@ -508,6 +514,9 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		public function on_deactivate() {
 			$this->ensure_loaded( 'IfthenpayLpExpirySweep', '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php' );
 			wp_clear_scheduled_hook( IfthenpayLpExpirySweep::HOOK );
+
+			$this->ensure_loaded( 'IfthenpayLpLapsedAppointmentDigest', '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php' );
+			wp_clear_scheduled_hook( IfthenpayLpLapsedAppointmentDigest::HOOK );
 		}
 
 		public function on_activate() {
@@ -525,6 +534,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$this->ensure_loaded( 'IfthenpayLpExpirySweep', '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php' );
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
+			}
+
+			$this->ensure_loaded( 'IfthenpayLpLapsedAppointmentDigest', '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php' );
+			if ( ! wp_next_scheduled( IfthenpayLpLapsedAppointmentDigest::HOOK ) ) {
+				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
 
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
