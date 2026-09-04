@@ -54,6 +54,14 @@ class IfthenpayLpPaymentMethodAvailability {
 				'code'      => 'ifthenpay_multibanco',
 				'time_type' => 'later',
 			),
+			'ifthenpay_payshop'    => array(
+				'name'      => __( 'Payshop', 'ifthenpay-payments-for-latepoint' ),
+				'label'     => __( 'Payshop reference', 'ifthenpay-payments-for-latepoint' ),
+				// No dedicated Payshop asset shipped yet; reuses the processor's own symbol.
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'code'      => 'ifthenpay_payshop',
+				'time_type' => 'later',
+			),
 		);
 	}
 
@@ -147,6 +155,34 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
+	 * Payshop needs more than a usable gateway key: the merchant must have checked "PAYSHOP" in
+	 * Payment Methods, and the selected gateway must actually carry a PAYSHOP account — same shape
+	 * as is_multibanco_usable(), minus the lead-time check: unlike Multibanco, nothing in this
+	 * add-on's own settings imposes a minimum lead time on Payshop, and nothing about Payshop's own
+	 * API forces one either.
+	 *
+	 * A dataset fetch failure fails open, same reasoning as every other gate in this class.
+	 */
+	private static function is_payshop_usable(): bool {
+		if ( ! in_array( 'PAYSHOP', IfthenpayLpAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
+			return false;
+		}
+
+		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
+		$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		if ( '' === $backoffice_key || '' === $gateway_key ) {
+			return false;
+		}
+
+		$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
+		if ( null === $dataset ) {
+			return true;
+		}
+
+		return isset( $dataset['accounts'][ $gateway_key ]['PAYSHOP'] );
+	}
+
+	/**
 	 * PayByLink needs more than a usable gateway key: at least one of the merchant's enabled Pay Now
 	 * methods must actually carry a live account on the selected gateway. Without this, ifthenpay
 	 * would still create a link, but with an empty accounts field — its hosted page then falls back
@@ -222,10 +258,11 @@ class IfthenpayLpPaymentMethodAvailability {
 	/**
 	 * This add-on's supported methods, filtered down to the ones actually usable right now —
 	 * ifthenpay_gateway additionally needs is_pay_by_link_usable(), ifthenpay_multibanco
-	 * additionally needs is_multibanco_usable(). Both fail the same way for the same reason: no
-	 * live account behind the merchant's own selection means neither should reach checkout only to
-	 * fail once picked. Shared by both the payment-times filter and the enabled-methods filter so
-	 * the two can never disagree about which methods are currently offered.
+	 * additionally needs is_multibanco_usable(), ifthenpay_payshop additionally needs
+	 * is_payshop_usable(). All three fail the same way for the same reason: no live account behind
+	 * the merchant's own selection means none of them should reach checkout only to fail once
+	 * picked. Shared by both the payment-times filter and the enabled-methods filter so the two can
+	 * never disagree about which methods are currently offered.
 	 *
 	 * @return array<string,array<string,mixed>>
 	 */
@@ -240,6 +277,9 @@ class IfthenpayLpPaymentMethodAvailability {
 		}
 		if ( isset( $methods['ifthenpay_multibanco'] ) && ! self::is_multibanco_usable() ) {
 			unset( $methods['ifthenpay_multibanco'] );
+		}
+		if ( isset( $methods['ifthenpay_payshop'] ) && ! self::is_payshop_usable() ) {
+			unset( $methods['ifthenpay_payshop'] );
 		}
 
 		return $methods;
