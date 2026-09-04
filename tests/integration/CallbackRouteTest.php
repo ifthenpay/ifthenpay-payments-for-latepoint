@@ -64,6 +64,29 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The same as seed_record_for_fixture(), but for a Payshop row — no entity, proving
+	 * settle_payment() settles it through the exact same path with zero method-specific handling.
+	 *
+	 * @param string $token      Must match the fixture's own `reference` param.
+	 * @param string $request_id Must match the fixture's own `request_id` param.
+	 * @param string $amount     Must match the fixture's own `amount` param.
+	 */
+	private function seed_payshop_record_for_fixture( string $token, string $request_id, string $amount ): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => $amount ) );
+		ifthenpay_lp_insert_pending_transaction_row(
+			$fixture,
+			$request_id,
+			array(
+				'token'       => $token,
+				'method'      => 'PAYSHOP',
+				'amount'      => $amount,
+				'gateway_key' => ifthenpay_lp_callback_fixture_gateway_key(),
+				'entity'      => null,
+			)
+		);
+	}
+
+	/**
 	 * The valid fixture settles: 200, and the underlying order actually gets paid.
 	 */
 	public function test_valid_notification_settles_and_returns_200(): void {
@@ -74,6 +97,20 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$this->assertSame( 200, $response->get_status() );
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-VALID-0001' );
 		$this->assertNotNull( $record );
+		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The same route settles a Payshop row too, with the exact same handler — no entity involved,
+	 * only `method` in the payload differs from Multibanco's own valid fixture.
+	 */
+	public function test_valid_payshop_notification_settles_and_returns_200(): void {
+		$this->seed_payshop_record_for_fixture( 'lp-order-tok-payshop1', 'REQ-VALID-PAYSHOP-0001', '25.00' );
+
+		$response = $this->dispatch( 'valid-payshop.txt' );
+
+		$this->assertSame( 200, $response->get_status() );
+		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-VALID-PAYSHOP-0001' );
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
 	}
 
@@ -270,6 +307,17 @@ class CallbackRouteTest extends WP_UnitTestCase {
 	 */
 	public function test_payshop_shaped_request_returns_404(): void {
 		$response = $this->dispatch( 'payshop-shaped.txt' );
+
+		$this->assertSame( 404, $response->get_status() );
+	}
+
+	/**
+	 * The reverse: a request shaped for the old, per-method Multibanco registration (`key`,
+	 * `orderId`) is rejected the same way — 404, not misread as valid just because it happens to
+	 * carry `amount`/`reference` fields too.
+	 */
+	public function test_multibanco_shaped_request_returns_404(): void {
+		$response = $this->dispatch( 'multibanco-shaped.txt' );
 
 		$this->assertSame( 404, $response->get_status() );
 	}
