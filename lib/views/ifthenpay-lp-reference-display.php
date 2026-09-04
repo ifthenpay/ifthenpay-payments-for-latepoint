@@ -72,6 +72,88 @@ class IfthenpayLpReferenceDisplay {
 	}
 
 	/**
+	 * Every string both renderers show, in one place — a wording change here reaches the
+	 * confirmation step, the email, and the dashboard tile together, rather than risking one
+	 * surface being edited and the other forgotten.
+	 *
+	 * @param bool $is_paid Whether $record is PAID (vs. still pending).
+	 * @return string
+	 */
+	private static function title_for( bool $is_paid ): string {
+		return $is_paid
+			? __( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
+			: __( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
+	}
+
+	/**
+	 * The label for the token row — shown in both states, unlike the entity/reference/amount rows.
+	 *
+	 * @return string
+	 */
+	private static function order_id_label(): string {
+		return __( 'ifthenpay Order ID', 'ifthenpay-payments-for-latepoint' );
+	}
+
+	/**
+	 * Shown once a record is PAID, in place of the payment instructions.
+	 *
+	 * @return string
+	 */
+	private static function paid_message(): string {
+		return __( 'Paid.', 'ifthenpay-payments-for-latepoint' );
+	}
+
+	/**
+	 * Shown while a record is still pending, above the entity/reference/amount details.
+	 *
+	 * @return string
+	 */
+	private static function payment_instructions(): string {
+		return __( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' );
+	}
+
+	/**
+	 * The Entity/Reference/Amount/Pay-by rows — only shown while pending (render_html()'s own
+	 * $is_paid branch already hides all of this once paid, same as render_email_html()). Each
+	 * carries its own `key`, so render_html() can build its per-row CSS class
+	 * (`ifthenpay-reference-box-row-{key}`) from the same data instead of hardcoding it once per
+	 * field on top of the field's own label/value.
+	 *
+	 * @param object $record As returned by for_order()/for_booking().
+	 * @return array<int,array{key:string,label:string,value:string}>
+	 */
+	private static function detail_rows( object $record ): array {
+		$rows = array(
+			array(
+				'key'   => 'entity',
+				'label' => __( 'Entity', 'ifthenpay-payments-for-latepoint' ),
+				'value' => (string) $record->entity,
+			),
+			array(
+				'key'   => 'reference',
+				'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
+				'value' => (string) $record->reference,
+			),
+			array(
+				'key'   => 'amount',
+				'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+				'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
+			),
+		);
+
+		$deadline = self::deadline_for( $record );
+		if ( '' !== $deadline ) {
+			$rows[] = array(
+				'key'   => 'deadline',
+				'label' => __( 'Pay by', 'ifthenpay-payments-for-latepoint' ),
+				'value' => $deadline,
+			);
+		}
+
+		return $rows;
+	}
+
+	/**
 	 * Renders the reference box. Escaping happens here, not at each call site. Markup uses
 	 * `ifthenpay-reference-box-*` classes, styled in ifthenpay-payments-for-latepoint-front.css — a
 	 * merchant who wants a different look can target those same classes with their own CSS (a child
@@ -80,48 +162,31 @@ class IfthenpayLpReferenceDisplay {
 	 * @param object $record As returned by for_order()/for_booking().
 	 */
 	public static function render_html( object $record ): string {
-		$is_paid  = 'PAID' === $record->status;
-		$deadline = self::deadline_for( $record );
+		$is_paid = 'PAID' === $record->status;
 
 		ob_start();
 		?>
 		<div class="ifthenpay-reference-box <?php echo $is_paid ? 'is-paid' : 'is-pending'; ?>">
 			<div class="ifthenpay-reference-box-title">
-				<?php
-				echo $is_paid
-					? esc_html__( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
-					: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
-				?>
+				<?php echo esc_html( self::title_for( $is_paid ) ); ?>
 			</div>
 			<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-order-id">
-				<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'ifthenpay Order ID', 'ifthenpay-payments-for-latepoint' ); ?></span>
+				<span class="ifthenpay-reference-box-label"><?php echo esc_html( self::order_id_label() ); ?></span>
 				<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->token ); ?></span>
 			</div>
 			<?php if ( $is_paid ) : ?>
-				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
+				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html( self::paid_message() ); ?></p>
 			<?php else : ?>
 				<p class="ifthenpay-reference-box-instructions">
-					<?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' ); ?>
+					<?php echo esc_html( self::payment_instructions() ); ?>
 				</p>
 				<div class="ifthenpay-reference-box-details">
-					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-entity">
-						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Entity', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->entity ); ?></span>
-					</div>
-					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-reference">
-						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Reference', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box-value"><?php echo esc_html( (string) $record->reference ); ?></span>
-					</div>
-					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-amount">
-						<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Amount', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<span class="ifthenpay-reference-box-value"><?php echo esc_html( OsMoneyHelper::format_price( $record->amount, true, false ) ); ?></span>
-					</div>
-					<?php if ( '' !== $deadline ) : ?>
-						<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-deadline">
-							<span class="ifthenpay-reference-box-label"><?php echo esc_html__( 'Pay by', 'ifthenpay-payments-for-latepoint' ); ?></span>
-							<span class="ifthenpay-reference-box-value"><?php echo esc_html( $deadline ); ?></span>
+					<?php foreach ( self::detail_rows( $record ) as $row ) : ?>
+						<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-<?php echo esc_attr( $row['key'] ); ?>">
+							<span class="ifthenpay-reference-box-label"><?php echo esc_html( $row['label'] ); ?></span>
+							<span class="ifthenpay-reference-box-value"><?php echo esc_html( $row['value'] ); ?></span>
 						</div>
-					<?php endif; ?>
+					<?php endforeach; ?>
 				</div>
 				<div class="ifthenpay-reference-box-footer">
 					<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
@@ -137,18 +202,24 @@ class IfthenpayLpReferenceDisplay {
 	 * Email-safe rendering of the same data — HTML email clients never load this plugin's own
 	 * stylesheet, so render_html()'s CSS-class markup reaches an inbox as bare, unstyled text once
 	 * appended to a LatePoint notification (append_reference_to_email_content(), main plugin
-	 * file). Uses OsPriceBreakdownHelper::output_price_breakdown_row( ..., true ) — the same
-	 * inline-styled row primitive LatePoint's own "Order Summary" section in that same email
-	 * already renders with — instead of inventing separate styling.
+	 * file). Confirmed directly against LatePoint core (mailers/layouts/default.html,
+	 * mailers/customer/order_created.html, and OsPriceBreakdownHelper::output_price_breakdown_row())
+	 * that LatePoint's own emails are 100% hand-inlined too — there is no CSS inliner anywhere in
+	 * its mail pipeline (OsMailer::render() just includes the layout and hands the result straight
+	 * to wp_mail()), so a class-based approach would not survive a real inbox either. This reuses
+	 * output_price_breakdown_row( ..., true ) — the same inline-styled row primitive LatePoint's own
+	 * "Order Summary" section already renders with, `style => 'total'` included — rather than
+	 * hand-rolling separate styling for the one row that matters most (Amount).
 	 *
-	 * Wrapped in its own card matching LatePoint's own email layout (mailers/layouts/default.html
-	 * — same background/padding/max-width/shadow/radius, copied by value, not read from that file:
-	 * it's a stored, merchant-editable option (`email_layout_template`) by the time this runs, not
-	 * a template this plugin can hook into). $action->prepared_data_for_run['content']
-	 * (append_reference_to_email_content()) is that layout already fully rendered — its own white
-	 * card is already closed — so appending here always lands outside every one of its wrapper
-	 * divs, on the plain page background; a card of our own, rather than bare unstyled content, is
-	 * what makes that unavoidable placement still read as a deliberate second section.
+	 * Wrapped in the exact same two-level structure as mailers/layouts/default.html — the outer
+	 * grey page gutter (`padding: 20px; background-color: #f0f0f0`) *and* the inner white card —
+	 * copied by value, not read from that file: it's a stored, merchant-editable option
+	 * (`email_layout_template`) by the time this runs, not a template this plugin can hook into.
+	 * $action->prepared_data_for_run['content'] (append_reference_to_email_content()) is that
+	 * layout already fully rendered, outer gutter included — so appending after it lands on the
+	 * plain <body> background with no gutter of its own unless this reproduces one. Confirmed live
+	 * in Mailpit: without the outer wrapper, this card sits flush against the inbox edges instead of
+	 * inset like every other section of the same email.
 	 *
 	 * @param object $record As returned by for_order()/for_booking().
 	 */
@@ -157,54 +228,38 @@ class IfthenpayLpReferenceDisplay {
 
 		ob_start();
 		?>
-		<div style="background-color: #fff; padding: 30px; margin: 20px auto 0 auto; max-width: 450px; box-shadow: 0px 2px 6px -1px rgba(0,0,0,0.2); border-radius: 6px; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 16px; line-height: 1.5;">
-			<h4 style="margin-bottom: 10px; margin-top: 0; font-size: 16px; font-weight: bold;">
+		<div style="padding: 20px; background-color: #f0f0f0; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+			<div style="background-color: #fff; padding: 30px; margin: 0px auto; max-width: 450px; box-shadow: 0px 2px 6px -1px rgba(0,0,0,0.2); border-radius: 6px; font-size: 16px; line-height: 1.5;">
+				<h4 style="margin-bottom: 10px; margin-top: 0; font-size: 16px; font-weight: bold;">
+					<?php echo esc_html( self::title_for( $is_paid ) ); ?>
+				</h4>
 				<?php
-				echo $is_paid
-					? esc_html__( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
-					: esc_html__( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
-				?>
-			</h4>
-			<?php
-			OsPriceBreakdownHelper::output_price_breakdown_row(
-				array(
-					'label' => __( 'ifthenpay Order ID', 'ifthenpay-payments-for-latepoint' ),
-					'value' => (string) $record->token,
-				),
-				true
-			);
-			?>
-			<?php if ( $is_paid ) : ?>
-				<p><?php echo esc_html__( 'Paid.', 'ifthenpay-payments-for-latepoint' ); ?></p>
-			<?php else : ?>
-				<p><?php echo esc_html__( 'Pay at any Multibanco ATM or via your bank\'s homebanking app, using the Entity and Reference below.', 'ifthenpay-payments-for-latepoint' ); ?></p>
-				<?php
-				$rows     = array(
+				OsPriceBreakdownHelper::output_price_breakdown_row(
 					array(
-						'label' => __( 'Entity', 'ifthenpay-payments-for-latepoint' ),
-						'value' => (string) $record->entity,
+						'label' => self::order_id_label(),
+						'value' => (string) $record->token,
 					),
-					array(
-						'label' => __( 'Reference', 'ifthenpay-payments-for-latepoint' ),
-						'value' => (string) $record->reference,
-					),
-					array(
-						'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
-						'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
-					),
+					true
 				);
-				$deadline = self::deadline_for( $record );
-				if ( '' !== $deadline ) {
-					$rows[] = array(
-						'label' => __( 'Pay by', 'ifthenpay-payments-for-latepoint' ),
-						'value' => $deadline,
-					);
-				}
-				foreach ( $rows as $row ) {
-					OsPriceBreakdownHelper::output_price_breakdown_row( $row, true );
-				}
 				?>
-			<?php endif; ?>
+				<?php if ( $is_paid ) : ?>
+					<p><?php echo esc_html( self::paid_message() ); ?></p>
+				<?php else : ?>
+					<p><?php echo esc_html( self::payment_instructions() ); ?></p>
+					<?php
+					foreach ( self::detail_rows( $record ) as $row ) {
+						// Matches LatePoint's own "Balance Due" treatment in the same email: the thick
+						// top border output_price_breakdown_row() already draws for style => 'total',
+						// so the one figure the customer actually needs (Amount) stands out the same
+						// way LatePoint's own total row does, not a bespoke style of our own.
+						if ( 'amount' === $row['key'] ) {
+							$row['style'] = 'total';
+						}
+						OsPriceBreakdownHelper::output_price_breakdown_row( $row, true );
+					}
+					?>
+				<?php endif; ?>
+			</div>
 		</div>
 		<?php
 		return (string) ob_get_clean();
