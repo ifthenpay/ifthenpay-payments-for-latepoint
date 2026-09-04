@@ -21,10 +21,10 @@ class IfthenpayLpPaymentProcessor {
 	public const PROCESSOR_CODE = 'ifthenpay';
 
 	/**
-	 * Used whenever the merchant's own validity setting is missing or zero — D-2 requires a
-	 * validity value is always sent to ifthenpay, since its own API default is no expiry at all,
-	 * which would hold a booking slot forever. Public: also the settings field's own placeholder
-	 * (IfthenpayLpAdminFormRenderer::render_multibanco_validity_field()), so the two never drift.
+	 * Used whenever the merchant's own validity setting is missing or zero — a validity value must
+	 * always be sent to ifthenpay, since its own API default is no expiry at all, which would hold
+	 * a booking slot forever. Public: also the settings field's own placeholder
+	 * (IfthenpayLpAdminFormRenderer::render_multibanco_timing_fields()), so the two never drift.
 	 */
 	public const DEFAULT_MULTIBANCO_VALIDITY_DAYS = 3;
 
@@ -139,10 +139,11 @@ class IfthenpayLpPaymentProcessor {
 
 	/**
 	 * Generates a Multibanco reference for a deferred checkout and persists it. Returns a
-	 * non-success result WITHOUT calling $order_intent->add_error() — see research.md:
-	 * OsOrderIntentModel::convert_to_order() aborts conversion only on $intent->get_error(), a
-	 * falsy $transaction does not stop it, so this is exactly how native "Pay Later" behaves.
-	 * Adding an error here would fail the whole booking instead of committing it unpaid.
+	 * non-success result WITHOUT calling $order_intent->add_error() — verified directly against
+	 * LatePoint's own source: OsOrderIntentModel::convert_to_order() aborts conversion only on
+	 * $intent->get_error(), a falsy $transaction does not stop it, so this is exactly how native
+	 * "Pay Later" behaves. Adding an error here would fail the whole booking instead of committing
+	 * it unpaid.
 	 *
 	 * @param OsOrderIntentModel $order_intent The order intent being converted.
 	 * @return array<string,mixed>
@@ -163,8 +164,20 @@ class IfthenpayLpPaymentProcessor {
 		if ( $validity_days <= 0 ) {
 			// IfthenpayLpMultibancoValidityValidation blocks a save below its own MIN_DAYS (1), so
 			// this only catches a value saved before that floor existed, or written outside the
-			// validator — a missing or zero setting must never mean "no expiry" (D-2).
+			// validator — a missing or zero setting must never mean "no expiry".
 			$validity_days = self::DEFAULT_MULTIBANCO_VALIDITY_DAYS;
+		}
+
+		// A reference must never outlive the appointment it pays for — the setting above is a
+		// ceiling, not the value sent as-is. days_until_earliest_booking() is null only when the
+		// intent carries no booking item at all (not a real deferred-checkout scenario today, but
+		// left unclamped rather than fatal if it ever happens). max(0, ...) never sends a negative
+		// expiry_days even if this intent somehow reached checkout below the minimum lead time
+		// (IfthenpayLpPaymentMethodAvailability's own gate is what should normally prevent that —
+		// this is the defensive backstop for a resumed or legacy intent, not the primary guarantee).
+		$days_until_appointment = IfthenpayLpAppointmentLeadTime::days_until_earliest_booking( $order_intent->build_cart_object() );
+		if ( null !== $days_until_appointment ) {
+			$validity_days = max( 0, min( $validity_days, $days_until_appointment - 1 ) );
 		}
 
 		try {

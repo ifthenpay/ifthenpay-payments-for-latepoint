@@ -21,6 +21,15 @@ class IfthenpayLpPaymentMethodAvailability {
 	public const PROCESSOR_CODE = 'ifthenpay';
 
 	/**
+	 * Used whenever the merchant's own minimum-lead-time setting is missing or invalid. 2, not 1:
+	 * at a 1-day minimum, a customer booking at 23:00 for a 09:00 appointment gets a two-hour real
+	 * payment window — technically possible via homebanking, but a poor experience that reliably
+	 * ends in a blocked slot and a cancellation. Public: also the settings field's own placeholder
+	 * (IfthenpayLpAdminFormRenderer::render_multibanco_lead_time_field()), so the two never drift.
+	 */
+	public const DEFAULT_MULTIBANCO_LEAD_TIME_DAYS = 2;
+
+	/**
 	 * This add-on's supported methods, unconditionally — whether or not they're currently usable.
 	 * See usable_supported_payment_methods() for the filtered, "offer this at checkout" version.
 	 *
@@ -64,29 +73,6 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
-	 * The `latepoint_all_payment_methods` filter callback.
-	 *
-	 * @param array<string,mixed> $payment_methods The filter's own accumulator.
-	 * @return array<string,mixed>
-	 */
-	public static function register_payment_methods( array $payment_methods ): array {
-		return array_merge( $payment_methods, self::get_supported_payment_methods() );
-	}
-
-	/**
-	 * The `latepoint_enabled_payment_methods` filter callback.
-	 *
-	 * @param array<string,mixed> $enabled_payment_methods The filter's own accumulator.
-	 * @return array<string,mixed>
-	 */
-	public static function register_enabled_payment_methods( array $enabled_payment_methods ): array {
-		if ( OsPaymentsHelper::is_payment_processor_enabled( self::PROCESSOR_CODE ) ) {
-			$enabled_payment_methods = array_merge( $enabled_payment_methods, self::usable_supported_payment_methods() );
-		}
-		return $enabled_payment_methods;
-	}
-
-	/**
 	 * The `latepoint_get_all_payment_times` filter callback.
 	 *
 	 * @param array<string,mixed> $payment_times The filter's own accumulator.
@@ -125,9 +111,12 @@ class IfthenpayLpPaymentMethodAvailability {
 	/**
 	 * Multibanco needs more than a usable gateway key: the merchant must have checked "MB" in
 	 * Payment Methods (IfthenpayLpAdminFormRenderer::get_saved_enabled_methods() — one setting
-	 * covers both the "Pay Now" and "Pay Later" sections, the split there is display-only), and
-	 * the selected gateway must actually carry an MB account. Otherwise the method would be
-	 * offered at checkout only to fail at reference-creation time with a confusing error.
+	 * covers both the "Pay Now" and "Pay Later" sections, the split there is display-only), the
+	 * selected gateway must actually carry an MB account, and the current checkout's own
+	 * appointment must not be sooner than the merchant's minimum lead time
+	 * (is_appointment_far_enough_out()). Otherwise the method would be offered at checkout only to
+	 * fail at reference-creation time with a confusing error, or produce a reference with no real
+	 * payment window.
 	 *
 	 * A dataset fetch failure fails open, same reasoning as is_gateway_key_usable(): an outage
 	 * must not take checkout down for an otherwise valid setup. If it recurs at the moment of
@@ -145,12 +134,53 @@ class IfthenpayLpPaymentMethodAvailability {
 			return false;
 		}
 
+		if ( ! self::is_appointment_far_enough_out() ) {
+			return false;
+		}
+
 		$dataset = IfthenpayLpGatewayDataset::get( $backoffice_key );
 		if ( null === $dataset ) {
 			return true;
 		}
 
 		return isset( $dataset['accounts'][ $gateway_key ]['MB'] );
+	}
+
+	/**
+	 * Below the merchant's own minimum lead time, Multibanco is not offered at checkout at all — a
+	 * reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock on why
+	 * "days" is a calendar distance, not a rolling 24h window).
+	 *
+	 * Only touches cart state for a request that is genuinely mid-checkout: a cart cookie must
+	 * already exist (OsCartsHelper::get_cart_uuid()) before reconstructing it — this filter also
+	 * fires on requests that are not a checkout at all, and OsCartsHelper::get_or_create_cart()
+	 * sets a fresh cookie as a side effect for a visitor who never had one (verified directly
+	 * against LatePoint's own OsCartsHelper::create_cart() source).
+	 *
+	 * No cart yet, or a cart with no booking item in it — nothing to gate against — fails open,
+	 * same reasoning as every other check in this class: an inconclusive state must never itself be
+	 * why checkout breaks.
+	 */
+	private static function is_appointment_far_enough_out(): bool {
+		if ( empty( OsCartsHelper::get_cart_uuid() ) ) {
+			return true;
+		}
+
+		$days_until = IfthenpayLpAppointmentLeadTime::days_until_earliest_booking( OsCartsHelper::get_or_create_cart() );
+		if ( null === $days_until ) {
+			return true;
+		}
+
+		$minimum = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_lead_time_days', self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS );
+		if ( $minimum < IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS ) {
+			// IfthenpayLpMultibancoLeadTimeValidation blocks a save below its own MIN_DAYS, so this
+			// only catches a value saved before that floor existed, or written outside the
+			// validator — a missing or zero setting must never mean "no minimum" (same reasoning as
+			// IfthenpayLpPaymentProcessor's own validity-days fallback).
+			$minimum = self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS;
+		}
+
+		return $days_until >= $minimum;
 	}
 
 	/**

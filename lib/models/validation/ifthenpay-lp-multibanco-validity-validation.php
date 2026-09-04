@@ -28,32 +28,20 @@ class IfthenpayLpMultibancoValidityValidation {
 	public const MAX_DAYS = 730;
 
 	/**
-	 * Decides whether a Reference Validity value should block the save it came from.
+	 * Decides whether a Reference Validity value should block the save it came from. The range
+	 * check itself is IfthenpayLpWholeDaysSettingValidation's own — nothing here is specific to
+	 * this setting beyond its bounds and label.
 	 *
 	 * @param string $value Raw setting value; empty means "not set" (a sane default is used at
 	 *                      payment time — see IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS).
 	 * @return string|null An error message to reject the save with, or null to allow it.
 	 */
 	public static function check( string $value ): ?string {
-		$value = trim( $value );
-		if ( '' === $value ) {
-			return null;
-		}
-
-		if ( ! ctype_digit( $value ) ) {
-			return __( 'Reference validity must be a whole number of days.', 'ifthenpay-payments-for-latepoint' );
-		}
-
-		$days = (int) $value;
-		if ( $days < self::MIN_DAYS || $days > self::MAX_DAYS ) {
-			return sprintf(
-				/* translators: 1: minimum accepted days, 2: maximum accepted days */
-				__( 'Reference validity must be between %1$d and %2$d days.', 'ifthenpay-payments-for-latepoint' ),
-				self::MIN_DAYS,
-				self::MAX_DAYS
-			);
-		}
-
-		return null;
+		return IfthenpayLpWholeDaysSettingValidation::check(
+			$value,
+			self::MIN_DAYS,
+			self::MAX_DAYS,
+			__( 'Reference validity', 'ifthenpay-payments-for-latepoint' )
+		);
 	}
 }
