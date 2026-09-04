@@ -39,35 +39,14 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$this->init_hooks();
 		}
 
+		// --- Bootstrap: constants and file includes -----------------------
+
+		/**
+		 * The two constants every version of this addon has always defined.
+		 */
 		public function define_constants() {
 			$this->define( 'IFTHENPAY_PLUGIN_VERSION', $this->version );
 			$this->define( 'IFTHENPAY_TABLE_VERSION', $this->db_version );
-		}
-
-		public static function public_stylesheets() {
-			return plugin_dir_url( __FILE__ ) . 'public/stylesheets/';
-		}
-
-		public static function public_javascripts() {
-			return plugin_dir_url( __FILE__ ) . 'public/javascripts/';
-		}
-
-		public static function images_url() {
-			return plugin_dir_url( __FILE__ ) . 'public/images/';
-		}
-
-		/**
-		 * Cache-busting query arg for a public asset: the file's own last-modified time when it can
-		 * be read, falling back to the plugin version — so an edited .css/.js file is refetched
-		 * immediately, without needing a manual version bump per tweak.
-		 *
-		 * @param string $relative_path Path under the plugin root, e.g. `public/stylesheets/x.css`.
-		 */
-		public function asset_version( string $relative_path ): string {
-			$path  = plugin_dir_path( __FILE__ ) . $relative_path;
-			$mtime = file_exists( $path ) ? filemtime( $path ) : false;
-
-			return false !== $mtime ? (string) $mtime : $this->version;
 		}
 
 		public function define( $name, $value ) {
@@ -76,58 +55,121 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 		}
 
+		/**
+		 * Hooked to `latepoint_includes` (see register_bootstrap_hooks()) — grouped by concern, not
+		 * load order: none of these files reference each other at the top level (only from inside a
+		 * method body, resolved lazily when it's actually called), so only files that genuinely
+		 * belong together are grouped together.
+		 */
 		public function includes() {
+			$this->include_controllers();
+			$this->include_api_client();
+			$this->include_validation();
+			$this->include_payment_processing();
+			$this->include_views();
+			$this->include_settlement();
+			$this->include_cli();
+		}
+
+		private function include_controllers(): void {
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-checkout-controller.php';
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-callback-rest-controller.php';
+		}
 
+		/**
+		 * The ifthenpay HTTP layer itself and every operation built on it.
+		 */
+		private function include_api_client(): void {
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-exceptions.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-api-client.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-key-validator.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-method-catalog.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-pay-by-link.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-multibanco-reference.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-callback-registration.php';
+		}
+
+		/**
+		 * Save-time validators for this addon's own settings — see each hook glue method
+		 * (validate_*_on_save()) for how they're wired to `latepoint_model_validate`.
+		 */
+		private function include_validation(): void {
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-backoffice-key-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
+		}
+
+		/**
+		 * Deciding which methods are offered, and turning a checkout into an actual payment attempt.
+		 */
+		private function include_payment_processing(): void {
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-data-formatter.php';
-			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-method-catalog.php';
-			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-enabled-method-gate.php';
-			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-pay-by-link-method-eligibility.php';
-			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-multibanco-reference.php';
-			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-times.php';
-			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-callback-registration.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-callback-params.php';
-			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-lock.php';
-			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-appointment-lead-time.php';
-			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-lock.php';
+			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-processor.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-method-availability.php';
+		}
 
+		private function include_views(): void {
 			include_once __DIR__ . '/lib/views/ifthenpay-lp-admin-form-renderer.php';
 			include_once __DIR__ . '/lib/views/ifthenpay-lp-email-helper.php';
+			include_once __DIR__ . '/lib/views/ifthenpay-lp-reference-display.php';
+		}
 
+		/**
+		 * Settling a payment, tracking it, and the crons that keep it from being left stale.
+		 */
+		private function include_settlement(): void {
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-transaction-repository.php';
-
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-transaction-status.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-manual-recheck.php';
-			include_once __DIR__ . '/lib/views/ifthenpay-lp-reference-display.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php';
+		}
 
+		private function include_cli(): void {
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				include_once __DIR__ . '/lib/controllers/ifthenpay-lp-cli-commands.php';
 			}
 		}
 
+		// --- Bootstrap: hook registration -----------------------------
+
+		/**
+		 * Runs from the constructor, before includes() has loaded any lib/ file — every callback
+		 * below is either a method on $this, or a callable array naming a class that isn't defined
+		 * yet. Both are resolved lazily when the hook actually fires, not now, so this is safe; a
+		 * class *constant* (e.g. `IfthenpayLpExpirySweep::HOOK`) would not be, since PHP resolves
+		 * that immediately — see register_cron_hooks()'s own note.
+		 */
 		public function init_hooks() {
+			$this->register_bootstrap_hooks();
+			$this->register_asset_hooks();
+			$this->register_settings_hooks();
+			$this->register_payment_hooks();
+			$this->register_cron_hooks();
+			$this->register_reference_display_hooks();
+			$this->register_lifecycle_hooks();
+		}
+
+		private function register_bootstrap_hooks(): void {
 			add_action( 'latepoint_init', array( $this, 'latepoint_init' ) );
 			add_action( 'latepoint_includes', array( $this, 'includes' ) );
 			add_filter( 'latepoint_installed_addons', array( $this, 'register_addon' ) );
+		}
 
+		private function register_asset_hooks(): void {
 			add_action( 'latepoint_admin_enqueue_scripts', array( $this, 'load_admin_scripts_and_styles' ) );
 			add_filter( 'latepoint_localized_vars_admin', array( $this, 'localized_vars_for_admin' ) );
 
@@ -136,47 +178,80 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			add_filter( 'latepoint_clean_layout_js_files', array( $this, 'add_scripts_to_clean_layout' ), 10 );
 			add_filter( 'latepoint_clean_layout_css_files', array( $this, 'add_styles_to_clean_layout' ), 10 );
+		}
 
+		private function register_settings_hooks(): void {
 			add_filter( 'latepoint_payment_processors', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_processor' ) );
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
-			// Fires for every OsModel save — see validate_backoffice_key_on_save()'s own docblock.
+
+			// Fires for every OsModel save — each validate_*_on_save() filters down to its own
+			// setting by name, so one hook can carry all of this addon's save-time validation.
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_validity_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_lead_time_on_save' ), 10, 3 );
+
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
+		}
 
+		private function register_payment_hooks(): void {
 			add_filter( 'latepoint_get_all_payment_times', array( 'IfthenpayLpPaymentMethodAvailability', 'add_all_payment_methods_to_payment_times' ) );
 			add_filter( 'latepoint_get_enabled_payment_times', array( 'IfthenpayLpPaymentMethodAvailability', 'add_enabled_payment_methods_to_payment_times' ) );
 
 			add_filter( 'latepoint_process_payment_for_order_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payments_for_order_intent' ), 10, 2 );
 			add_filter( 'latepoint_process_payment_for_transaction_intent', array( 'IfthenpayLpPaymentProcessor', 'process_payment_for_transaction_intent' ), 10, 2 );
 			add_action( 'latepoint_transaction_created', array( 'IfthenpayLpPaymentProcessor', 'backfill_realtime_transaction_notes' ) );
+		}
 
+		/**
+		 * The callback route and the two WP-Cron jobs — a class *constant* reference
+		 * (`IfthenpayLpExpirySweep::HOOK`, `IfthenpayLpLapsedAppointmentDigest::HOOK`) is not safe
+		 * here, unlike everywhere else in this file: init_hooks() runs before includes() has loaded
+		 * either class, and PHP resolves a constant immediately, not lazily. The literal hook-name
+		 * strings below must therefore match those constants' own values exactly.
+		 */
+		private function register_cron_hooks(): void {
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
-			// Not IfthenpayLpExpirySweep::HOOK here — that class doesn't exist yet at this point
-			// (init_hooks() runs from this addon's own constructor, before includes() has loaded
-			// any lib/ file; see this method's own callable-array registrations above, which are
-			// resolved lazily when their hooks actually fire, unlike a class constant reference).
 			add_action( 'ifthenpay_lp_expiry_sweep', array( 'IfthenpayLpExpirySweep', 'run' ) );
-			// Same reasoning: IfthenpayLpLapsedAppointmentDigest::HOOK isn't loaded yet either.
 			add_action( 'ifthenpay_lp_lapsed_appointment_digest', array( 'IfthenpayLpLapsedAppointmentDigest', 'run' ) );
+		}
 
-			// Customer-facing surfaces for a deferred payment's own reference — see
-			// IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
+		/**
+		 * Customer-facing surfaces for a deferred payment's own reference — see
+		 * IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
+		 */
+
+		/**
+		 * Two of these hooks are a confirmation-step/dashboard-tile pair, the other two a
+		 * full-summary-lightbox pair — both pairs fire with the exact same single argument
+		 * (OsOrderModel or OsBookingModel, confirmed against LatePoint core's own do_action()
+		 * calls), so one callback per model type covers both call sites in each pair.
+		 */
+		private function register_reference_display_hooks(): void {
 			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
+			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
-			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_order_summary' ) );
-			add_action( 'latepoint_booking_full_summary_head_info_after', array( $this, 'render_reference_on_booking_summary' ) );
+			add_action( 'latepoint_booking_full_summary_head_info_after', array( $this, 'render_reference_on_dashboard_tile' ) );
 			add_filter( 'latepoint_process_prepare_data_for_run', array( $this, 'append_reference_to_email_content' ) );
+		}
 
+		private function register_lifecycle_hooks(): void {
 			add_action( 'init', array( $this, 'init' ), 0 );
 
 			register_activation_hook( __FILE__, array( $this, 'on_activate' ) );
 			register_deactivation_hook( __FILE__, array( $this, 'on_deactivate' ) );
 		}
 
+		// --- Settings: save-time validation and post-save side effects ----
+
+		/**
+		 * The `latepoint_encrypted_settings` filter callback — this addon's only setting that
+		 * needs encryption at rest.
+		 *
+		 * @param string[] $encrypted_settings The filter's own accumulator.
+		 * @return string[]
+		 */
 		public function add_encrypted_settings( $encrypted_settings ) {
 			$encrypted_settings[] = 'ifthenpay_backoffice_key';
 			return $encrypted_settings;
@@ -273,6 +348,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			IfthenpayLpCallbackRegistration::register( $gateway_key );
 		}
 
+		// --- Reference display: confirmation step, dashboard, summaries, email ---
+
 		/**
 		 * Prints the reference box on the booking confirmation step.
 		 *
@@ -301,24 +378,6 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			if ( $record ) {
 				echo IfthenpayLpReferenceDisplay::render_html( $record ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- render_html() escapes internally.
 			}
-		}
-
-		/**
-		 * Prints the reference box on the order summary lightbox.
-		 *
-		 * @param OsOrderModel $order As passed by the hook.
-		 */
-		public function render_reference_on_order_summary( $order ) {
-			$this->render_reference_on_confirmation_step( $order );
-		}
-
-		/**
-		 * Prints the reference box on the booking summary lightbox.
-		 *
-		 * @param OsBookingModel $booking As passed by the hook.
-		 */
-		public function render_reference_on_booking_summary( $booking ) {
-			$this->render_reference_on_dashboard_tile( $booking );
 		}
 
 		/**
@@ -369,6 +428,15 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return $action;
 		}
 
+		// --- Assets, localization, and the settings page's own field rendering ---
+
+		/**
+		 * The `latepoint_localized_vars_admin` filter callback — everything the admin script
+		 * needs up front, so it never has to round-trip for state the page render already knows.
+		 *
+		 * @param array<string,mixed> $localized_vars The filter's own accumulator.
+		 * @return array<string,mixed>
+		 */
 		public function localized_vars_for_admin( $localized_vars ) {
 			$localized_vars['ifthenpay_validate_key_route']     = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'validate_key' );
 			$localized_vars['ifthenpay_disconnect_route']       = OsRouterHelper::build_route_name( 'payments_ifthenpay_settings', 'disconnect' );
@@ -472,20 +540,50 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			return $css_files;
 		}
 
+		public static function public_stylesheets() {
+			return plugin_dir_url( __FILE__ ) . 'public/stylesheets/';
+		}
+
+		public static function public_javascripts() {
+			return plugin_dir_url( __FILE__ ) . 'public/javascripts/';
+		}
+
+		public static function images_url() {
+			return plugin_dir_url( __FILE__ ) . 'public/images/';
+		}
+
+		/**
+		 * Cache-busting query arg for a public asset: the file's own last-modified time when it can
+		 * be read, falling back to the plugin version — so an edited .css/.js file is refetched
+		 * immediately, without needing a manual version bump per tweak.
+		 *
+		 * @param string $relative_path Path under the plugin root, e.g. `public/stylesheets/x.css`.
+		 */
+		public function asset_version( string $relative_path ): string {
+			$path  = plugin_dir_path( __FILE__ ) . $relative_path;
+			$mtime = file_exists( $path ) ? filemtime( $path ) : false;
+
+			return false !== $mtime ? (string) $mtime : $this->version;
+		}
+
+		// --- WordPress lifecycle: init, activation, deactivation ----------
+
+		/**
+		 * Runs on every request (priority 0, before LatePoint's own `init`) — the in-place-update
+		 * catch-up work that on_activate() also does, so a site that merely updated the plugin
+		 * (never re-activating it) still ends up in the same state as a fresh install.
+		 */
 		public function init() {
 			// Domain Path in the plugin header alone doesn't load the compiled .mo files.
 			load_plugin_textdomain( 'ifthenpay-payments-for-latepoint', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
 			// Cheap when already current; also upgrades the schema on an in-place update, not only
-			// on (re)activation.
+			// on (re)activation. Same reasoning for the legacy-settings cleanup and the two
+			// wp_schedule_event() calls below — an update must reach the same end state as a fresh
+			// activation, not just whatever on_activate() did the first time this site installed it.
 			IfthenpayLpTransactionRepository::maybe_upgrade_schema();
-
-			// Same reasoning: an in-place update would otherwise leave a stale Gateway Key until the
-			// merchant next saves settings.
 			IfthenpayLpLegacySettingsCleanup::maybe_run();
 
-			// Same reasoning: an in-place update from a version that never scheduled this cron must
-			// still end up with it scheduled.
 			if ( ! wp_next_scheduled( IfthenpayLpExpirySweep::HOOK ) ) {
 				wp_schedule_event( time(), 'hourly', IfthenpayLpExpirySweep::HOOK );
 			}
