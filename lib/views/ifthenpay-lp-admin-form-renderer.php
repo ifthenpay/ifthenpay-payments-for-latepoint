@@ -275,8 +275,9 @@ class IfthenpayLpAdminFormRenderer {
 				</div>
 				<?php
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
+				self::render_timing_section_intro();
 				self::render_timing_fields(
-					__( 'Multibanco Timing', 'ifthenpay-payments-for-latepoint' ),
+					__( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
 					$deferred_catalog['MB']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_multibanco_validity_days',
@@ -284,20 +285,16 @@ class IfthenpayLpAdminFormRenderer {
 						'default' => IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
 						'min'     => IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
 						'max'     => IfthenpayLpMultibancoValidityValidation::MAX_DAYS,
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						'note'    => __( 'How long a customer has to pay before the reference expires and the slot is released. Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
 					),
 					array(
 						'field'   => 'ifthenpay_multibanco_lead_time_days',
 						'default' => IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
 						'min'     => IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
 						'max'     => IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS,
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						'note'    => __( "Multibanco won't be offered for an appointment sooner than this. Default %1\$d, accepts %2\$d–%3\$d.", 'ifthenpay-payments-for-latepoint' ),
 					)
 				);
 				self::render_timing_fields(
-					__( 'Payshop Timing', 'ifthenpay-payments-for-latepoint' ),
+					__( 'Payshop', 'ifthenpay-payments-for-latepoint' ),
 					$deferred_catalog['PAYSHOP']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_payshop_validity_days',
@@ -305,16 +302,12 @@ class IfthenpayLpAdminFormRenderer {
 						'default' => IfthenpayLpPaymentProcessor::DEFAULT_PAYSHOP_VALIDITY_DAYS,
 						'min'     => IfthenpayLpPayshopValidityValidation::MIN_DAYS,
 						'max'     => IfthenpayLpPayshopValidityValidation::MAX_DAYS,
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						'note'    => __( 'How long a customer has to pay before the reference expires and the slot is released. Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
 					),
 					array(
 						'field'   => 'ifthenpay_payshop_lead_time_days',
 						'default' => IfthenpayLpPaymentMethodAvailability::DEFAULT_PAYSHOP_LEAD_TIME_DAYS,
 						'min'     => IfthenpayLpPayshopLeadTimeValidation::MIN_DAYS,
 						'max'     => IfthenpayLpPayshopLeadTimeValidation::MAX_DAYS,
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						'note'    => __( "Payshop won't be offered for an appointment sooner than this. Default %1\$d, accepts %2\$d–%3\$d.", 'ifthenpay-payments-for-latepoint' ),
 					)
 				);
 				?>
@@ -324,86 +317,108 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * The two settings that together keep a deferred reference inside a real payment window: how
-	 * long it stays payable (also clamped at payment time against the appointment itself, so it can
-	 * never outlive it) and how close to the appointment it can still be offered at all. Side by
-	 * side — a merchant reading one naturally wants to see the other; e.g. "3-day validity" only
-	 * means something in combination with "offered starting 2 days out". Shared by Multibanco and
-	 * Payshop's own timing sections (render_pay_later_configuration()) — the two settings pairs are
-	 * independent (own values, own defaults), only the rendering shape is identical. The header
-	 * carries the same icon as this method's own row in the list above it, so which block belongs to
-	 * which method is visible at a glance rather than inferred from two identically-worded "Timing"
-	 * headings in a row. Save-time range validation for both fields is
-	 * IfthenpayLpWholeDaysSettingValidation, wired up in the main plugin file via each setting's own
-	 * validator; left blank, each side has its own default applied elsewhere at the moment it matters.
+	 * The two field concepts, explained once — Multibanco and Payshop's own sections below repeat
+	 * only the numbers (their own defaults/ranges differ), not this explanation, since the concepts
+	 * themselves don't differ between methods. Saying it twice was the actual redundancy the
+	 * previous per-method "Timing" heading + full-sentence field notes produced; it also caused the
+	 * two methods' rows to visibly disalign, since one method's longer note would wrap onto a
+	 * second line while the other's stayed on one.
+	 */
+	private static function render_timing_section_intro(): void {
+		?>
+		<div class="label-with-description ifthenpay-timing-heading">
+			<h3><?php echo esc_html__( 'Timing', 'ifthenpay-payments-for-latepoint' ); ?></h3>
+			<div class="label-desc">
+				<?php echo esc_html__( 'Reference Validity is how long a reference stays payable once issued, before the slot is released. Minimum Lead Time is how soon before the appointment a method can still be offered at all.', 'ifthenpay-payments-for-latepoint' ); ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * One method's own Reference Validity + Minimum Lead Time fields — the pair that together keep
+	 * a deferred reference inside a real payment window (also clamped at payment time against the
+	 * appointment itself, so it can never outlive it). Side by side — a merchant reading one
+	 * naturally wants to see the other; e.g. "3-day validity" only means something in combination
+	 * with "offered starting 2 days out". Shared by Multibanco and Payshop's own sections
+	 * (render_pay_later_configuration(), directly below render_timing_section_intro()'s shared
+	 * explanation) — the two settings pairs are independent (own values, own defaults), only the
+	 * rendering shape is identical. The heading carries the same icon as this method's own row in
+	 * the list above it, so which block belongs to which method is visible at a glance. Each field's
+	 * own note is deliberately just the default/range, not a repeated explanation — short enough to
+	 * stay on one line regardless of which method's numbers are longer, so the two methods' rows
+	 * line up instead of disaligning when one note wraps and the other doesn't. Save-time range
+	 * validation for both fields is IfthenpayLpWholeDaysSettingValidation, wired up in the main
+	 * plugin file via each setting's own validator; left blank, each side has its own default
+	 * applied elsewhere at the moment it matters.
 	 *
-	 * @param string                                                                   $method_label Method-specific heading, e.g. "Multibanco Timing".
-	 * @param string                                                                   $icon_url     Same icon shown for this method in render_methods_list().
-	 * @param array{field:string,label:string,default:int,min:int,max:int,note:string} $validity  Reference Validity field config.
-	 * @param array{field:string,default:int,min:int,max:int,note:string}              $lead_time    Minimum Lead Time field config.
+	 * @param string                                                       $method_label Method name, e.g. "Multibanco".
+	 * @param string                                                       $icon_url     Same icon shown for this method in render_methods_list().
+	 * @param array{field:string,label:string,default:int,min:int,max:int} $validity     Reference Validity field config.
+	 * @param array{field:string,default:int,min:int,max:int}              $lead_time    Minimum Lead Time field config.
 	 */
 	private static function render_timing_fields( string $method_label, string $icon_url, array $validity, array $lead_time ): void {
 		?>
-		<div class="label-with-description ifthenpay-timing-heading">
-			<h3>
+		<div class="ifthenpay-timing-method">
+			<div class="ifthenpay-timing-method-heading">
 				<?php if ( '' !== $icon_url ) : ?>
 					<img src="<?php echo esc_url( $icon_url ); ?>" class="ifthenpay-method-icon" alt="" />
 				<?php endif; ?>
-				<?php echo esc_html( $method_label ); ?>
-			</h3>
-		</div>
-		<div class="os-row">
-			<div class="os-col-6">
-				<?php
-				echo OsFormHelper::number_field(
-					'settings[' . $validity['field'] . ']',
-					esc_html( $validity['label'] ),
-					esc_attr( OsSettingsHelper::get_settings_value( $validity['field'] ) ),
-					$validity['min'],
-					$validity['max'],
-					array(
-						'theme'       => 'simple',
-						'placeholder' => (string) $validity['default'],
-					)
-				);
-				?>
-				<p class="ifthenpay-field-note">
-					<?php
-					printf(
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						esc_html( $validity['note'] ),
-						$validity['default'],
-						$validity['min'],
-						$validity['max']
-					);
-					?>
-				</p>
+				<span><?php echo esc_html( $method_label ); ?></span>
 			</div>
-			<div class="os-col-6">
-				<?php
-				echo OsFormHelper::number_field(
-					'settings[' . $lead_time['field'] . ']',
-					esc_html__( 'Minimum Lead Time (days)', 'ifthenpay-payments-for-latepoint' ),
-					esc_attr( OsSettingsHelper::get_settings_value( $lead_time['field'] ) ),
-					$lead_time['min'],
-					$lead_time['max'],
-					array(
-						'theme'       => 'simple',
-						'placeholder' => (string) $lead_time['default'],
-					)
-				);
-				?>
-				<p class="ifthenpay-field-note">
+			<div class="os-row">
+				<div class="os-col-6">
 					<?php
-					printf(
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						esc_html( $lead_time['note'] ),
-						$lead_time['default'],
-						$lead_time['min'],
-						$lead_time['max']
+					echo OsFormHelper::number_field(
+						'settings[' . $validity['field'] . ']',
+						esc_html( $validity['label'] ),
+						esc_attr( OsSettingsHelper::get_settings_value( $validity['field'] ) ),
+						$validity['min'],
+						$validity['max'],
+						array(
+							'theme'       => 'simple',
+							'placeholder' => (string) $validity['default'],
+						)
 					);
 					?>
-				</p>
+					<p class="ifthenpay-field-note">
+						<?php
+						printf(
+							/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+							esc_html__( 'Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
+							$validity['default'],
+							$validity['min'],
+							$validity['max']
+						);
+						?>
+					</p>
+				</div>
+				<div class="os-col-6">
+					<?php
+					echo OsFormHelper::number_field(
+						'settings[' . $lead_time['field'] . ']',
+						esc_html__( 'Minimum Lead Time (days)', 'ifthenpay-payments-for-latepoint' ),
+						esc_attr( OsSettingsHelper::get_settings_value( $lead_time['field'] ) ),
+						$lead_time['min'],
+						$lead_time['max'],
+						array(
+							'theme'       => 'simple',
+							'placeholder' => (string) $lead_time['default'],
+						)
+					);
+					?>
+					<p class="ifthenpay-field-note">
+						<?php
+						printf(
+							/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+							esc_html__( 'Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
+							$lead_time['default'],
+							$lead_time['min'],
+							$lead_time['max']
+						);
+						?>
+					</p>
+				</div>
 			</div>
 		</div>
 		<?php

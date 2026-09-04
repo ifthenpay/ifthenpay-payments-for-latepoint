@@ -65,25 +65,33 @@
 	display: inline;
 }
 
-/* Each method's own Timing block repeats the same icon shown for it in .ifthenpay-methods-list
-   above, inline with the heading text, so which block belongs to which method reads at a glance
-   instead of two identically-worded "Timing" headings in a row. A top border plus extra spacing
-   (beyond .label-with-description's own native margin) keeps a method's own Timing block visually
-   grouped with itself and separated from the previous method's, rather than the two runs of fields
-   reading as one continuous list. */
+/* The shared "Timing" heading + explanation (render_timing_section_intro()) — said once, not
+   repeated per method — gets a top divider to separate it from the method list above. */
 #paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading {
 	margin-top: 1.5rem;
 	padding-top: 1.5rem;
 	border-top: 1px solid #e3e6ea;
 }
 
-#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading h3 {
+/* Each method's own Timing block (render_timing_fields()) repeats the same icon shown for it in
+   .ifthenpay-methods-list above, inline with its own name, so which block belongs to which method
+   reads at a glance. Only field notes carry the numbers here — the explanation lives once in
+   .ifthenpay-timing-heading above — so both methods' notes stay on one line regardless of which
+   method's numbers are longer, and the two methods' rows line up instead of disaligning when one
+   note wraps and the other doesn't. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method {
+	margin-top: 1rem;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+	font-weight: 600;
+	margin-bottom: 0.5rem;
 }
 
-#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading .ifthenpay-method-icon {
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading .ifthenpay-method-icon {
 	height: 1.1rem;
 	width: auto;
 }
