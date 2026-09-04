@@ -1,7 +1,7 @@
 <?php
 /**
- * The hourly WP-Cron job that cancels deferred payments (Multibanco) whose reference expired
- * unpaid, releasing the slot they were holding.
+ * The hourly WP-Cron job that cancels deferred payments (Multibanco, Payshop) whose reference
+ * expired unpaid, releasing the slot they were holding.
  *
  * @package ifthenpay-payments-for-latepoint
  */
