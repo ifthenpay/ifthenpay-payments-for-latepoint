@@ -251,7 +251,7 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * Multibanco (functional) and Payshop (not yet — spec 002) — their own section, since nothing
+	 * Multibanco (functional) and Payshop (not yet functional) — their own section, since nothing
 	 * in Pay Now Configuration (Gateway Key, Default Method, Description) applies to them, and
 	 * Multibanco has its own setting (reference validity) nothing else needs.
 	 *

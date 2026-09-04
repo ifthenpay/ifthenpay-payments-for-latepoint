@@ -1,9 +1,9 @@
 <?php
 /**
- * Parses and validates the inbound payment-notification query string, per
- * specs/001-multibanco-deferred/contracts/callback.md. We chose these five parameter names
- * ourselves when registering the callback template (IfthenpayLpCallbackRegistration) — see that
- * contract for why a single shape now covers every method, deferred or realtime.
+ * Parses and validates the inbound payment-notification query string. We chose these five
+ * parameter names ourselves when registering the callback template
+ * (IfthenpayLpCallbackRegistration), which is why a single shape now covers every method,
+ * deferred or realtime.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -13,11 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Every field is an opaque string. `amount`, `reference` and `apk` are required per the contract's
- * own validation order (step 1); `method` and `request_id` are always sent by ifthenpay from our
- * own template but are not themselves re-validated here — a missing one becomes ''. No length or
- * digits-only assertion is ever applied: real records carry a `request_id` of `"0"` and a
- * `reference` that is a domain name (see research.md).
+ * Every field is an opaque string. `amount`, `reference` and `apk` are required, checked first as
+ * the cheapest, most decisive validation; `method` and `request_id` are always sent by ifthenpay
+ * from our own template but are not themselves re-validated here — a missing one becomes ''. No
+ * length or digits-only assertion is ever applied: real records carry a `request_id` of `"0"` and
+ * a `reference` that is a domain name.
  */
 class IfthenpayLpCallbackParams {
 
@@ -112,7 +112,7 @@ class IfthenpayLpCallbackParams {
 			return false;
 		}
 
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- decoding the anti-phishing key ifthenpay itself base64-encoded (research.md), not obfuscation.
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- decoding the anti-phishing key ifthenpay itself base64-encoded, not obfuscation.
 		$decoded = base64_decode( $this->apk, true );
 		if ( false === $decoded ) {
 			return false;

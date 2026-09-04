@@ -2,9 +2,8 @@
 /**
  * Buckets this add-on's payment methods into LatePoint's "now" vs "later" payment-time groups —
  * the hinge that lets a deferred method (Multibanco) commit a booking unpaid instead of blocking
- * checkout. See specs/001-multibanco-deferred/plan.md §1 and research.md's own note that
- * `add_all_payment_methods_to_payment_times()` previously hardcoded every method into "now",
- * silently contradicting a method's own declared `time_type`.
+ * checkout. `add_all_payment_methods_to_payment_times()` previously hardcoded every method into
+ * "now", silently contradicting a method's own declared `time_type`.
  *
  * @package ifthenpay-payments-for-latepoint
  */

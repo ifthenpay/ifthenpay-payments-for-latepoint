@@ -56,11 +56,11 @@ class IfthenpayLpExpiry {
 	 * The reverse direction: turns the Multibanco reference API's own returned `ExpiryDate`
 	 * (`DD-MM-YYYY`, verified against a real sandbox call — see
 	 * IfthenpayLpMultibancoReference) into the repository's `expires_at` DATETIME — end of that
-	 * day, plus a margin for callback delivery, never `now + N days` (plan.md §7: a reference
-	 * created in the morning with a one-day window must still be payable that evening; computing
-	 * from creation time instead of the real deadline would cancel it hours too early). Nothing is
+	 * day, plus a margin for callback delivery, never `now + N days` (a reference created in the
+	 * morning with a one-day window must still be payable that evening; computing from creation
+	 * time instead of the real deadline would cancel it hours too early). Nothing is
 	 * assumed about the merchant's own validity setting here — this trusts the value ifthenpay
-	 * itself returned, per D-1's own rationale for calling the reference API directly.
+	 * itself returned.
 	 *
 	 * @param string $expiry_date_ddmmyyyy The API response's own `ExpiryDate` field.
 	 * @param int    $margin_hours         Hours added after end-of-day, covering ifthenpay's own

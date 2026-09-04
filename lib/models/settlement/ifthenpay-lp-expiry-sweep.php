@@ -1,9 +1,7 @@
 <?php
 /**
  * The hourly WP-Cron job that cancels deferred payments (Multibanco) whose reference expired
- * unpaid, releasing the slot they were holding (D-3/D-4). See
- * specs/001-multibanco-deferred/plan.md §7 and contracts/settlement.md's "Interaction with the
- * expiry job".
+ * unpaid, releasing the slot they were holding.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -79,7 +77,7 @@ class IfthenpayLpExpirySweep {
 		}
 
 		foreach ( $order->get_bookings_from_order_items( true ) as $booking ) {
-			// The one status that actually releases the slot (D-3: availability excludes only
+			// The one status that actually releases the slot (availability excludes only
 			// cancelled bookings) — nothing else does.
 			OsBookingHelper::change_booking_status( $booking->id, LATEPOINT_BOOKING_STATUS_CANCELLED );
 		}

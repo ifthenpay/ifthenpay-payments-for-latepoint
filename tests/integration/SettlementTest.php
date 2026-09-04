@@ -1,9 +1,9 @@
 <?php
 /**
  * Proves IfthenpayLpSettlement::settle_payment() against a real order+booking+invoice chain and
- * real LatePoint state-change helpers — one test per guarantee in
- * specs/001-multibanco-deferred/contracts/settlement.md. Brain Monkey can't exercise real
- * OsModel::save() or booking/order transitions, so this needs the wp-phpunit harness.
+ * real LatePoint state-change helpers — one test per guarantee this method makes about settling a
+ * payment. Brain Monkey can't exercise real OsModel::save() or booking/order transitions, so this
+ * needs the wp-phpunit harness.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -166,7 +166,7 @@ class SettlementTest extends WP_UnitTestCase {
 
 	/**
 	 * A request id with no matching record at all is rejected — nothing to settle, and nothing is
-	 * revealed about whether a record with a different id exists (NFR-6).
+	 * revealed about whether a record with a different id exists.
 	 */
 	public function test_unknown_request_id_is_rejected(): void {
 		$result = IfthenpayLpSettlement::settle_payment( 'REQ-DOES-NOT-EXIST', array( 'amount' => '25.00' ), 'callback' );

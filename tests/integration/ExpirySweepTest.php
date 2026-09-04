@@ -1,8 +1,8 @@
 <?php
 /**
  * Proves IfthenpayLpExpirySweep — the hourly cron that cancels deferred payments (Multibanco)
- * whose reference expired unpaid, releasing the slot (D-3/D-4). One test per guarantee in
- * plan.md §7 and contracts/settlement.md's "Interaction with the expiry job".
+ * whose reference expired unpaid, releasing the slot. One test per guarantee this job makes about
+ * its interaction with settlement.
  *
  * @package ifthenpay-payments-for-latepoint
  */

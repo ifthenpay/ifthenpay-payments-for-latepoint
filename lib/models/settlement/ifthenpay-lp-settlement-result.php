@@ -1,7 +1,6 @@
 <?php
 /**
- * The outcome of IfthenpayLpSettlement::settle_payment() — see
- * specs/001-multibanco-deferred/contracts/settlement.md. Deliberately knows nothing about HTTP;
+ * The outcome of IfthenpayLpSettlement::settle_payment(). Deliberately knows nothing about HTTP;
  * each caller (the REST callback, the polling endpoint, the manual re-check action) maps a status
  * to whatever response shape it needs.
  *

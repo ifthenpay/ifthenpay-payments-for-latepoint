@@ -1,8 +1,8 @@
 <?php
 /**
  * Proves IfthenpayLpPaymentTimes::add_methods() — the fix for the bug where every method was
- * hardcoded into LATEPOINT_PAYMENT_TIME_NOW regardless of its own `time_type` (research.md,
- * plan.md §1). The realtime gateway and a deferred method must land in different buckets, or
+ * hardcoded into LATEPOINT_PAYMENT_TIME_NOW regardless of its own `time_type`. The realtime
+ * gateway and a deferred method must land in different buckets, or
  * checkout blocks Multibanco waiting for a payment that will not arrive for days.
  *
  * @package ifthenpay-payments-for-latepoint
@@ -26,7 +26,7 @@ final class PaymentTimesTest extends TestCase {
 
 	/**
 	 * The two real methods this add-on registers: realtime Pay By Link stays 'now', deferred
-	 * Multibanco lands under 'later' — the exact regression tasks.md T-07 calls for.
+	 * Multibanco lands under 'later' — the exact regression this bucketing must guard against.
 	 */
 	public function test_realtime_and_deferred_methods_land_in_different_buckets(): void {
 		$payment_methods = array(

@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Two commands: re-registering the callback URL against the currently saved Gateway Key (the
  * merchant-facing fix when a site's URL changes; during development, the fix for a cloudflared
  * tunnel URL that rotated since the last save), and manually settling a payment whose callback was
- * missed or failed (D-5, spec 001) — the practical way to trigger
+ * missed or failed — the practical way to trigger
  * OsPaymentsIfthenpaySettingsController::recheck_payment() without a dedicated admin UI button yet.
  */
 class IfthenpayLpCliCommands {
@@ -62,7 +62,7 @@ class IfthenpayLpCliCommands {
 	}
 
 	/**
-	 * Manually settles a payment whose callback was missed or failed (D-5) — confirms the payment
+	 * Manually settles a payment whose callback was missed or failed — confirms the payment
 	 * with ifthenpay directly (IfthenpayLpTransactionStatus::check()) before settling anything, so
 	 * running it against a payment that never actually completed is a safe no-op, not a risk.
 	 *

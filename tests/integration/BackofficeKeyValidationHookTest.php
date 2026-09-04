@@ -50,9 +50,9 @@ class BackofficeKeyValidationHookTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An out-of-range Reference Validity aborts the real save (T-14, spec 001) — the same hook
-	 * wiring as the Backoffice Key, proven separately since it's a different setting name and
-	 * needs no decryption.
+	 * An out-of-range Reference Validity aborts the real save — the same hook wiring as the
+	 * Backoffice Key, proven separately since it's a different setting name and needs no
+	 * decryption.
 	 */
 	public function test_out_of_range_multibanco_validity_blocks_the_real_save(): void {
 		$model        = new OsSettingsModel();

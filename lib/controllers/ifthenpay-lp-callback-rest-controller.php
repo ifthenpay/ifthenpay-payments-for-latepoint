@@ -1,9 +1,9 @@
 <?php
 /**
  * The inbound payment-notification endpoint — a plain WP REST route, not one of LatePoint's own
- * `latepoint_route_call` actions (payments-ifthenpay-checkout-controller.php). See
- * specs/001-multibanco-deferred/plan.md §4: a stable public URL independent of LatePoint's
- * admin-post plumbing, kept separate from the add-on's browser-facing controller actions.
+ * `latepoint_route_call` actions (payments-ifthenpay-checkout-controller.php). It needs a stable
+ * public URL independent of LatePoint's admin-post plumbing, kept separate from the add-on's
+ * browser-facing controller actions.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -13,11 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Implements the validation order and response mapping from
- * specs/001-multibanco-deferred/contracts/callback.md exactly: cheapest, most decisive checks
- * first (parameter presence, then a fast unlocked lookup, then the anti-phishing key) before ever
- * calling IfthenpayLpSettlement::settle_payment() — which owns the lock, the authoritative
- * already-settled check, and the authoritative amount check. No response body in any case.
+ * Validates cheapest, most decisive checks first (parameter presence, then a fast unlocked
+ * lookup, then the anti-phishing key) before ever calling IfthenpayLpSettlement::settle_payment()
+ * — which owns the lock, the authoritative already-settled check, and the authoritative amount
+ * check. No response body in any case.
  */
 class IfthenpayLpCallbackRestController {
 
@@ -156,7 +155,7 @@ class IfthenpayLpCallbackRestController {
 	}
 
 	/**
-	 * Maps a settlement outcome to the response table in contracts/callback.md.
+	 * Maps a settlement outcome to the HTTP status ifthenpay expects for it.
 	 *
 	 * @param IfthenpayLpSettlementResult $result As returned by settle_payment().
 	 */
