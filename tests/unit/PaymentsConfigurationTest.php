@@ -47,6 +47,7 @@ final class PaymentsConfigurationTest extends TestCase {
 				'esc_html__' => static fn( $text ) => $text,
 				'esc_attr'   => static fn( $text ) => $text,
 				'esc_url'    => static fn( $text ) => $text,
+				'__'         => static fn( $text ) => $text,
 			)
 		);
 	}

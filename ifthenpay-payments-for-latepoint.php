@@ -100,6 +100,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-payshop-validity-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-payshop-lead-time-validation.php';
 		}
 
 		/**
@@ -190,6 +192,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_validity_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_lead_time_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_payshop_validity_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_payshop_lead_time_on_save' ), 10, 3 );
 
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
@@ -314,6 +318,40 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			$error = IfthenpayLpMultibancoLeadTimeValidation::check( (string) $model->value );
+			if ( null !== $error ) {
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
+		 * Same hook, same shape as validate_multibanco_validity_on_save() — Payshop's own setting,
+		 * not shared with Multibanco's.
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_payshop_validity_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_payshop_validity_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpPayshopValidityValidation::check( (string) $model->value );
+			if ( null !== $error ) {
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
+		 * Same hook, same shape as validate_multibanco_lead_time_on_save() — Payshop's own setting,
+		 * not shared with Multibanco's.
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_payshop_lead_time_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_payshop_lead_time_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpPayshopLeadTimeValidation::check( (string) $model->value );
 			if ( null !== $error ) {
 				$model->add_error( 'validation', $error );
 			}
