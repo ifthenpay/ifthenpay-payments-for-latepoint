@@ -16,7 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Validates cheapest, most decisive checks first (parameter presence, then a fast unlocked
  * lookup, then the anti-phishing key) before ever calling IfthenpayLpSettlement::settle_payment()
  * — which owns the lock, the authoritative already-settled check, and the authoritative amount
- * check. No response body in any case.
+ * check. Every rejection is an empty body; only the success path carries one (see status_for()'s
+ * own docblock for why).
  */
 class IfthenpayLpCallbackRestController {
 
@@ -65,7 +66,8 @@ class IfthenpayLpCallbackRestController {
 		}
 
 		if ( 'realtime' === $record->kind ) {
-			return new WP_REST_Response( null, self::settle_realtime( $record, $params ) );
+			$outcome = self::settle_realtime( $record, $params );
+			return new WP_REST_Response( $outcome['body'], $outcome['status'] );
 		}
 
 		$result = IfthenpayLpSettlement::settle_payment(
@@ -75,7 +77,7 @@ class IfthenpayLpCallbackRestController {
 			$params->reference
 		);
 
-		return new WP_REST_Response( null, self::status_for( $result ) );
+		return new WP_REST_Response( self::body_for( $result ), self::status_for( $result ) );
 	}
 
 	/**
@@ -103,9 +105,9 @@ class IfthenpayLpCallbackRestController {
 	 *
 	 * @param object                    $record As found by token; already gateway-key authenticated.
 	 * @param IfthenpayLpCallbackParams $params As parsed from the request.
-	 * @return int HTTP status.
+	 * @return array{status:int,body:?string}
 	 */
-	private static function settle_realtime( object $record, IfthenpayLpCallbackParams $params ): int {
+	private static function settle_realtime( object $record, IfthenpayLpCallbackParams $params ): array {
 		try {
 			return IfthenpayLpSettlementLock::with_lock(
 				(string) $record->token,
@@ -116,7 +118,11 @@ class IfthenpayLpCallbackRestController {
 		} catch ( IfthenpayLpLockUnavailableException $e ) {
 			// Our own side, not a verdict on the payment — same as the deferred path's own
 			// lock_unavailable handling (IfthenpayLpSettlement::settle_payment()); ifthenpay retries.
-			return 500;
+			unset( $e );
+			return array(
+				'status' => 500,
+				'body'   => null,
+			);
 		}
 	}
 
@@ -126,20 +132,29 @@ class IfthenpayLpCallbackRestController {
 	 * browser's own polling settled this same row in between).
 	 *
 	 * @param IfthenpayLpCallbackParams $params As passed to settle_realtime().
-	 * @return int HTTP status.
+	 * @return array{status:int,body:?string}
 	 */
-	private static function settle_realtime_locked( IfthenpayLpCallbackParams $params ): int {
+	private static function settle_realtime_locked( IfthenpayLpCallbackParams $params ): array {
 		$record = IfthenpayLpTransactionRepository::find_by_token( $params->reference );
 		if ( ! $record ) {
-			return 404;
+			return array(
+				'status' => 404,
+				'body'   => null,
+			);
 		}
 
 		if ( 'PAID' === $record->status ) {
-			return 200;
+			return array(
+				'status' => 200,
+				'body'   => IfthenpayLpSettlementResult::ALREADY_SETTLED,
+			);
 		}
 
 		if ( null !== $record->amount && IfthenpayLpDataFormatter::format_amount( $record->amount ) !== IfthenpayLpDataFormatter::format_amount( $params->amount ) ) {
-			return 409;
+			return array(
+				'status' => 409,
+				'body'   => null,
+			);
 		}
 
 		// Not a txid — the callback's own request_id, the only correlation handle it carries. Kept
@@ -151,7 +166,10 @@ class IfthenpayLpCallbackRestController {
 		);
 		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, true );
 
-		return 200;
+		return array(
+			'status' => 200,
+			'body'   => IfthenpayLpSettlementResult::SETTLED,
+		);
 	}
 
 	/**
@@ -172,5 +190,20 @@ class IfthenpayLpCallbackRestController {
 			default: // FAILED — our own side, not a verdict on the payment; ifthenpay should retry.
 				return 500;
 		}
+	}
+
+	/**
+	 * A body only on the success path — the literal string 'settled' or 'already_settled' — so a
+	 * developer testing this endpoint by hand (curl, a webhook tester) can see which one fired
+	 * without inspecting the database. ifthenpay's own retry engine never reads it: any response
+	 * other than 200 already triggers a retry regardless of which code it is, which is the same
+	 * reason the distinct 403/404/409/500 codes above exist — visibility for a human, not a
+	 * functional need on ifthenpay's side. Every rejection stays an empty body; a settlement
+	 * outcome is the one thing worth a developer being able to tell apart without a DB lookup.
+	 *
+	 * @param IfthenpayLpSettlementResult $result As returned by settle_payment().
+	 */
+	private static function body_for( IfthenpayLpSettlementResult $result ): ?string {
+		return $result->is_settled() ? $result->status() : null;
 	}
 }

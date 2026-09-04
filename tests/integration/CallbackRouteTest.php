@@ -95,6 +95,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$response = $this->dispatch( 'valid-multibanco.txt' );
 
 		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'settled', $response->get_data() );
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-VALID-0001' );
 		$this->assertNotNull( $record );
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
@@ -110,6 +111,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$response = $this->dispatch( 'valid-payshop.txt' );
 
 		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'settled', $response->get_data() );
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( 'REQ-VALID-PAYSHOP-0001' );
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
 	}
@@ -126,7 +128,9 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$second = $this->dispatch( 'duplicate.txt' );
 
 		$this->assertSame( 200, $first->get_status() );
+		$this->assertSame( 'settled', $first->get_data() );
 		$this->assertSame( 200, $second->get_status() );
+		$this->assertSame( 'already_settled', $second->get_data() );
 
 		$transactions = ( new OsTransactionModel() )->where( array( 'token' => 'lp-order-tok-abc123' ) )->get_results_as_models();
 		$this->assertCount( 1, is_array( $transactions ) ? $transactions : array( $transactions ) );
@@ -231,6 +235,7 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$response = $this->dispatch( 'valid-multibanco.txt' );
 
 		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'settled', $response->get_data() );
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'lp-order-tok-abc123' );
 		$this->assertSame( 'PAID', $record->status ); // @phpstan-ignore-line property.notFound
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
@@ -261,7 +266,9 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$second = $this->dispatch( 'duplicate.txt' );
 
 		$this->assertSame( 200, $first->get_status() );
+		$this->assertSame( 'settled', $first->get_data() );
 		$this->assertSame( 200, $second->get_status() );
+		$this->assertSame( 'already_settled', $second->get_data() );
 	}
 
 	/**
@@ -332,14 +339,16 @@ class CallbackRouteTest extends WP_UnitTestCase {
 		$response = $this->dispatch( 'requestid-legacy-zero.txt' );
 
 		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'settled', $response->get_data() );
 		$record = IfthenpayLpTransactionRepository::find_by_request_id( '0' );
 		$this->assertNotNull( $record->settled_at ); // @phpstan-ignore-line property.notFound
 	}
 
 	/**
-	 * No response body in any case — only the status code carries meaning.
+	 * Every rejection carries an empty body — only the status code carries meaning there. A
+	 * settlement outcome is the one exception (see body_for()'s own docblock).
 	 */
-	public function test_response_never_carries_a_body(): void {
+	public function test_rejection_never_carries_a_body(): void {
 		$response = $this->dispatch( 'unknown-reference.txt' );
 
 		$this->assertNull( $response->get_data() );
