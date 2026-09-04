@@ -276,7 +276,8 @@ class IfthenpayLpAdminFormRenderer {
 				<?php
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
 				self::render_timing_fields(
-					esc_html__( 'Multibanco needs a real payment window: how long a reference stays open once issued, and how soon before the appointment it can still be offered at all.', 'ifthenpay-payments-for-latepoint' ),
+					__( 'Multibanco Timing', 'ifthenpay-payments-for-latepoint' ),
+					$deferred_catalog['MB']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_multibanco_validity_days',
 						'label'   => __( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
@@ -296,7 +297,8 @@ class IfthenpayLpAdminFormRenderer {
 					)
 				);
 				self::render_timing_fields(
-					esc_html__( 'Payshop needs a real payment window: how long a reference stays open once issued, and how soon before the appointment it can still be offered at all.', 'ifthenpay-payments-for-latepoint' ),
+					__( 'Payshop Timing', 'ifthenpay-payments-for-latepoint' ),
+					$deferred_catalog['PAYSHOP']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_payshop_validity_days',
 						'label'   => __( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
@@ -328,20 +330,27 @@ class IfthenpayLpAdminFormRenderer {
 	 * side — a merchant reading one naturally wants to see the other; e.g. "3-day validity" only
 	 * means something in combination with "offered starting 2 days out". Shared by Multibanco and
 	 * Payshop's own timing sections (render_pay_later_configuration()) — the two settings pairs are
-	 * independent (own values, own defaults), only the rendering shape is identical. Save-time
-	 * range validation for both fields is IfthenpayLpWholeDaysSettingValidation, wired up in the
-	 * main plugin file via each setting's own validator; left blank, each side has its own default
-	 * applied elsewhere at the moment it matters.
+	 * independent (own values, own defaults), only the rendering shape is identical. The header
+	 * carries the same icon as this method's own row in the list above it, so which block belongs to
+	 * which method is visible at a glance rather than inferred from two identically-worded "Timing"
+	 * headings in a row. Save-time range validation for both fields is
+	 * IfthenpayLpWholeDaysSettingValidation, wired up in the main plugin file via each setting's own
+	 * validator; left blank, each side has its own default applied elsewhere at the moment it matters.
 	 *
-	 * @param string                                                                   $description  Explains what this method's own payment window needs.
+	 * @param string                                                                   $method_label Method-specific heading, e.g. "Multibanco Timing".
+	 * @param string                                                                   $icon_url     Same icon shown for this method in render_methods_list().
 	 * @param array{field:string,label:string,default:int,min:int,max:int,note:string} $validity  Reference Validity field config.
 	 * @param array{field:string,default:int,min:int,max:int,note:string}              $lead_time    Minimum Lead Time field config.
 	 */
-	private static function render_timing_fields( string $description, array $validity, array $lead_time ): void {
+	private static function render_timing_fields( string $method_label, string $icon_url, array $validity, array $lead_time ): void {
 		?>
-		<div class="label-with-description">
-			<h3><?php echo esc_html__( 'Timing', 'ifthenpay-payments-for-latepoint' ); ?></h3>
-			<div class="label-desc"><?php echo $description; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped by every caller (esc_html__()). ?></div>
+		<div class="label-with-description ifthenpay-timing-heading">
+			<h3>
+				<?php if ( '' !== $icon_url ) : ?>
+					<img src="<?php echo esc_url( $icon_url ); ?>" class="ifthenpay-method-icon" alt="" />
+				<?php endif; ?>
+				<?php echo esc_html( $method_label ); ?>
+			</h3>
 		</div>
 		<div class="os-row">
 			<div class="os-col-6">
