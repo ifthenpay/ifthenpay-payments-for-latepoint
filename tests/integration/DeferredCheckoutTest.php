@@ -31,6 +31,14 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	private ?array $last_multibanco_reference_request = null;
 
 	/**
+	 * Same idea as $last_multibanco_reference_request, for `payshop/reference` — captures the
+	 * actual `validade` (YYYYMMDD) the validity clamp computed.
+	 *
+	 * @var array<string,mixed>|null
+	 */
+	private ?array $last_payshop_reference_request = null;
+
+	/**
 	 * Mocks the ifthenpay HTTP layer first — saving the Backoffice Key below goes through the
 	 * plugin's own save-time validation (IfthenpayLpBackofficeKeyValidation), which makes a real
 	 * network call unless intercepted. Then seeds the settings a working Multibanco checkout needs.
@@ -83,23 +91,27 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 			$this->last_multibanco_reference_request = json_decode( (string) ( $args['body'] ?? '' ), true );
 			return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'multibanco-reference-valid.json' ) );
 		}
+		if ( false !== strpos( $url, 'payshop/reference' ) ) {
+			$this->last_payshop_reference_request = json_decode( (string) ( $args['body'] ?? '' ), true );
+			return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'payshop-reference-valid.json' ) );
+		}
 
 		return $preempt;
 	}
 
 	/**
-	 * Builds a not-yet-converted order intent selecting Multibanco, the shape
+	 * Builds a not-yet-converted order intent selecting a deferred method, the shape
 	 * OsPaymentsHelper::should_processor_handle_payment_for_order_intent() and
-	 * IfthenpayLpPaymentProcessor::process_deferred_payment_by_intent() both need to see —
-	 * including a real booking in cart_items_data, which the validity clamp now reads via
-	 * build_cart_object() (a real checkout always has this; only the fixture was previously
-	 * cutting the corner).
+	 * IfthenpayLpPaymentProcessor's own deferred processing methods both need to see — including a
+	 * real booking in cart_items_data, which the validity clamp now reads via build_cart_object()
+	 * (a real checkout always has this; only the fixture was previously cutting the corner).
 	 *
+	 * @param string $method           'ifthenpay_multibanco' or 'ifthenpay_payshop'.
 	 * @param string $amount           The intent's charge_amount.
 	 * @param string $appointment_date Y-m-d; default is safely far from any lead-time floor these
 	 *                                 tests don't otherwise care about.
 	 */
-	private function create_multibanco_order_intent( string $amount = '25.00', string $appointment_date = '' ): OsOrderIntentModel {
+	private function create_deferred_order_intent( string $method, string $amount = '25.00', string $appointment_date = '' ): OsOrderIntentModel {
 		if ( '' === $appointment_date ) {
 			$appointment_date = gmdate( 'Y-m-d', strtotime( '+10 days' ) );
 		}
@@ -117,7 +129,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		$order_intent->payment_data    = wp_json_encode(
 			array(
 				'processor' => 'ifthenpay',
-				'method'    => 'ifthenpay_multibanco',
+				'method'    => $method,
 				'time'      => LATEPOINT_PAYMENT_TIME_LATER,
 				'portion'   => LATEPOINT_PAYMENT_PORTION_FULL,
 				'token'     => '',
@@ -171,7 +183,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_multibanco_validity_days', '10' );
 		$tomorrow = gmdate( 'Y-m-d', strtotime( '+1 day' ) );
 
-		$order_intent = $this->create_multibanco_order_intent( '25.00', $tomorrow );
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco', '25.00', $tomorrow );
 		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$this->assertNotNull( $this->last_multibanco_reference_request );
@@ -186,7 +198,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_multibanco_validity_days', '5' );
 		$far_out = gmdate( 'Y-m-d', strtotime( '+30 days' ) );
 
-		$order_intent = $this->create_multibanco_order_intent( '25.00', $far_out );
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco', '25.00', $far_out );
 		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$this->assertNotNull( $this->last_multibanco_reference_request );
@@ -199,7 +211,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	 * OsOrderIntentModel::convert_to_order() goes on to commit the booking.
 	 */
 	public function test_deferred_checkout_produces_a_pending_reference_without_an_intent_error(): void {
-		$order_intent = $this->create_multibanco_order_intent( '25.00' );
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco', '25.00' );
 
 		$result = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
@@ -222,7 +234,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	 * key and the value the callback will carry back.
 	 */
 	public function test_stores_ifthenpays_own_request_id(): void {
-		$order_intent = $this->create_multibanco_order_intent();
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco' );
 
 		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
@@ -237,7 +249,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	public function test_not_offered_when_multibanco_is_not_enabled_in_settings(): void {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'MBWAY' ) );
 
-		$order_intent = $this->create_multibanco_order_intent();
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco' );
 		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
 
 		$this->assertSame( array( 'sentinel' => true ), $result );
@@ -252,7 +264,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 	public function test_not_offered_when_gateway_key_has_no_mb_account(): void {
 		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'GATEWAY-WITH-NO-ACCOUNTS' );
 
-		$order_intent = $this->create_multibanco_order_intent();
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco' );
 		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
 
 		$this->assertSame( array( 'sentinel' => true ), $result );
@@ -280,7 +292,7 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 			3
 		);
 
-		$order_intent = $this->create_multibanco_order_intent();
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_multibanco' );
 		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
 
 		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
@@ -314,6 +326,164 @@ class DeferredCheckoutTest extends WP_UnitTestCase {
 			array(
 				'processor' => 'ifthenpay',
 				'method'    => 'ifthenpay_multibanco',
+				'time'      => LATEPOINT_PAYMENT_TIME_LATER,
+				'portion'   => LATEPOINT_PAYMENT_PORTION_FULL,
+			)
+		);
+		$transaction_intent->save();
+
+		$result = IfthenpayLpPaymentProcessor::process_payment_for_transaction_intent( array( 'sentinel' => true ), $transaction_intent );
+
+		$this->assertSame( array( 'sentinel' => true ), $result );
+		$this->assertFalse( $transaction_intent->get_error() );
+	}
+
+	/**
+	 * Payshop's own equivalent of test_validity_is_clamped_below_the_settings_own_minimum_when_the_appointment_is_tomorrow() —
+	 * proves the actual `validade` sent, not just that checkout succeeds. An appointment tomorrow
+	 * clamps to 0 days out (today), even with a validity setting of 10.
+	 */
+	public function test_payshop_validity_is_clamped_below_the_settings_own_minimum_when_the_appointment_is_tomorrow(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payshop_validity_days', '10' );
+		$tomorrow = gmdate( 'Y-m-d', strtotime( '+1 day' ) );
+
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop', '25.00', $tomorrow );
+		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
+
+		$this->assertNotNull( $this->last_payshop_reference_request );
+		$this->assertSame( gmdate( 'Ymd' ), $this->last_payshop_reference_request['validade'] );
+	}
+
+	/**
+	 * The reverse: an appointment far enough out is never clamped — the merchant's own setting is
+	 * sent exactly as saved.
+	 */
+	public function test_payshop_validity_is_not_clamped_when_the_appointment_is_far_out(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payshop_validity_days', '5' );
+		$far_out = gmdate( 'Y-m-d', strtotime( '+30 days' ) );
+
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop', '25.00', $far_out );
+		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
+
+		$this->assertNotNull( $this->last_payshop_reference_request );
+		$this->assertSame( gmdate( 'Ymd', strtotime( '+5 days' ) ), $this->last_payshop_reference_request['validade'] );
+	}
+
+	/**
+	 * A Payshop checkout produces a pending, unpaid order intent and a stored reference — without
+	 * blocking, and without adding an intent error. No entity, unlike Multibanco.
+	 */
+	public function test_payshop_deferred_checkout_produces_a_pending_reference_without_an_intent_error(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop' );
+
+		$result = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
+
+		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
+		$this->assertFalse( $order_intent->get_error() );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key );
+		$this->assertNotNull( $record );
+		$this->assertSame( 'deferred', $record->kind ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'PAYSHOP', $record->method ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'PENDING', $record->status ); // @phpstan-ignore-line property.notFound
+		$this->assertNull( $record->entity ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( '900123456', $record->reference ); // @phpstan-ignore-line property.notFound -- from payshop-reference-valid.json
+		$this->assertNotNull( $record->expires_at ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( self::GATEWAY_KEY, $record->gateway_key ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The stored request id is the reference API's own RequestId.
+	 */
+	public function test_payshop_stores_ifthenpays_own_request_id(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop' );
+
+		IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key );
+		$this->assertSame( 'C9lXGpQR4c7mzkZfFUb5', $record->request_id ); // @phpstan-ignore-line property.notFound -- from payshop-reference-valid.json
+	}
+
+	/**
+	 * Payshop not checked in Payment Methods: never offered at checkout — a no-op, not an error.
+	 */
+	public function test_payshop_not_offered_when_not_enabled_in_settings(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'MB' ) );
+
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop' );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
+
+		$this->assertSame( array( 'sentinel' => true ), $result );
+		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key ) );
+	}
+
+	/**
+	 * A gateway with no PAYSHOP account: same as above, not offered.
+	 */
+	public function test_payshop_not_offered_when_gateway_key_has_no_payshop_account(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'GATEWAY-WITH-NO-ACCOUNTS' );
+
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop' );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array( 'sentinel' => true ), $order_intent );
+
+		$this->assertSame( array( 'sentinel' => true ), $result );
+		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key ) );
+	}
+
+	/**
+	 * A rejected reference request is a checkout error the customer can act on. The intent gets an
+	 * error and nothing is stored.
+	 */
+	public function test_payshop_reference_api_rejection_adds_an_intent_error_and_stores_nothing(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+
+		// Priority 20, after setUp()'s own mock (priority 10) — both match the same
+		// 'payshop/reference' URL and neither consults the incoming $preempt, so whichever runs
+		// last wins; this one needs to be that one.
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, $args, $url ) {
+				if ( false !== strpos( $url, 'payshop/reference' ) ) {
+					return ifthenpay_lp_mock_response( 200, ifthenpay_lp_fixture( 'payshop-reference-invalid-key.json' ) );
+				}
+				return $preempt;
+			},
+			20,
+			3
+		);
+
+		$order_intent = $this->create_deferred_order_intent( 'ifthenpay_payshop' );
+		$result       = IfthenpayLpPaymentProcessor::process_payments_for_order_intent( array(), $order_intent );
+
+		$this->assertSame( LATEPOINT_STATUS_ERROR, $result['status'] );
+		$this->assertNotFalse( $order_intent->get_error() );
+		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( $order_intent->intent_key ) );
+	}
+
+	/**
+	 * Selecting Payshop for a direct invoice payment (TRANSACTION intent, not ORDER) is safely
+	 * excluded — same reasoning as test_multibanco_on_a_transaction_intent_is_not_offered().
+	 */
+	public function test_payshop_on_a_transaction_intent_is_not_offered(): void {
+		$customer             = new OsCustomerModel();
+		$customer->first_name = 'Test';
+		$customer->last_name  = 'Customer';
+		$customer->email      = 'ifthenpay-lp-deferred-txn-' . wp_generate_password( 8, false ) . '@example.com';
+		$customer->save();
+
+		$transaction_intent                = new OsTransactionIntentModel();
+		$transaction_intent->order_id      = 1; // Presence-validated only; nothing here joins out to a real order.
+		$transaction_intent->customer_id   = $customer->id;
+		$transaction_intent->charge_amount = '25.00';
+		$transaction_intent->payment_data  = wp_json_encode(
+			array(
+				'processor' => 'ifthenpay',
+				'method'    => 'ifthenpay_payshop',
 				'time'      => LATEPOINT_PAYMENT_TIME_LATER,
 				'portion'   => LATEPOINT_PAYMENT_PORTION_FULL,
 			)

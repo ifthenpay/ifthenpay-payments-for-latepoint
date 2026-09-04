@@ -48,7 +48,10 @@ class IfthenpayLpPaymentProcessor {
 
 		$method = $order_intent->get_payment_data_value( 'method' );
 		if ( 'ifthenpay_multibanco' === $method ) {
-			return self::process_deferred_payment_by_intent( $order_intent );
+			return self::process_deferred_multibanco_payment_by_intent( $order_intent );
+		}
+		if ( 'ifthenpay_payshop' === $method ) {
+			return self::process_deferred_payshop_payment_by_intent( $order_intent );
 		}
 		if ( 'ifthenpay_gateway' !== $method ) {
 			return $result;
@@ -76,6 +79,9 @@ class IfthenpayLpPaymentProcessor {
 		$method = $transaction_intent->get_payment_data_value( 'method' );
 		if ( 'ifthenpay_multibanco' === $method ) {
 			return self::intent_error( $transaction_intent, __( 'Multibanco is not available for this payment. Please choose another method.', 'ifthenpay-payments-for-latepoint' ) );
+		}
+		if ( 'ifthenpay_payshop' === $method ) {
+			return self::intent_error( $transaction_intent, __( 'Payshop is not available for this payment. Please choose another method.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 		if ( 'ifthenpay_gateway' !== $method ) {
 			return $result;
@@ -144,6 +150,30 @@ class IfthenpayLpPaymentProcessor {
 	}
 
 	/**
+	 * A reference must never outlive the appointment it pays for — the merchant's own setting
+	 * (already defaulted/floored by the caller) is a ceiling, not the value sent as-is. Shared by
+	 * both deferred methods since the rule itself must never drift between them — a genuine
+	 * correctness rule, not incidental duplication.
+	 *
+	 * $days_until_appointment is null only when the intent carries no booking item at all (not a
+	 * real deferred-checkout scenario today, but left unclamped rather than fatal if it ever
+	 * happens). max(0, ...) never returns a negative value even if this intent somehow reached
+	 * checkout below the minimum lead time (IfthenpayLpPaymentMethodAvailability's own gate is what
+	 * should normally prevent that — this is the defensive backstop for a resumed or legacy intent,
+	 * not the primary guarantee).
+	 *
+	 * @param int      $validity_days          The merchant's own setting, already defaulted/floored.
+	 * @param int|null $days_until_appointment As returned by IfthenpayLpAppointmentLeadTime::days_until_earliest_booking().
+	 */
+	private static function clamp_validity_to_appointment( int $validity_days, ?int $days_until_appointment ): int {
+		if ( null === $days_until_appointment ) {
+			return $validity_days;
+		}
+
+		return max( 0, min( $validity_days, $days_until_appointment - 1 ) );
+	}
+
+	/**
 	 * Generates a Multibanco reference for a deferred checkout and persists it. Returns a
 	 * non-success result WITHOUT calling $order_intent->add_error() — verified directly against
 	 * LatePoint's own source: OsOrderIntentModel::convert_to_order() aborts conversion only on
@@ -154,7 +184,7 @@ class IfthenpayLpPaymentProcessor {
 	 * @param OsOrderIntentModel $order_intent The order intent being converted.
 	 * @return array<string,mixed>
 	 */
-	private static function process_deferred_payment_by_intent( OsOrderIntentModel $order_intent ): array {
+	private static function process_deferred_multibanco_payment_by_intent( OsOrderIntentModel $order_intent ): array {
 		$amount = IfthenpayLpDataFormatter::format_amount( $order_intent->charge_amount );
 
 		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
@@ -173,18 +203,10 @@ class IfthenpayLpPaymentProcessor {
 			// validator — a missing or zero setting must never mean "no expiry".
 			$validity_days = self::DEFAULT_MULTIBANCO_VALIDITY_DAYS;
 		}
-
-		// A reference must never outlive the appointment it pays for — the setting above is a
-		// ceiling, not the value sent as-is. days_until_earliest_booking() is null only when the
-		// intent carries no booking item at all (not a real deferred-checkout scenario today, but
-		// left unclamped rather than fatal if it ever happens). max(0, ...) never sends a negative
-		// expiry_days even if this intent somehow reached checkout below the minimum lead time
-		// (IfthenpayLpPaymentMethodAvailability's own gate is what should normally prevent that —
-		// this is the defensive backstop for a resumed or legacy intent, not the primary guarantee).
-		$days_until_appointment = IfthenpayLpAppointmentLeadTime::days_until_earliest_booking( $order_intent->build_cart_object() );
-		if ( null !== $days_until_appointment ) {
-			$validity_days = max( 0, min( $validity_days, $days_until_appointment - 1 ) );
-		}
+		$validity_days = self::clamp_validity_to_appointment(
+			$validity_days,
+			IfthenpayLpAppointmentLeadTime::days_until_earliest_booking( $order_intent->build_cart_object() )
+		);
 
 		try {
 			$reference = IfthenpayLpMultibancoReference::create( $mb_key, $order_intent->intent_key, $amount, IfthenpayLpExpiry::to_multibanco_days( $validity_days ) );
@@ -205,6 +227,70 @@ class IfthenpayLpPaymentProcessor {
 				'entity'      => $reference->entity,
 				'reference'   => $reference->reference,
 				'expires_at'  => IfthenpayLpExpiry::to_expires_at_datetime( $reference->expiry_date ),
+			)
+		);
+
+		return array(
+			'status'  => LATEPOINT_STATUS_ERROR,
+			'message' => '',
+		);
+	}
+
+	/**
+	 * Generates a Payshop reference for a deferred checkout and persists it — same contract as
+	 * process_deferred_multibanco_payment_by_intent(), differing only where Payshop's own API
+	 * actually differs: no entity, expiry sent (and reconstructed for `expires_at`) as an absolute
+	 * `YYYYMMDD` date rather than a day count, since ifthenpay's own create response never echoes
+	 * an expiry back the way Multibanco's does.
+	 *
+	 * @param OsOrderIntentModel $order_intent The order intent being converted.
+	 * @return array<string,mixed>
+	 */
+	private static function process_deferred_payshop_payment_by_intent( OsOrderIntentModel $order_intent ): array {
+		$amount = IfthenpayLpDataFormatter::format_amount( $order_intent->charge_amount );
+
+		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
+		$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		$dataset        = '' !== $backoffice_key ? IfthenpayLpGatewayDataset::get( $backoffice_key ) : null;
+		$payshop_key    = $dataset['accounts'][ $gateway_key ]['PAYSHOP'] ?? '';
+
+		if ( '' === $payshop_key ) {
+			return self::intent_error( $order_intent, __( 'Payshop is not currently available. Please choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
+		}
+
+		$validity_days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_payshop_validity_days', self::DEFAULT_PAYSHOP_VALIDITY_DAYS );
+		if ( $validity_days <= 0 ) {
+			// Same reasoning as the Multibanco branch: IfthenpayLpPayshopValidityValidation blocks
+			// a save below its own MIN_DAYS (1), so this only catches a value saved before that
+			// floor existed, or written outside the validator.
+			$validity_days = self::DEFAULT_PAYSHOP_VALIDITY_DAYS;
+		}
+		$validity_days = self::clamp_validity_to_appointment(
+			$validity_days,
+			IfthenpayLpAppointmentLeadTime::days_until_earliest_booking( $order_intent->build_cart_object() )
+		);
+
+		$expiry_date = IfthenpayLpExpiry::to_date( $validity_days );
+
+		try {
+			$reference = IfthenpayLpPayshopReference::create( $payshop_key, $order_intent->intent_key, $amount, $expiry_date );
+		} catch ( IfthenpayLpApiException $e ) {
+			return self::intent_error( $order_intent, __( 'Could not generate a Payshop reference right now. Please try again or choose another payment method.', 'ifthenpay-payments-for-latepoint' ) );
+		}
+
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => $order_intent->intent_key,
+				'request_id'  => $reference->request_id,
+				'intent_id'   => $order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'PAYSHOP',
+				'status'      => 'PENDING',
+				'amount'      => $amount,
+				'gateway_key' => $gateway_key,
+				'entity'      => null,
+				'reference'   => $reference->reference,
+				'expires_at'  => IfthenpayLpExpiry::to_expires_at_datetime_from_ymd( $expiry_date ),
 			)
 		);
 

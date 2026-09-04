@@ -88,6 +88,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-multibanco-reference.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-payshop-reference.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-callback-registration.php';
 		}
 
