@@ -80,4 +80,29 @@ class IfthenpayLpExpiry {
 
 		return $parsed->format( 'Y-m-d H:i:s' );
 	}
+
+	/**
+	 * The same computation as to_expires_at_datetime(), but for Payshop: its own reference
+	 * creation response carries no expiry field to trust back (confirmed against ifthenpay's own
+	 * PHP SDK and public docs — success returns only Code/Message/Reference/RequestId), so this
+	 * trusts what this add-on itself sent as `validade` (to_date()'s own `YYYYMMDD` output)
+	 * instead of a value ifthenpay echoed back.
+	 *
+	 * @param string $expiry_date_ymd The `YYYYMMDD` value already sent as `validade`.
+	 * @param int    $margin_hours    Hours added after end-of-day, covering ifthenpay's own
+	 *                                callback retry window.
+	 */
+	public static function to_expires_at_datetime_from_ymd( string $expiry_date_ymd, int $margin_hours = 24 ): string {
+		$parsed = DateTime::createFromFormat( '!Ymd', $expiry_date_ymd, new DateTimeZone( 'UTC' ) );
+		if ( false === $parsed ) {
+			// Unparseable is not a valid reason to hold a slot forever — fall back to "now", so the
+			// expiry job still reclaims it eventually rather than never.
+			$parsed = new DateTime( 'now', new DateTimeZone( 'UTC' ) );
+		}
+
+		$parsed->setTime( 23, 59, 59 );
+		$parsed->modify( "+{$margin_hours} hours" );
+
+		return $parsed->format( 'Y-m-d H:i:s' );
+	}
 }

@@ -251,9 +251,9 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * Multibanco (functional) and Payshop (not yet functional) — their own section, since nothing
-	 * in Pay Now Configuration (Gateway Key, Default Method, Description) applies to them, and
-	 * Multibanco has its own setting (reference validity) nothing else needs.
+	 * Multibanco and Payshop — their own section, since nothing in Pay Now Configuration (Gateway
+	 * Key, Default Method, Description) applies to them, and each has its own timing settings
+	 * (reference validity, minimum lead time) nothing else needs.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $deferred_catalog     Deferred slice of the catalog.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
@@ -271,7 +271,7 @@ class IfthenpayLpAdminFormRenderer {
 			<div class="sub-section-content">
 				<div class="label-with-description">
 					<h3><?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?></h3>
-					<div class="label-desc"><?php echo esc_html__( 'Multibanco and Payshop let customers pay by reference instead of on the spot. Payshop checkout processing is not built yet — enabling it here will offer it, but a customer cannot yet complete a booking with it.', 'ifthenpay-payments-for-latepoint' ); ?></div>
+					<div class="label-desc"><?php echo esc_html__( 'Multibanco and Payshop let customers pay by reference instead of on the spot.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
 				<?php
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );

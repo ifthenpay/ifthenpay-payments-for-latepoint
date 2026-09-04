@@ -134,8 +134,8 @@ class IfthenpayLpPaymentMethodAvailability {
 	 *
 	 * A dataset fetch failure fails open, same reasoning as is_gateway_key_usable(): an outage
 	 * must not take checkout down for an otherwise valid setup. If it recurs at the moment of
-	 * checkout, IfthenpayLpPaymentProcessor::process_deferred_payment_by_intent() fails that one
-	 * attempt gracefully instead.
+	 * checkout, IfthenpayLpPaymentProcessor::process_deferred_multibanco_payment_by_intent() fails
+	 * that one attempt gracefully instead.
 	 */
 	private static function is_multibanco_usable(): bool {
 		if ( ! in_array( 'MB', IfthenpayLpAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
