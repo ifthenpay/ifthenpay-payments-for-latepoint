@@ -275,7 +275,7 @@ class IfthenpayLpAdminFormRenderer {
 				</div>
 				<?php
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
-				self::render_multibanco_validity_field();
+				self::render_multibanco_timing_fields();
 				?>
 			</div>
 		</div>
@@ -283,16 +283,25 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * How many days a Multibanco reference stays payable — always sent to the reference API
-	 * (D-2: the API's own default is no expiry at all, which would hold a booking slot forever).
-	 * Save-time range validation is IfthenpayLpMultibancoValidityValidation, wired up in the main
-	 * plugin file; left blank, IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS
-	 * applies at payment time.
+	 * The two settings that together keep a Multibanco reference inside a real payment window:
+	 * how long it stays payable (also clamped at payment time against the appointment itself, so it
+	 * can never outlive it) and how close to the appointment it can still be offered at all. Side by
+	 * side — a merchant reading
+	 * one naturally wants to see the other; e.g. "3-day validity" only means something in
+	 * combination with "offered starting 2 days out". Save-time range validation for both is
+	 * IfthenpayLpWholeDaysSettingValidation, wired up in the main plugin file via each setting's own
+	 * validator; left blank, each side has its own default applied elsewhere at the moment it
+	 * matters (IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
+	 * IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS).
 	 */
-	private static function render_multibanco_validity_field(): void {
+	private static function render_multibanco_timing_fields(): void {
 		?>
+		<div class="label-with-description">
+			<h3><?php echo esc_html__( 'Timing', 'ifthenpay-payments-for-latepoint' ); ?></h3>
+			<div class="label-desc"><?php echo esc_html__( 'Multibanco needs a real payment window: how long a reference stays open once issued, and how soon before the appointment it can still be offered at all.', 'ifthenpay-payments-for-latepoint' ); ?></div>
+		</div>
 		<div class="os-row">
-			<div class="os-col-12">
+			<div class="os-col-6">
 				<?php
 				echo OsFormHelper::number_field(
 					'settings[ifthenpay_multibanco_validity_days]',
@@ -309,9 +318,37 @@ class IfthenpayLpAdminFormRenderer {
 				<p class="ifthenpay-field-note">
 					<?php
 					printf(
-						/* translators: %d: default number of days, when the field is left blank */
-						esc_html__( 'How many days a customer has to pay before the reference expires and the booking is released. Leave blank to use the default of %d days.', 'ifthenpay-payments-for-latepoint' ),
-						IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS
+						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+						esc_html__( 'How long a customer has to pay before the reference expires and the slot is released. Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
+						IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
+						IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
+						IfthenpayLpMultibancoValidityValidation::MAX_DAYS
+					);
+					?>
+				</p>
+			</div>
+			<div class="os-col-6">
+				<?php
+				echo OsFormHelper::number_field(
+					'settings[ifthenpay_multibanco_lead_time_days]',
+					esc_html__( 'Minimum Lead Time (days)', 'ifthenpay-payments-for-latepoint' ),
+					esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_lead_time_days' ) ),
+					IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
+					IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS,
+					array(
+						'theme'       => 'simple',
+						'placeholder' => (string) IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
+					)
+				);
+				?>
+				<p class="ifthenpay-field-note">
+					<?php
+					printf(
+						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+						esc_html__( "Multibanco won't be offered for an appointment sooner than this. Default %1\$d, accepts %2\$d–%3\$d.", 'ifthenpay-payments-for-latepoint' ),
+						IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
+						IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
+						IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS
 					);
 					?>
 				</p>

@@ -85,6 +85,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-api-client.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-key-validator.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-backoffice-key-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-data-formatter.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-method-catalog.php';
@@ -100,6 +101,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-lock.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-settlement-result.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-appointment-lead-time.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-processor.php';
 			include_once __DIR__ . '/lib/models/ifthenpay-lp-payment-method-availability.php';
 
@@ -134,13 +137,12 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_filter( 'latepoint_clean_layout_css_files', array( $this, 'add_styles_to_clean_layout' ), 10 );
 
 			add_filter( 'latepoint_payment_processors', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_processor' ) );
-			add_filter( 'latepoint_all_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_payment_methods' ) );
-			add_filter( 'latepoint_enabled_payment_methods', array( 'IfthenpayLpPaymentMethodAvailability', 'register_enabled_payment_methods' ) );
 			add_action( 'latepoint_payment_processor_settings', array( $this, 'add_settings_fields' ), 10 );
 			add_filter( 'latepoint_encrypted_settings', array( $this, 'add_encrypted_settings' ) );
 			// Fires for every OsModel save — see validate_backoffice_key_on_save()'s own docblock.
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_validity_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_lead_time_on_save' ), 10, 3 );
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
 
@@ -158,8 +160,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// resolved lazily when their hooks actually fire, unlike a class constant reference).
 			add_action( 'ifthenpay_lp_expiry_sweep', array( 'IfthenpayLpExpirySweep', 'run' ) );
 
-			// Customer-facing surfaces for a deferred payment's own reference (T-13, spec 001) —
-			// see IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
+			// Customer-facing surfaces for a deferred payment's own reference — see
+			// IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
 			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
 			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_order_summary' ) );
@@ -207,8 +209,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		/**
 		 * Same hook, same shape as validate_backoffice_key_on_save() — a separate method rather
 		 * than one big branch, since this setting isn't encrypted and needs no decrypt step.
-		 * Rejects the save only for a value outside the accepted range (T-14, spec 001): "Invalid
-		 * validity is rejected at save, not at payment time."
+		 * Rejects the save only for a value outside the accepted range: invalid validity is rejected
+		 * at save time, not silently discovered later at the moment of payment.
 		 *
 		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
 		 */
@@ -218,6 +220,22 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			}
 
 			$error = IfthenpayLpMultibancoValidityValidation::check( (string) $model->value );
+			if ( null !== $error ) {
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
+		 * Same hook, same shape as validate_multibanco_validity_on_save().
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_multibanco_lead_time_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_multibanco_lead_time_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpMultibancoLeadTimeValidation::check( (string) $model->value );
 			if ( null !== $error ) {
 				$model->add_error( 'validation', $error );
 			}

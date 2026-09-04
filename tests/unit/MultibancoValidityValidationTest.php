@@ -12,6 +12,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
+require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
 require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
 
 /**
