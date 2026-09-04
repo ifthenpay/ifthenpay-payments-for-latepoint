@@ -281,7 +281,6 @@ class IfthenpayLpAdminFormRenderer {
 					$deferred_catalog['MB']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_multibanco_validity_days',
-						'label'   => __( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
 						'default' => IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
 						'min'     => IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
 						'max'     => IfthenpayLpMultibancoValidityValidation::MAX_DAYS,
@@ -298,7 +297,6 @@ class IfthenpayLpAdminFormRenderer {
 					$deferred_catalog['PAYSHOP']['image'] ?? '',
 					array(
 						'field'   => 'ifthenpay_payshop_validity_days',
-						'label'   => __( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
 						'default' => IfthenpayLpPaymentProcessor::DEFAULT_PAYSHOP_VALIDITY_DAYS,
 						'min'     => IfthenpayLpPayshopValidityValidation::MIN_DAYS,
 						'max'     => IfthenpayLpPayshopValidityValidation::MAX_DAYS,
@@ -338,24 +336,16 @@ class IfthenpayLpAdminFormRenderer {
 	/**
 	 * One method's own Reference Validity + Minimum Lead Time fields — the pair that together keep
 	 * a deferred reference inside a real payment window (also clamped at payment time against the
-	 * appointment itself, so it can never outlive it). Side by side — a merchant reading one
-	 * naturally wants to see the other; e.g. "3-day validity" only means something in combination
-	 * with "offered starting 2 days out". Shared by Multibanco and Payshop's own sections
-	 * (render_pay_later_configuration(), directly below render_timing_section_intro()'s shared
-	 * explanation) — the two settings pairs are independent (own values, own defaults), only the
-	 * rendering shape is identical. The heading carries the same icon as this method's own row in
-	 * the list above it, so which block belongs to which method is visible at a glance. Each field's
-	 * own note is deliberately just the default/range, not a repeated explanation — short enough to
-	 * stay on one line regardless of which method's numbers are longer, so the two methods' rows
-	 * line up instead of disaligning when one note wraps and the other doesn't. Save-time range
-	 * validation for both fields is IfthenpayLpWholeDaysSettingValidation, wired up in the main
-	 * plugin file via each setting's own validator; left blank, each side has its own default
-	 * applied elsewhere at the moment it matters.
+	 * appointment itself, so it can never outlive it). Shared by Multibanco and Payshop's own
+	 * sections (render_pay_later_configuration(), directly below render_timing_section_intro()'s
+	 * shared explanation) — the two settings pairs are independent, only the rendering shape is
+	 * identical. Save-time range validation for both fields is IfthenpayLpWholeDaysSettingValidation,
+	 * wired up in the main plugin file via each setting's own validator.
 	 *
-	 * @param string                                                       $method_label Method name, e.g. "Multibanco".
-	 * @param string                                                       $icon_url     Same icon shown for this method in render_methods_list().
-	 * @param array{field:string,label:string,default:int,min:int,max:int} $validity     Reference Validity field config.
-	 * @param array{field:string,default:int,min:int,max:int}              $lead_time    Minimum Lead Time field config.
+	 * @param string                                          $method_label Method name, e.g. "Multibanco".
+	 * @param string                                          $icon_url     Same icon shown for this method in render_methods_list() — pairs the heading with that row above it.
+	 * @param array{field:string,default:int,min:int,max:int} $validity     Reference Validity field config.
+	 * @param array{field:string,default:int,min:int,max:int} $lead_time    Minimum Lead Time field config.
 	 */
 	private static function render_timing_fields( string $method_label, string $icon_url, array $validity, array $lead_time ): void {
 		?>
@@ -371,7 +361,7 @@ class IfthenpayLpAdminFormRenderer {
 					<?php
 					echo OsFormHelper::number_field(
 						'settings[' . $validity['field'] . ']',
-						esc_html( $validity['label'] ),
+						esc_html__( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
 						esc_attr( OsSettingsHelper::get_settings_value( $validity['field'] ) ),
 						$validity['min'],
 						$validity['max'],
@@ -427,9 +417,10 @@ class IfthenpayLpAdminFormRenderer {
 	/**
 	 * The method codes currently enabled. Which account each one uses is looked up live from the
 	 * gateway dataset at checkout time (IfthenpayLpDataFormatter::build_accounts_string()) instead of
-	 * being stored here too. Public: checkout-time gating (see the main plugin file's
-	 * is_multibanco_usable()) reads the same saved list this form renders checkboxes from — one
-	 * setting covers both "Pay Now" and "Pay Later Configuration", the split is display-only.
+	 * being stored here too. Public: checkout-time gating (see
+	 * IfthenpayLpPaymentMethodAvailability::is_deferred_method_usable()) reads the same saved list
+	 * this form renders checkboxes from — one setting covers both "Pay Now" and "Pay Later
+	 * Configuration", the split is display-only.
 	 *
 	 * @return string[]
 	 */
