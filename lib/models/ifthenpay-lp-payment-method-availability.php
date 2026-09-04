@@ -30,6 +30,12 @@ class IfthenpayLpPaymentMethodAvailability {
 	public const DEFAULT_MULTIBANCO_LEAD_TIME_DAYS = 2;
 
 	/**
+	 * Same reasoning as DEFAULT_MULTIBANCO_LEAD_TIME_DAYS, own constant since the two settings are
+	 * independent.
+	 */
+	public const DEFAULT_PAYSHOP_LEAD_TIME_DAYS = 2;
+
+	/**
 	 * This add-on's supported methods, unconditionally — whether or not they're currently usable.
 	 * See usable_supported_payment_methods() for the filtered, "offer this at checkout" version.
 	 *
@@ -142,7 +148,7 @@ class IfthenpayLpPaymentMethodAvailability {
 			return false;
 		}
 
-		if ( ! self::is_appointment_far_enough_out() ) {
+		if ( ! self::is_appointment_far_enough_out( 'ifthenpay_multibanco_lead_time_days', self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS, IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS ) ) {
 			return false;
 		}
 
@@ -156,10 +162,11 @@ class IfthenpayLpPaymentMethodAvailability {
 
 	/**
 	 * Payshop needs more than a usable gateway key: the merchant must have checked "PAYSHOP" in
-	 * Payment Methods, and the selected gateway must actually carry a PAYSHOP account — same shape
-	 * as is_multibanco_usable(), minus the lead-time check: unlike Multibanco, nothing in this
-	 * add-on's own settings imposes a minimum lead time on Payshop, and nothing about Payshop's own
-	 * API forces one either.
+	 * Payment Methods, the selected gateway must actually carry a PAYSHOP account, and the current
+	 * checkout's own appointment must not be sooner than the merchant's own minimum lead time for
+	 * Payshop — same shape as is_multibanco_usable(), own setting: Payshop is an offline method too
+	 * (a trip to an agent or CTT, if anything a narrower window than an ATM or homebanking
+	 * available at any hour), so it needs the identical protection for the identical reason.
 	 *
 	 * A dataset fetch failure fails open, same reasoning as every other gate in this class.
 	 */
@@ -171,6 +178,10 @@ class IfthenpayLpPaymentMethodAvailability {
 		$backoffice_key = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 		$gateway_key    = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
 		if ( '' === $backoffice_key || '' === $gateway_key ) {
+			return false;
+		}
+
+		if ( ! self::is_appointment_far_enough_out( 'ifthenpay_payshop_lead_time_days', self::DEFAULT_PAYSHOP_LEAD_TIME_DAYS, IfthenpayLpPayshopLeadTimeValidation::MIN_DAYS ) ) {
 			return false;
 		}
 
@@ -219,9 +230,11 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
-	 * Below the merchant's own minimum lead time, Multibanco is not offered at checkout at all — a
-	 * reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock on why
-	 * "days" is a calendar distance, not a rolling 24h window).
+	 * Below a merchant's own minimum lead time, a deferred method is not offered at checkout at
+	 * all — a reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock
+	 * on why "days" is a calendar distance, not a rolling 24h window). Shared by
+	 * is_multibanco_usable() and is_payshop_usable(), each passing its own setting name, default
+	 * and floor — the two settings are independent, but the check itself is identical.
 	 *
 	 * Only touches cart state for a request that is genuinely mid-checkout: a cart cookie must
 	 * already exist (OsCartsHelper::get_cart_uuid()) before reconstructing it — this filter also
@@ -232,8 +245,15 @@ class IfthenpayLpPaymentMethodAvailability {
 	 * No cart yet, or a cart with no booking item in it — nothing to gate against — fails open,
 	 * same reasoning as every other check in this class: an inconclusive state must never itself be
 	 * why checkout breaks.
+	 *
+	 * @param string $setting_name The merchant setting to read (in whole days).
+	 * @param int    $default_days Used when the setting is missing, or below $min_days.
+	 * @param int    $min_days     The setting's own validator floor (e.g.
+	 *                             IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS) — a value below
+	 *                             it can only mean it was saved before that floor existed, or
+	 *                             written outside the validator, never a deliberate "no minimum".
 	 */
-	private static function is_appointment_far_enough_out(): bool {
+	private static function is_appointment_far_enough_out( string $setting_name, int $default_days, int $min_days ): bool {
 		if ( empty( OsCartsHelper::get_cart_uuid() ) ) {
 			return true;
 		}
@@ -243,13 +263,9 @@ class IfthenpayLpPaymentMethodAvailability {
 			return true;
 		}
 
-		$minimum = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_lead_time_days', self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS );
-		if ( $minimum < IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS ) {
-			// IfthenpayLpMultibancoLeadTimeValidation blocks a save below its own MIN_DAYS, so this
-			// only catches a value saved before that floor existed, or written outside the
-			// validator — a missing or zero setting must never mean "no minimum" (same reasoning as
-			// IfthenpayLpPaymentProcessor's own validity-days fallback).
-			$minimum = self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS;
+		$minimum = (int) OsSettingsHelper::get_settings_value( $setting_name, $default_days );
+		if ( $minimum < $min_days ) {
+			$minimum = $default_days;
 		}
 
 		return $days_until >= $minimum;

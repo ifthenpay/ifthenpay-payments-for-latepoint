@@ -29,6 +29,12 @@ class IfthenpayLpPaymentProcessor {
 	public const DEFAULT_MULTIBANCO_VALIDITY_DAYS = 3;
 
 	/**
+	 * Same reasoning as DEFAULT_MULTIBANCO_VALIDITY_DAYS, own constant since the two settings are
+	 * independent — a merchant can raise or lower one without touching the other.
+	 */
+	public const DEFAULT_PAYSHOP_VALIDITY_DAYS = 3;
+
+	/**
 	 * The `latepoint_process_payment_for_order_intent` filter callback — a booking checkout.
 	 *
 	 * @param array<string,mixed> $result       The filter's own accumulator.
