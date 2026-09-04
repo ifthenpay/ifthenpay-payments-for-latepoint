@@ -95,8 +95,7 @@ class IfthenpayLpExpiry {
 	public static function to_expires_at_datetime_from_ymd( string $expiry_date_ymd, int $margin_hours = 24 ): string {
 		$parsed = DateTime::createFromFormat( '!Ymd', $expiry_date_ymd, new DateTimeZone( 'UTC' ) );
 		if ( false === $parsed ) {
-			// Unparseable is not a valid reason to hold a slot forever — fall back to "now", so the
-			// expiry job still reclaims it eventually rather than never.
+			// Same fallback as to_expires_at_datetime(): reclaim eventually rather than never.
 			$parsed = new DateTime( 'now', new DateTimeZone( 'UTC' ) );
 		}
 
