@@ -211,7 +211,7 @@ class IfthenpayLpReferenceDisplay {
 				</div>
 				<div class="ifthenpay-reference-box-footer">
 					<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
-					<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
+					<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
 				</div>
 			<?php endif; ?>
 		</div>

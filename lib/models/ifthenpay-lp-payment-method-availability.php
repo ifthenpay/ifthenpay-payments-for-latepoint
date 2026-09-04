@@ -48,23 +48,21 @@ class IfthenpayLpPaymentMethodAvailability {
 			'ifthenpay_gateway'    => array(
 				'name'      => 'ifthenpay Gateway',
 				'label'     => 'ifthenpay Gateway',
-				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-gateway.png',
 				'code'      => 'ifthenpay_checkout',
 				'time_type' => 'now',
 			),
 			'ifthenpay_multibanco' => array(
 				'name'      => __( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
 				'label'     => __( 'Multibanco reference', 'ifthenpay-payments-for-latepoint' ),
-				// No dedicated Multibanco asset shipped yet; reuses the processor's own symbol.
-				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'multibanco-brand.png',
 				'code'      => 'ifthenpay_multibanco',
 				'time_type' => 'later',
 			),
 			'ifthenpay_payshop'    => array(
 				'name'      => __( 'Payshop', 'ifthenpay-payments-for-latepoint' ),
 				'label'     => __( 'Payshop reference', 'ifthenpay-payments-for-latepoint' ),
-				// No dedicated Payshop asset shipped yet; reuses the processor's own symbol.
-				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'payshop-brand.png',
 				'code'      => 'ifthenpay_payshop',
 				'time_type' => 'later',
 			),
@@ -81,7 +79,7 @@ class IfthenpayLpPaymentMethodAvailability {
 		$payment_processors[ self::PROCESSOR_CODE ] = array(
 			'code'      => self::PROCESSOR_CODE,
 			'name'      => __( 'ifthenpay', 'ifthenpay-payments-for-latepoint' ),
-			'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'processor-logo.png',
+			'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png',
 		);
 		return $payment_processors;
 	}
