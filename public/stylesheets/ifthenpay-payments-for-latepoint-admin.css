@@ -83,6 +83,15 @@
 	margin-top: 1rem;
 }
 
+/* A plain divider between Multibanco's and Payshop's own Timing blocks — the shared heading
+   above already separates the method list from Multibanco's; this just keeps Payshop's block
+   from running straight into Multibanco's numbers with no visual break. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method + .ifthenpay-timing-method {
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #e3e6ea;
+}
+
 #paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading {
 	display: flex;
 	align-items: center;
