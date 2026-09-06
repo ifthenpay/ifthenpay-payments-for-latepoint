@@ -74,25 +74,46 @@ class IfthenpayLpReferenceDisplay {
 	/**
 	 * Every string both renderers show, in one place — a wording change here reaches the
 	 * confirmation step, the email, and the dashboard tile together, rather than risking one
-	 * surface being edited and the other forgotten. Multibanco and Payshop each get their own
-	 * strings rather than one templated with the method name swapped in: "pay at any Multibanco
-	 * ATM" and "pay at a Payshop agent or CTT" don't share a sentence shape, and forcing them to
-	 * would read like a translation of a translation in pt_PT.
+	 * surface being edited and the other forgotten. Method-agnostic on purpose: the title is always
+	 * rendered next to method_icon()'s own brand mark (both renderers), which is what now tells
+	 * Multibanco and Payshop apart — saying the method's name in the text too would be redundant.
 	 *
-	 * @param bool   $is_paid Whether $record is PAID (vs. still pending).
-	 * @param string $method  $record->method — 'MB' or 'PAYSHOP'.
+	 * @param bool $is_paid Whether $record is PAID (vs. still pending).
 	 * @return string
 	 */
-	private static function title_for( bool $is_paid, string $method ): string {
+	private static function title_for( bool $is_paid ): string {
+		return $is_paid
+			? __( 'Payment', 'ifthenpay-payments-for-latepoint' )
+			: __( 'Pay by reference', 'ifthenpay-payments-for-latepoint' );
+	}
+
+	/**
+	 * The method's own brand mark, shown next to title_for() in both renderers now that the title
+	 * text itself no longer names the method. Width/height are given explicitly (not just left to
+	 * CSS) because render_email_html() has no stylesheet to fall back on — both images are a fixed
+	 * 200px-tall source (692×200 Multibanco, 756×200 Payshop), so the width here is that same source
+	 * ratio at a shared 18px display height, rather than one image getting stretched or squashed to
+	 * match the other's box.
+	 *
+	 * @param string $method $record->method — 'MB' or 'PAYSHOP'.
+	 * @return array{label:string,url:string,width:int,height:int}
+	 */
+	private static function method_icon( string $method ): array {
 		if ( 'PAYSHOP' === $method ) {
-			return $is_paid
-				? __( 'Payshop payment', 'ifthenpay-payments-for-latepoint' )
-				: __( 'Pay by Payshop reference', 'ifthenpay-payments-for-latepoint' );
+			return array(
+				'label'  => 'Payshop',
+				'url'    => IfthenpayPaymentsForLatepoint::images_url() . 'payshop-brand.png',
+				'width'  => 68,
+				'height' => 18,
+			);
 		}
 
-		return $is_paid
-			? __( 'Multibanco payment', 'ifthenpay-payments-for-latepoint' )
-			: __( 'Pay by Multibanco reference', 'ifthenpay-payments-for-latepoint' );
+		return array(
+			'label'  => 'Multibanco',
+			'url'    => IfthenpayPaymentsForLatepoint::images_url() . 'multibanco-brand.png',
+			'width'  => 62,
+			'height' => 18,
+		);
 	}
 
 	/**
@@ -188,8 +209,16 @@ class IfthenpayLpReferenceDisplay {
 		ob_start();
 		?>
 		<div class="ifthenpay-reference-box <?php echo $is_paid ? 'is-paid' : 'is-pending'; ?>">
+			<?php $icon = self::method_icon( $record->method ); ?>
 			<div class="ifthenpay-reference-box-title">
-				<?php echo esc_html( self::title_for( $is_paid, $record->method ) ); ?>
+				<img
+					src="<?php echo esc_url( $icon['url'] ); ?>"
+					alt="<?php echo esc_attr( $icon['label'] ); ?>"
+					width="<?php echo esc_attr( (string) $icon['width'] ); ?>"
+					height="<?php echo esc_attr( (string) $icon['height'] ); ?>"
+					class="ifthenpay-reference-box-mark"
+				/>
+				<?php echo esc_html( self::title_for( $is_paid ) ); ?>
 			</div>
 			<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-order-id">
 				<span class="ifthenpay-reference-box-label"><?php echo esc_html( self::order_id_label() ); ?></span>
@@ -246,13 +275,21 @@ class IfthenpayLpReferenceDisplay {
 	 */
 	public static function render_email_html( object $record ): string {
 		$is_paid = 'PAID' === $record->status;
+		$icon    = self::method_icon( $record->method );
 
 		ob_start();
 		?>
 		<div style="padding: 20px; background-color: #f0f0f0; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
 			<div style="background-color: #fff; padding: 30px; margin: 0px auto; max-width: 450px; box-shadow: 0px 2px 6px -1px rgba(0,0,0,0.2); border-radius: 6px; font-size: 16px; line-height: 1.5;">
 				<h4 style="margin-bottom: 10px; margin-top: 0; font-size: 16px; font-weight: bold;">
-					<?php echo esc_html( self::title_for( $is_paid, $record->method ) ); ?>
+					<img
+						src="<?php echo esc_url( $icon['url'] ); ?>"
+						alt="<?php echo esc_attr( $icon['label'] ); ?>"
+						width="<?php echo esc_attr( (string) $icon['width'] ); ?>"
+						height="<?php echo esc_attr( (string) $icon['height'] ); ?>"
+						style="vertical-align:middle; margin-right:8px;"
+					/>
+					<?php echo esc_html( self::title_for( $is_paid ) ); ?>
 				</h4>
 				<?php
 				OsPriceBreakdownHelper::output_price_breakdown_row(
