@@ -102,9 +102,15 @@ class ProcessSeederTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The seeded action's own settings carry a non-empty subject/content and a customer-only
-	 * recipient — no agent action, since generate_replacement_vars_from_transaction() never
-	 * populates an `agent` merge-tag context (an order can span bookings with different agents).
+	 * The seeded action's own settings carry a customer-only recipient — no agent action, since
+	 * generate_replacement_vars_from_transaction() never populates an `agent` merge-tag context (an
+	 * order can span bookings with different agents) — and content that actually carries this
+	 * plugin's own copy (transaction_created.html), not just *some* non-empty string.
+	 * OsEmailHelper::get_email_layout() itself calls WP_Filesystem() internally and can fail
+	 * depending on the request context it runs in (verified live: works from a real admin session
+	 * or WP-CLI, silently returns '' from certain unauthenticated request contexts) — IfthenpayLpProcessSeeder::fallback_layout()
+	 * covers that case, but either way the customer's own content must survive, not just an
+	 * empty-but-truthy layout wrapper.
 	 */
 	public function test_seeded_process_has_one_customer_only_email_action(): void {
 		IfthenpayLpProcessSeeder::seed_transaction_created_process();
@@ -117,7 +123,8 @@ class ProcessSeederTest extends WP_UnitTestCase {
 		$this->assertSame( 'send_email', $items[0]['settings']['type'] );
 		$this->assertStringContainsString( '{{customer_email}}', $items[0]['settings']['settings']['to_email'] );
 		$this->assertStringNotContainsString( '{{agent_email}}', $items[0]['settings']['settings']['to_email'] );
-		$this->assertNotEmpty( $items[0]['settings']['settings']['content'] );
+		$this->assertStringContainsString( "We've received your payment", $items[0]['settings']['settings']['content'] );
+		$this->assertStringContainsString( '{{order_confirmation_code}}', $items[0]['settings']['settings']['content'] );
 	}
 
 	/**
