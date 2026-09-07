@@ -164,6 +164,71 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * The customer dashboard's own batch-prefetch: warms find_by_intent_id()'s own wp_cache entry
+	 * for every one of $customer_id's own order intents in 2 queries total, regardless of how many
+	 * bookings that customer has. Without this, for_order()/for_booking() (IfthenpayLpReferenceDisplay)
+	 * each run their own find_by_intent_id() call once per booking tile LatePoint's dashboard
+	 * renders (`latepoint_customer_dashboard_after_booking_info_tile`, once per booking in a loop) —
+	 * this is called once, before that loop starts
+	 * (`latepoint_customer_dashboard_before_appointments`), so every one of those later calls
+	 * transparently hits cache instead. Deliberately does not also prefetch/cache the
+	 * OsOrderItemModel/OsOrderIntentModel::where() lookups those same callers make on the way here —
+	 * only this add-on's own table is this repository's concern; reaching into LatePoint's own model
+	 * layer to cache its lookups too would mean duplicating LatePoint's own ORM behavior. So this
+	 * takes the add-on's own per-dashboard query cost from O(3N) to O(2N + 2), not O(1)/O(N) — 2
+	 * batch queries here, plus LatePoint's own unavoidable 2 lookups per booking.
+	 *
+	 * `order_intents` has its own `customer_id` column, separate from `order_id` — that's what makes
+	 * a one-query prefetch possible without needing the specific booking list LatePoint's own
+	 * `latepoint_customer_dashboard_before_appointments` hook doesn't pass (only `$customer`).
+	 *
+	 * @param int $customer_id The dashboard's own logged-in customer.
+	 */
+	public static function prime_cache_for_customer( int $customer_id ): void {
+		global $wpdb;
+
+		// Own perf-critical priming path, same justification as find_expired_pending();
+		// LATEPOINT_TABLE_ORDER_INTENTS has no user-controlled part, the %d placeholder covers the
+		// only real value.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$intent_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT id FROM `' . LATEPOINT_TABLE_ORDER_INTENTS . '` WHERE customer_id = %d AND order_id IS NOT NULL',
+				$customer_id
+			)
+		);
+		// phpcs:enable
+		if ( ! $intent_ids ) {
+			return;
+		}
+
+		$table        = self::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $intent_ids ), '%d' ) );
+		// $table has no user-controlled part; $placeholders is a fixed count of %d literals, one per
+		// entry in $intent_ids, which $wpdb->prepare() itself fills in and %d-casts (a single array
+		// argument after the query is WordPress core's own documented way to fill N placeholders at
+		// once, not an unprepared value).
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM `{$table}` WHERE intent_id IN ({$placeholders})", $intent_ids )
+		);
+		// phpcs:enable
+
+		$by_intent = array();
+		foreach ( $rows as $row ) {
+			$by_intent[ (int) $row->intent_id ] = $row;
+		}
+
+		foreach ( $intent_ids as $id ) {
+			// The exact key shape find_one() computes for 'intent_id' — must match exactly, and
+			// negative-cache a miss (false, not skipped) the same way find_one() does, so a later
+			// find_by_intent_id() for a customer-owned intent with no transaction row never falls
+			// through to a real query either.
+			wp_cache_set( 'intent_id_' . (string) $id, $by_intent[ (int) $id ] ?? false, self::CACHE_GROUP );
+		}
+	}
+
+	/**
 	 * Sets the status column.
 	 *
 	 * @param string $token  Our correlation handle.
