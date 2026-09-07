@@ -124,7 +124,7 @@ class IfthenpayLpSettlement {
 		// Firing the event first (as apply_state_change() itself used to, right after saving the
 		// LatePoint transaction) sent that email showing "pay this reference" instructions for a
 		// reference that had, from the customer's own point of view, just been paid.
-		IfthenpayLpTransactionRepository::mark_settled( $record->token );
+		IfthenpayLpTransactionRepository::mark_settled( $record->token, $source );
 
 		do_action( 'latepoint_transaction_created', $transaction );
 

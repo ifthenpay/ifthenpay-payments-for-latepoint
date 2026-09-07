@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class IfthenpayLpTransactionRepository {
 
-	private const SCHEMA_VERSION        = '1.0.0';
+	private const SCHEMA_VERSION        = '1.1.0';
 	private const SCHEMA_VERSION_OPTION = 'ifthenpay_lp_transactions_schema_version';
 	private const CACHE_GROUP           = 'ifthenpay_lp_transactions';
 
@@ -77,6 +77,7 @@ class IfthenpayLpTransactionRepository {
 			pin_code VARCHAR(255) DEFAULT NULL,
 			paybylink_url VARCHAR(255) DEFAULT NULL,
 			settled_at DATETIME DEFAULT NULL,
+			settled_by VARCHAR(20) DEFAULT NULL,
 			method_data LONGTEXT DEFAULT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -239,18 +240,22 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Stamps a record settled — status PAID and settled_at now, together, in one update. Written
-	 * last inside settle_payment()'s locked section, only once the LatePoint state change it
-	 * guards has actually succeeded (see IfthenpayLpSettlement).
+	 * Stamps a record settled — status PAID, settled_at, and settled_by (real, queryable columns,
+	 * not method_data) all together, in one update. Written last inside settle_payment()'s locked
+	 * section, only once the LatePoint state change it guards has actually succeeded (see
+	 * IfthenpayLpSettlement).
 	 *
-	 * @param string $token Our correlation handle.
+	 * @param string $token  Our correlation handle.
+	 * @param string $source 'callback' | 'polling' | 'manual' — same vocabulary as
+	 *                        IfthenpayLpSettlement::settle_payment()'s own $source.
 	 */
-	public static function mark_settled( string $token ): bool {
+	public static function mark_settled( string $token, string $source ): bool {
 		return self::update_columns(
 			$token,
 			array(
 				'status'     => 'PAID',
 				'settled_at' => current_time( 'mysql', true ),
+				'settled_by' => $source,
 			)
 		);
 	}
@@ -295,13 +300,19 @@ class IfthenpayLpTransactionRepository {
 	 * Records an IfthenpayLpTransactionStatus::check() confirmation into method_data — always,
 	 * regardless of whether $confirmation->order_id ends up matching this row's own token, so a
 	 * mismatch is explainable later (verified_order_id here vs. token) instead of looking identical
-	 * to a genuine "ifthenpay never confirmed it" case. When it does match, `method` is corrected to
-	 * the confirmed value in the same write — and, when $settle is true, so is settling the row
-	 * (status PAID + settled_at), the same shape as mark_settled(). All of this is one
-	 * find_by_token() and one update_columns() call, not up to three: the realtime polling path
-	 * and manual re-check both used to chain record+correct-method(+settle) as separate calls, each
-	 * paying for its own re-fetch since every write here clears the token cache entry the next
-	 * one's own internal fetch would otherwise hit.
+	 * to a genuine "ifthenpay never confirmed it" case. `ifthenpay_response` is the endpoint's own
+	 * raw, decoded JSON body (`$confirmation->raw`, when the caller set it — check() itself always
+	 * does; the callback route's own locally-built stand-in $confirmation does not, since a webhook
+	 * is received, not fetched from an endpoint) — kept verbatim alongside the narrower
+	 * `verified_*` fields already derived from it, for support/dispute lookups that need to see
+	 * exactly what ifthenpay actually returned, not just what this add-on made of it. When
+	 * order_id matches, `method` is corrected to the confirmed value in the same write — and, when
+	 * $settle is true, so is settling the row (status PAID + settled_at + settled_by), the same
+	 * shape as mark_settled(). All of this is one find_by_token() and one update_columns() call,
+	 * not up to three: the realtime polling path and manual re-check both used to chain
+	 * record+correct-method(+settle) as separate calls, each paying for its own re-fetch since
+	 * every write here clears the token cache entry the next one's own internal fetch would
+	 * otherwise hit.
 	 *
 	 * @param string $token          Our correlation handle.
 	 * @param string $transaction_id The identifier checked with ifthenpay — a txid for a realtime
@@ -309,12 +320,18 @@ class IfthenpayLpTransactionRepository {
 	 *                                IfthenpayLpTransactionStatus's own docblock on why the two
 	 *                                sometimes coincide and sometimes don't).
 	 * @param object $confirmation   As returned by IfthenpayLpTransactionStatus::check().
+	 * @param string $source         'callback' | 'polling' | 'manual' — same vocabulary as
+	 *                                IfthenpayLpSettlement::settle_payment()'s own $source. Only
+	 *                                written to the row (as settled_by) when $settle is true; the
+	 *                                manual re-check path passes 'manual' here for self-documentation
+	 *                                even though it settles separately, through settle_payment(),
+	 *                                which stamps settled_by itself via mark_settled().
 	 * @param bool   $settle         Whether to also mark the row settled when order_id matches —
 	 *                                the realtime polling path settles here directly; manual
 	 *                                re-check settles separately, through settle_payment().
-	 * @phpstan-param object{payment_method:string,amount:string,order_id:string} $confirmation
+	 * @phpstan-param object{payment_method:string,amount:string,order_id:string,raw?:array<string,mixed>} $confirmation
 	 */
-	public static function record_verification( string $token, string $transaction_id, object $confirmation, bool $settle = false ): bool {
+	public static function record_verification( string $token, string $transaction_id, object $confirmation, string $source, bool $settle = false ): bool {
 		$record = self::find_by_token( $token );
 		if ( ! $record ) {
 			return false;
@@ -329,6 +346,9 @@ class IfthenpayLpTransactionRepository {
 				'verified_order_id'       => $confirmation->order_id,
 			)
 		);
+		if ( isset( $confirmation->raw ) ) {
+			$method_data['ifthenpay_response'] = $confirmation->raw;
+		}
 
 		$columns = array( 'method_data' => wp_json_encode( $method_data ) );
 		if ( $confirmation->order_id === $token ) {
@@ -336,6 +356,7 @@ class IfthenpayLpTransactionRepository {
 			if ( $settle ) {
 				$columns['status']     = 'PAID';
 				$columns['settled_at'] = current_time( 'mysql', true );
+				$columns['settled_by'] = $source;
 			}
 		}
 

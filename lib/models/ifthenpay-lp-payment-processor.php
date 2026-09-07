@@ -127,9 +127,18 @@ class IfthenpayLpPaymentProcessor {
 	 * (`latepoint_transaction_created`, fired right after its own `$transaction->save()` —
 	 * `lib/models/order_intent_model.php`) — core sets token/method/amount/etc. but never notes,
 	 * unlike IfthenpayLpSettlement::apply_state_change()'s own transaction (deferred/callback/manual),
-	 * which already carries one. Only ever reachable via the realtime polling path: settle_payment()
-	 * needs an already-converted order, and this order is still being converted at the point this
-	 * fires, so a callback settling it first is not possible here.
+	 * which already carries one. `settle_payment()`/`apply_state_change()` themselves are never what
+	 * fires this: a callback for a *realtime* row settles through settle_realtime() instead (which,
+	 * like the polling path, marks our own repository row PAID directly and never touches a
+	 * LatePoint transaction itself), so this only ever backfills a row one of those two already
+	 * settled.
+	 *
+	 * Which of the two actually did the settling is read back from the row's own `settled_by`
+	 * column (IfthenpayLpTransactionRepository::record_verification()'s own $source, stamped at
+	 * the moment of settlement — this hook fires later, once LatePoint's own convert_to_order()
+	 * runs, by which point there is no other way to tell a webhook-settled row from a
+	 * polling-settled one). Null on a row settled before that column existed — falls back to a
+	 * source-agnostic label rather than asserting a specific mechanism that can't be verified.
 	 *
 	 * @param OsTransactionModel $transaction As passed by the hook.
 	 */
@@ -143,9 +152,10 @@ class IfthenpayLpPaymentProcessor {
 			return;
 		}
 
-		$txid = IfthenpayLpTransactionRepository::decode_method_data( $record )['transaction_id'] ?? '';
+		$txid   = IfthenpayLpTransactionRepository::decode_method_data( $record )['transaction_id'] ?? '';
+		$source = $record->settled_by ?? __( 'ifthenpay confirmation', 'ifthenpay-payments-for-latepoint' ); // @phpstan-ignore-line property.notFound
 
-		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, 'ifthenpay transaction ID', $txid, 'polling' );
+		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, 'ifthenpay transaction ID', $txid, $source );
 		$transaction->update_attributes( array( 'notes' => $notes ) );
 	}
 

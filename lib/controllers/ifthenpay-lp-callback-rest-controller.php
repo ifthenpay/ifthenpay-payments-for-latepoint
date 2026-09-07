@@ -164,7 +164,7 @@ class IfthenpayLpCallbackRestController {
 			'amount'         => $params->amount,
 			'order_id'       => $params->reference,
 		);
-		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, true );
+		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, 'callback', true );
 
 		return array(
 			'status' => 200,
