@@ -112,11 +112,21 @@ class IfthenpayLpSettlement {
 			return IfthenpayLpSettlementResult::rejected( 'order_not_settleable' );
 		}
 
-		if ( ! self::apply_state_change( $record, $order, $request_id, $source ) ) {
+		$transaction = self::apply_state_change( $record, $order, $request_id, $source );
+		if ( null === $transaction ) {
 			return IfthenpayLpSettlementResult::failed( 'state_change_failed' );
 		}
 
+		// Stamped before the event fires, not after — a listener reacting synchronously to
+		// latepoint_transaction_created (e.g. IfthenpayLpProcessSeeder's own "Payment Received"
+		// email) reads this add-on's own repository row via IfthenpayLpReferenceDisplay::for_order(),
+		// and must see it already PAID, not the still-PENDING row that existed a moment ago.
+		// Firing the event first (as apply_state_change() itself used to, right after saving the
+		// LatePoint transaction) sent that email showing "pay this reference" instructions for a
+		// reference that had, from the customer's own point of view, just been paid.
 		IfthenpayLpTransactionRepository::mark_settled( $record->token );
+
+		do_action( 'latepoint_transaction_created', $transaction );
 
 		return IfthenpayLpSettlementResult::settled();
 	}
@@ -143,6 +153,11 @@ class IfthenpayLpSettlement {
 	 * inconsistent, and fire no event (so no notifications). Only the repository's own settled_at is
 	 * stamped by the caller, and only once every step here has actually succeeded.
 	 *
+	 * Returns the saved OsTransactionModel rather than firing `latepoint_transaction_created`
+	 * itself — the caller (settle_locked()) fires it, deliberately after mark_settled(), so a
+	 * listener reacting to that event synchronously (e.g. a notification) already sees this add-on's
+	 * own repository row as PAID, not the still-PENDING row that existed a moment earlier.
+	 *
 	 * @param object       $record     The repository row (see IfthenpayLpTransactionRepository).
 	 * @param OsOrderModel $order      The already-loaded, already-validated order.
 	 * @param string       $request_id ifthenpay's identifier for this payment — recorded in
@@ -150,7 +165,7 @@ class IfthenpayLpSettlement {
 	 *                                 build_transaction_notes()).
 	 * @param string       $source     'callback' | 'polling' | 'manual' — recorded in `notes`.
 	 */
-	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id, string $source ): bool {
+	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id, string $source ): ?OsTransactionModel {
 		$transaction                  = new OsTransactionModel();
 		$transaction->token           = (string) $record->token;
 		$transaction->payment_method  = $record->method;
@@ -169,9 +184,8 @@ class IfthenpayLpSettlement {
 		}
 
 		if ( ! $transaction->save() ) {
-			return false;
+			return null;
 		}
-		do_action( 'latepoint_transaction_created', $transaction );
 
 		if ( ! $invoice->is_new_record() ) {
 			$invoice->update_attributes( array( 'status' => LATEPOINT_INVOICE_STATUS_PAID ) );
@@ -183,7 +197,7 @@ class IfthenpayLpSettlement {
 			OsBookingHelper::change_booking_status( $booking->id, LATEPOINT_BOOKING_STATUS_APPROVED );
 		}
 
-		return true;
+		return $transaction;
 	}
 
 	/**
