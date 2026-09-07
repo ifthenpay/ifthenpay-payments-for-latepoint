@@ -343,11 +343,17 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Shared column update by token, with cache invalidation. A row is cacheable by either of two
-	 * unique columns (find_by_token(), find_by_request_id()) — both entries are cleared, not just
-	 * the one this method was called with, or a caller that only ever looks a row up by the other
-	 * column (settle_payment() always looks up by request_id) would keep seeing a stale, pre-update
-	 * copy for the lifetime of that cache entry.
+	 * Shared column update by token, with cache invalidation. A row is cacheable by any of three
+	 * unique-ish columns (find_by_token(), find_by_request_id(), find_by_intent_id()) — all three
+	 * entries are cleared, not just the one this method was called with, or a caller that only ever
+	 * looks a row up by one of the other columns (settle_payment() always looks up by request_id;
+	 * IfthenpayLpReferenceDisplay::for_order() always looks up by intent_id) would keep seeing a
+	 * stale, pre-update copy for the lifetime of that cache entry — exactly what happened before
+	 * IfthenpayLpSettlement started firing `latepoint_transaction_created` only after this method's
+	 * own mark_settled() call: a listener reading via find_by_intent_id() in the same request, before
+	 * intent_id was ever accounted for here, could still have observed a stale PENDING row even with
+	 * that ordering fixed, the moment some other caller read it via intent_id earlier in the same
+	 * request. This closes that gap at its source rather than relying on call-order alone.
 	 *
 	 * @param string              $token  Our correlation handle.
 	 * @param array<string,mixed> $data   Column => value.
@@ -368,6 +374,9 @@ class IfthenpayLpTransactionRepository {
 			// falsy in PHP but must still have its cache entry cleared.
 			if ( $before && null !== $before->request_id && '' !== $before->request_id ) {
 				wp_cache_delete( "request_id_{$before->request_id}", self::CACHE_GROUP );
+			}
+			if ( $before && null !== $before->intent_id && '' !== $before->intent_id ) {
+				wp_cache_delete( 'intent_id_' . $before->intent_id, self::CACHE_GROUP );
 			}
 		}
 
