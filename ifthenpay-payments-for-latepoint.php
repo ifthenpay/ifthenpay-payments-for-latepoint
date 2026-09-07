@@ -231,6 +231,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		 * callback per model type covers both call sites in each pair.
 		 */
 		private function register_reference_display_hooks(): void {
+			add_action( 'latepoint_customer_dashboard_before_appointments', array( $this, 'prime_reference_cache_for_dashboard' ) );
 			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
@@ -387,6 +388,23 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		// --- Reference display: confirmation step, dashboard, summaries, email ---
+
+		/**
+		 * Fires once, before LatePoint's own per-booking dashboard tile loop starts — warms this
+		 * add-on's own transaction-lookup cache for every one of this customer's outstanding deferred
+		 * rows in 2 queries total, so render_reference_on_dashboard_tile()'s own per-tile lookup
+		 * (fired once per booking, right after this) hits cache instead of the database. See
+		 * IfthenpayLpTransactionRepository::prime_cache_for_customer()'s own docblock for what this
+		 * does and doesn't cover.
+		 *
+		 * @param OsCustomerModel $customer As passed by the hook.
+		 */
+		public function prime_reference_cache_for_dashboard( $customer ) {
+			if ( ! ( $customer instanceof OsCustomerModel ) ) {
+				return;
+			}
+			IfthenpayLpTransactionRepository::prime_cache_for_customer( (int) $customer->id );
+		}
 
 		/**
 		 * Prints the reference box on the booking confirmation step.
