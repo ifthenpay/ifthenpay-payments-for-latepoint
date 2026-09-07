@@ -66,8 +66,12 @@ class LapsedAppointmentDigestTest extends WP_UnitTestCase {
 	 * A real order+booking fixture, with the booking's own start_datetime_utc set directly to a
 	 * given point in time — the shared fixture only sets start_date/start_time (a real checkout's
 	 * own booking-save path computes start_datetime_utc separately; this test needs that column
-	 * populated directly rather than exercising that whole path again) — and pointed at this test's
-	 * own real agent, not the shared fixture's fake one.
+	 * populated directly rather than exercising that whole path again) — pointed at this test's own
+	 * real agent, not the shared fixture's fake one, and with a real deferred-pending transaction
+	 * row behind it: find_lapsed_booking_ids() is keyed off that row now, not the booking's own
+	 * status (a real deferred checkout never sets LATEPOINT_BOOKING_STATUS_PAYMENT_PENDING — see
+	 * IfthenpayLpLapsedAppointmentDigest's own docblock), so a fixture with no transaction row
+	 * behind it would never be found, regardless of booking status.
 	 *
 	 * @phpstan-return object{customer: OsCustomerModel, order_intent: OsOrderIntentModel, order: OsOrderModel, order_item: OsOrderItemModel, booking: OsBookingModel, invoice: OsInvoiceModel}
 	 *
@@ -75,7 +79,7 @@ class LapsedAppointmentDigestTest extends WP_UnitTestCase {
 	 * @param string $payment_status     The order's own payment_status.
 	 */
 	private function seed_booking_at( string $start_datetime_utc, string $payment_status = LATEPOINT_ORDER_PAYMENT_STATUS_NOT_PAID ): object {
-		$fixture = ifthenpay_lp_create_order_fixture( array( 'booking_status' => LATEPOINT_BOOKING_STATUS_PAYMENT_PENDING ) );
+		$fixture = ifthenpay_lp_create_order_fixture();
 		$fixture->booking->update_attributes(
 			array(
 				'start_datetime_utc' => $start_datetime_utc,
@@ -83,6 +87,7 @@ class LapsedAppointmentDigestTest extends WP_UnitTestCase {
 			)
 		);
 		$fixture->order->update_attributes( array( 'payment_status' => $payment_status ) );
+		ifthenpay_lp_insert_pending_transaction_row( $fixture, 'REQ-DIGEST-' . $fixture->order->id );
 
 		return $fixture;
 	}

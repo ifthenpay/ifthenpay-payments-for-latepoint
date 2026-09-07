@@ -47,28 +47,44 @@ class IfthenpayLpLapsedAppointmentDigest {
 	}
 
 	/**
-	 * Bookings whose appointment has already passed while the order behind them is still not fully
-	 * paid — joins to order_items/orders since payment status lives on the order, not the booking.
-	 * Scoped to `payment_pending` specifically: the one status a deferred Multibanco checkout
-	 * commits its booking as, while still held against the calendar and unpaid — a booking pending
-	 * for any other reason is not this feature's concern.
+	 * Bookings behind a still-PENDING deferred payment row whose appointment has already passed.
+	 *
+	 * Deliberately keyed off this add-on's own transactions table, not a LatePoint booking status:
+	 * a deferred Multibanco/Payshop checkout does not set the booking to
+	 * `LATEPOINT_BOOKING_STATUS_PAYMENT_PENDING` — it gets LatePoint's own `default_booking_status`
+	 * (`approved` out of the box) like any other booking, and that constant isn't even in this
+	 * LatePoint version's own status list any more. Querying on it (an earlier version of this
+	 * method did) matches nothing, ever — silently disabling this whole safety net. The
+	 * transactions table's own `kind = 'deferred' AND status = 'PENDING'` is the actual source of
+	 * truth for "still outstanding under this add-on's flow"; `o.payment_status != FULLY_PAID` is
+	 * kept alongside it to also skip a booking an agent already marked paid by hand outside that
+	 * flow, without us finding out. `b.status != CANCELLED` covers the same idea the other
+	 * direction: a booking the expiry sweep already cancelled also flips its transaction row to
+	 * CANCELLED (excluded by `t.status = 'PENDING'` alone), but an admin cancelling the booking by
+	 * hand, outside that sweep, would not — this still excludes it.
 	 *
 	 * @return string[] Booking ids.
 	 */
 	private static function find_lapsed_booking_ids(): array {
 		global $wpdb;
+		$transactions_table = IfthenpayLpTransactionRepository::table_name();
 
-		// A daily cron tick over a possibly large set, not a per-request lookup; the three table
-		// names are LatePoint's own constants, not user-controlled, and %s placeholders cover
-		// every real value.
+		// A daily cron tick over a possibly large set, not a per-request lookup; every table name
+		// is either this add-on's own (built from $wpdb->prefix, no user-controlled part) or one of
+		// LatePoint's own constants, and %s placeholders cover every real value.
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 		return $wpdb->get_col(
 			$wpdb->prepare(
-				'SELECT b.id FROM `' . LATEPOINT_TABLE_BOOKINGS . '` b
-				INNER JOIN `' . LATEPOINT_TABLE_ORDER_ITEMS . '` oi ON oi.id = b.order_item_id
+				'SELECT b.id FROM `' . $transactions_table . '` t
+				INNER JOIN `' . LATEPOINT_TABLE_ORDER_INTENTS . '` oi ON oi.id = t.intent_id
+				INNER JOIN `' . LATEPOINT_TABLE_ORDER_ITEMS . '` oit ON oit.order_id = oi.order_id
+				INNER JOIN `' . LATEPOINT_TABLE_BOOKINGS . '` b ON b.order_item_id = oit.id
 				INNER JOIN `' . LATEPOINT_TABLE_ORDERS . '` o ON o.id = oi.order_id
-				WHERE b.status = %s AND b.start_datetime_utc < %s AND o.payment_status != %s',
-				LATEPOINT_BOOKING_STATUS_PAYMENT_PENDING,
+				WHERE t.kind = %s AND t.status = %s AND oi.order_id IS NOT NULL
+				AND b.status != %s AND b.start_datetime_utc < %s AND o.payment_status != %s',
+				'deferred',
+				'PENDING',
+				LATEPOINT_BOOKING_STATUS_CANCELLED,
 				current_time( 'mysql', true ),
 				LATEPOINT_ORDER_PAYMENT_STATUS_FULLY_PAID
 			)
@@ -128,9 +144,14 @@ class IfthenpayLpLapsedAppointmentDigest {
 		$formatted_date = false !== $timestamp ? wp_date( get_option( 'date_format' ), $timestamp ) : $booking->start_date;
 		$formatted_time = false !== $timestamp ? wp_date( get_option( 'time_format' ), $timestamp ) : '';
 
+		// Payshop rows carry no entity (a reference stands alone there), unlike Multibanco's — and
+		// per this add-on's own invariant, reference/entity are opaque strings that may legitimately
+		// be "0" or similar, so this checks for a present entity rather than a truthy one.
 		$reference_record = IfthenpayLpReferenceDisplay::for_order( (int) $order->id );
 		$reference        = $reference_record
-			? $reference_record->entity . '/' . $reference_record->reference
+			? ( null !== $reference_record->entity && '' !== $reference_record->entity
+				? $reference_record->entity . '/' . $reference_record->reference
+				: $reference_record->reference )
 			: __( 'none on file', 'ifthenpay-payments-for-latepoint' );
 
 		return sprintf(
