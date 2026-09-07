@@ -4,8 +4,9 @@
  * OsDatabaseHelper::seed_initial_data() seeds exactly one default process, for `booking_created`,
  * which fires at checkout before any deferred (Multibanco/Payshop) payment exists. This add-on's
  * own settlement code already fires `do_action('latepoint_transaction_created', $transaction)` on
- * actual payment (IfthenpayLpSettlement::apply_state_change()), and LatePoint's own
- * OsProcessJobsHelper wires that event to any configured process — but ships no default one, so
+ * actual payment (IfthenpayLpSettlement::settle_locked(), after the repository row is stamped
+ * settled — see that class's own docblock), and LatePoint's own OsProcessJobsHelper wires that
+ * event to any configured process — but ships no default one, so
  * nothing notifies the customer that a reference was actually paid unless the merchant hand-builds
  * a workflow. This closes that gap the same way LatePoint closes it for its own default: seed a
  * real, merchant-editable OsProcessModel row, not an ad-hoc email fired from our own code.
