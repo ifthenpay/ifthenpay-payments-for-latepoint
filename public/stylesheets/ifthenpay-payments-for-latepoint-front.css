@@ -103,11 +103,11 @@
  */
 .ifthenpay-reference-box {
 	margin: 16px 0;
-	padding: 18px 20px;
-	border: 1px solid #e4e4e7;
-	border-radius: 12px;
-	background: #fafafa;
-	box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+	padding: 20px 22px;
+	border: 1px solid #ececef;
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
 }
 
 .ifthenpay-reference-box.is-paid {
@@ -115,24 +115,30 @@
 	border-color: #a7f3d0;
 }
 
-.ifthenpay-reference-box-title {
+.ifthenpay-reference-box-header {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	margin: 0 0 12px;
-	font-size: 15px;
-	font-weight: 600;
-	color: #18181b;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 0 16px;
+}
+
+.ifthenpay-reference-box.is-paid .ifthenpay-reference-box-header {
+	margin-bottom: 4px;
 }
 
 .ifthenpay-reference-box-mark {
-	height: 18px;
-	width: auto;
+	display: block;
 	flex: none;
+	height: 24px;
+	width: auto;
 }
 
-.ifthenpay-reference-box.is-paid .ifthenpay-reference-box-title {
-	margin-bottom: 4px;
+.ifthenpay-reference-box-order-id {
+	font-size: 12px;
+	font-weight: 500;
+	color: #a1a1aa;
+	white-space: nowrap;
 }
 
 .ifthenpay-reference-box-paid-message {
@@ -144,7 +150,7 @@
 .ifthenpay-reference-box-details {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 }
 
 .ifthenpay-reference-box-row {
@@ -156,23 +162,32 @@
 
 .ifthenpay-reference-box-label {
 	color: #71717a;
-	font-size: 13px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
 }
 
 .ifthenpay-reference-box-value {
-	font-weight: 600;
+	font-weight: 700;
+	font-size: 15px;
 	color: #18181b;
 	text-align: right;
 }
 
 .ifthenpay-reference-box-row-reference .ifthenpay-reference-box-value {
 	font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-	font-size: 16px;
-	letter-spacing: 0.5px;
+	font-size: 17px;
+	letter-spacing: 1px;
+}
+
+.ifthenpay-reference-box-row-amount .ifthenpay-reference-box-value {
+	color: #059669;
+	font-size: 19px;
 }
 
 .ifthenpay-reference-box-instructions {
-	margin: 0 0 12px;
+	margin: 0 0 14px;
 	font-size: 12px;
 	color: #71717a;
 	line-height: 1.4;
@@ -181,14 +196,26 @@
 .ifthenpay-reference-box-footer {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 6px;
-	margin-top: 12px;
-	padding-top: 10px;
-	border-top: 1px solid #e4e4e7;
+	gap: 12px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px dashed #d4d4d8;
 }
 
-.ifthenpay-reference-box-footer span {
+.ifthenpay-reference-box-deadline {
+	font-size: 12px;
+	font-weight: 600;
+	color: #dc2626;
+}
+
+.ifthenpay-reference-box-powered-by {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.ifthenpay-reference-box-powered-by span {
 	font-size: 11px;
 	color: #a1a1aa;
 }
