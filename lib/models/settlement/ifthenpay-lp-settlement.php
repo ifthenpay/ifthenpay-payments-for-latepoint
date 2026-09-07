@@ -13,7 +13,7 @@
  * only makes sense for a record created from an *order* intent (a booking checkout). LatePoint's
  * OsTransactionIntentModel::convert_to_transaction() (paying an existing invoice directly) aborts
  * outright on a non-success payment result instead of committing unpaid the way an order intent
- * does — verified against LatePoint 5.6.10 source — so a deferred method cannot currently be
+ * does — verified against LatePoint 5.6.9 source — so a deferred method cannot currently be
  * offered on that checkout path at all. Every record this function is ever asked to settle is
  * therefore assumed to carry an order-intent id.
  *

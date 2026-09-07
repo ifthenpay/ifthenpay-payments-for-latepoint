@@ -67,7 +67,7 @@ class IfthenpayLpSettlementResult {
 	}
 
 	/**
-	 * A considered "no" — must never be retried as-is.
+	 * See the class docblock for rejected vs. failed.
 	 *
 	 * @param string $reason Machine-readable reason code, e.g. 'amount_mismatch'.
 	 */
@@ -76,7 +76,7 @@ class IfthenpayLpSettlementResult {
 	}
 
 	/**
-	 * Our own side couldn't complete the attempt — safe, and expected, to retry later.
+	 * See the class docblock for rejected vs. failed.
 	 *
 	 * @param string $reason Machine-readable reason code, e.g. 'order_not_ready'.
 	 */

@@ -210,11 +210,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		/**
-		 * The callback route and the two WP-Cron jobs — a class *constant* reference
-		 * (`IfthenpayLpExpirySweep::HOOK`, `IfthenpayLpLapsedAppointmentDigest::HOOK`) is not safe
-		 * here, unlike everywhere else in this file: init_hooks() runs before includes() has loaded
-		 * either class, and PHP resolves a constant immediately, not lazily. The literal hook-name
-		 * strings below must therefore match those constants' own values exactly.
+		 * The callback route and the two WP-Cron jobs — the one place in this file where a class
+		 * *constant* reference isn't safe (see init_hooks()'s own note on why). The literal
+		 * hook-name strings below must match `IfthenpayLpExpirySweep::HOOK` and
+		 * `IfthenpayLpLapsedAppointmentDigest::HOOK`'s own values exactly.
 		 */
 		private function register_cron_hooks(): void {
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
@@ -224,14 +223,11 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		/**
 		 * Customer-facing surfaces for a deferred payment's own reference — see
-		 * IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
-		 */
-
-		/**
-		 * Two of these hooks are a confirmation-step/dashboard-tile pair, the other two a
-		 * full-summary-lightbox pair — both pairs fire with the exact same single argument
-		 * (OsOrderModel or OsBookingModel, confirmed against LatePoint core's own do_action()
-		 * calls), so one callback per model type covers both call sites in each pair.
+		 * IfthenpayLpReferenceDisplay's own docblock for what each hook receives. Two of these
+		 * hooks are a confirmation-step/dashboard-tile pair, the other two a full-summary-lightbox
+		 * pair — both pairs fire with the exact same single argument (OsOrderModel or
+		 * OsBookingModel, confirmed against LatePoint core's own do_action() calls), so one
+		 * callback per model type covers both call sites in each pair.
 		 */
 		private function register_reference_display_hooks(): void {
 			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
