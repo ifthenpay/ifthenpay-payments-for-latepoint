@@ -211,8 +211,13 @@ class IfthenpayLpSettlement {
 			$lines[] = $identifier_label . ': ' . $identifier_value;
 		}
 
-		if ( ! empty( $record->entity ) && ! empty( $record->reference ) ) {
-			$lines[] = 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;
+		// Payshop rows carry no entity (a reference stands alone there), unlike Multibanco's — this
+		// must not fall back to requiring both, or a real Payshop reference silently disappears from
+		// the note entirely instead of just dropping its (correctly absent) Entity label.
+		if ( ! empty( $record->reference ) ) {
+			$lines[] = empty( $record->entity )
+				? 'Reference: ' . $record->reference
+				: 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;
 		}
 
 		$lines[] = 'Settled via: ' . $source;
