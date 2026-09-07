@@ -39,19 +39,36 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		}
 
 		/**
-		 * Public endpoint for “TRANSACTION” checkout.
+		 * Public endpoint for “TRANSACTION” checkout. Resolves the invoice by its opaque
+		 * `access_key`, the same param LatePoint core's own payment_form.php view already emits as a
+		 * hidden field alongside `invoice_id` (verified at
+		 * latepoint/lib/views/invoices/payment_form.php:43,50) and the same mechanism
+		 * OsInvoicesController::payment_form()/summary_before_payment() use themselves — never the
+		 * raw sequential id, which anyone could enumerate to read another customer's charge amount
+		 * and generate a live Pay By Link for someone else's invoice.
 		 */
 		public function get_transaction_ifthenpay_options() {
-			if ( ! filter_var( $this->params['invoice_id'] ?? '', FILTER_VALIDATE_INT ) ) {
+			try {
+				// LatePoint core's own get_invoice_by_key() declares an `: OsInvoiceModel` return
+				// type, but for a non-empty key matching zero rows its internal
+				// get_results_as_models() call returns a bare `[]` instead (model.php's own
+				// set_limit(1) branch only unwraps to a single model when at least one row matched) —
+				// PHP throws a TypeError from inside the helper itself. VERIFIED: reproduced with a
+				// real non-matching key. A tampered/garbage key must be rejected the same as an empty
+				// or genuinely-not-found one, not surface as a fatal error.
+				$invoice = OsInvoicesHelper::get_invoice_by_key( sanitize_text_field( $this->params['key'] ?? '' ) );
+			} catch ( TypeError $e ) {
+				$invoice = null;
+			}
+			if ( ! $invoice || $invoice->is_new_record() ) {
 				$this->send_json(
 					array(
 						'status'  => LATEPOINT_STATUS_ERROR,
-						'message' => __( 'Invalid invoice ID', 'ifthenpay-payments-for-latepoint' ),
+						'message' => __( 'Invalid invoice', 'ifthenpay-payments-for-latepoint' ),
 					)
 				);
 				return;
 			}
-			$invoice = new OsInvoiceModel( $this->params['invoice_id'] );
 
 			$transaction_intent = OsTransactionIntentHelper::create_or_update_transaction_intent(
 				$invoice,
