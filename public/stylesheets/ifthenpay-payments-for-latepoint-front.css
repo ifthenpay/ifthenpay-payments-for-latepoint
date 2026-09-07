@@ -142,9 +142,26 @@
 }
 
 .ifthenpay-reference-box-paid-message {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 0;
 	color: #047857;
 	font-weight: 600;
+}
+
+.ifthenpay-reference-box-paid-icon {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background-color: #10b981;
+	color: #fff;
+	font-size: 12px;
+	line-height: 1;
 }
 
 .ifthenpay-reference-box-details {
