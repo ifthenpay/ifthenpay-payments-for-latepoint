@@ -273,26 +273,26 @@ class IfthenpayLpReferenceDisplay {
 						</div>
 					<?php endforeach; ?>
 				</div>
-				<div class="ifthenpay-reference-box-footer">
-					<?php if ( '' !== $deadline ) : ?>
-						<span class="ifthenpay-reference-box-deadline">
-							<?php
-							echo esc_html(
-								sprintf(
-									/* translators: %s: human-readable "pay by" deadline date. */
-									__( 'Pay by: %s', 'ifthenpay-payments-for-latepoint' ),
-									$deadline
-								)
-							);
-							?>
-						</span>
-					<?php endif; ?>
-					<span class="ifthenpay-reference-box-powered-by">
-						<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
-						<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
-					</span>
-				</div>
 			<?php endif; ?>
+			<div class="ifthenpay-reference-box-footer">
+				<?php if ( ! $is_paid && '' !== $deadline ) : ?>
+					<span class="ifthenpay-reference-box-deadline">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %s: human-readable "pay by" deadline date. */
+								__( 'Pay by: %s', 'ifthenpay-payments-for-latepoint' ),
+								$deadline
+							)
+						);
+						?>
+					</span>
+				<?php endif; ?>
+				<span class="ifthenpay-reference-box-powered-by">
+					<span><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
+					<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png' ); ?>" alt="ifthenpay" class="ifthenpay-reference-box-brand" />
+				</span>
+			</div>
 		</div>
 		<?php
 		return (string) ob_get_clean();
@@ -388,30 +388,30 @@ class IfthenpayLpReferenceDisplay {
 					<?php foreach ( $details as $row ) : ?>
 						<?php self::render_email_detail_row( $row ); ?>
 					<?php endforeach; ?>
-					<table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #d4d4d8;">
-						<tr>
-							<td style="text-align: left; vertical-align: middle;">
-								<?php if ( '' !== $deadline ) : ?>
-									<span style="font-size: 12px; font-weight: 600; color: #dc2626;">
-										<?php
-										echo esc_html(
-											sprintf(
-												/* translators: %s: human-readable "pay by" deadline date. */
-												__( 'Pay by: %s', 'ifthenpay-payments-for-latepoint' ),
-												$deadline
-											)
-										);
-										?>
-									</span>
-								<?php endif; ?>
-							</td>
-							<td style="text-align: right; vertical-align: middle; white-space: nowrap;">
-								<span style="font-size: 11px; color: #a1a1aa;"><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
-								<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png' ); ?>" alt="ifthenpay" style="height: 14px; width: auto; vertical-align: middle; margin-left: 4px;" />
-							</td>
-						</tr>
-					</table>
 				<?php endif; ?>
+				<table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #d4d4d8;">
+					<tr>
+						<td style="text-align: left; vertical-align: middle;">
+							<?php if ( ! $is_paid && '' !== $deadline ) : ?>
+								<span style="font-size: 12px; font-weight: 600; color: #dc2626;">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: %s: human-readable "pay by" deadline date. */
+											__( 'Pay by: %s', 'ifthenpay-payments-for-latepoint' ),
+											$deadline
+										)
+									);
+									?>
+								</span>
+							<?php endif; ?>
+						</td>
+						<td style="text-align: right; vertical-align: middle; white-space: nowrap;">
+							<span style="font-size: 11px; color: #a1a1aa;"><?php echo esc_html__( 'Powered by', 'ifthenpay-payments-for-latepoint' ); ?></span>
+							<img src="<?php echo esc_url( IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png' ); ?>" alt="ifthenpay" style="height: 14px; width: auto; vertical-align: middle; margin-left: 4px;" />
+						</td>
+					</tr>
+				</table>
 			</div>
 		</div>
 		<?php
