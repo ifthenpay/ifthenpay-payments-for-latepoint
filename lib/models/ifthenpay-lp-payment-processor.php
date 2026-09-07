@@ -62,7 +62,7 @@ class IfthenpayLpPaymentProcessor {
 	/**
 	 * The `latepoint_process_payment_for_transaction_intent` filter callback — paying an existing
 	 * invoice directly. Deferred methods cannot be offered here:
-	 * OsTransactionIntentModel::convert_to_transaction() (verified against LatePoint 5.6.10
+	 * OsTransactionIntentModel::convert_to_transaction() (verified against LatePoint 5.6.9
 	 * source) requires an immediately-successful payment result and aborts the whole conversion
 	 * otherwise — unlike the order path, there is no "commit unpaid, settle later" contract to
 	 * rely on. See IfthenpayLpSettlement's own file-level scope note.

@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Validates cheapest, most decisive checks first (parameter presence, then a fast unlocked
  * lookup, then the anti-phishing key) before ever calling IfthenpayLpSettlement::settle_payment()
  * — which owns the lock, the authoritative already-settled check, and the authoritative amount
- * check. Every rejection is an empty body; only the success path carries one (see status_for()'s
+ * check. Every rejection is an empty body; only the success path carries one (see body_for()'s
  * own docblock for why).
  */
 class IfthenpayLpCallbackRestController {
