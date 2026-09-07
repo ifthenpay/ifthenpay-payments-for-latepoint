@@ -123,10 +123,6 @@
 	margin: 0 0 16px;
 }
 
-.ifthenpay-reference-box.is-paid .ifthenpay-reference-box-header {
-	margin-bottom: 4px;
-}
-
 .ifthenpay-reference-box-mark {
 	display: block;
 	flex: none;
@@ -139,29 +135,6 @@
 	font-weight: 500;
 	color: #a1a1aa;
 	white-space: nowrap;
-}
-
-.ifthenpay-reference-box-paid-message {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin: 0;
-	color: #047857;
-	font-weight: 600;
-}
-
-.ifthenpay-reference-box-paid-icon {
-	display: inline-flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	width: 20px;
-	height: 20px;
-	border-radius: 50%;
-	background-color: #10b981;
-	color: #fff;
-	font-size: 12px;
-	line-height: 1;
 }
 
 .ifthenpay-reference-box-details {
@@ -201,6 +174,10 @@
 .ifthenpay-reference-box-row-amount .ifthenpay-reference-box-value {
 	color: #059669;
 	font-size: 19px;
+}
+
+.ifthenpay-reference-box-row-status .ifthenpay-reference-box-value {
+	color: #047857;
 }
 
 .ifthenpay-reference-box-instructions {

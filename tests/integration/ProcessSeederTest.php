@@ -207,8 +207,9 @@ class ProcessSeederTest extends WP_UnitTestCase {
 	/**
 	 * The append_reference_to_email_content() filter — run against the seeded process' own email
 	 * at send time — resolves a `transaction` data object to the order behind it, the same way it
-	 * already resolves `order`/`booking` ones, so the reference box (here "Paid <amount>", since
-	 * the row is already settled) reaches this email too.
+	 * already resolves `order`/`booking` ones, so the reference box (here a Status/Amount row pair,
+	 * since the row is already settled — see IfthenpayLpReferenceDisplay::paid_rows()) reaches this
+	 * email too.
 	 */
 	public function test_email_filter_resolves_transaction_data_object_to_paid_reference(): void {
 		$fixture     = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
@@ -230,8 +231,9 @@ class ProcessSeederTest extends WP_UnitTestCase {
 		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
 
 		$this->assertStringContainsString( 'Thanks for your payment.', $result->prepared_data_for_run['content'] );
+		$this->assertStringContainsString( 'Paid', $result->prepared_data_for_run['content'] );
 		// Currency symbol/placement is the site's own setting, not something to hardcode here (this
 		// harness's own test config formats it differently than the live dev site does).
-		$this->assertStringContainsString( 'Paid ' . OsMoneyHelper::format_price( '25.00', true, false ), $result->prepared_data_for_run['content'] );
+		$this->assertStringContainsString( OsMoneyHelper::format_price( '25.00', true, false ), $result->prepared_data_for_run['content'] );
 	}
 }

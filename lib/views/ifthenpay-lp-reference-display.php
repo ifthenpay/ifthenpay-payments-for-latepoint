@@ -159,20 +159,26 @@ class IfthenpayLpReferenceDisplay {
 	}
 
 	/**
-	 * Shown once a record is PAID, in place of the payment instructions — carries the amount that
-	 * was actually paid, not just the bare word "Paid.": a merchant's own reconciliation question
-	 * ("paid how much?") shouldn't need opening the order just to answer what this card already
-	 * knows.
+	 * Shown once a record is PAID, in place of the payment instructions/entity/reference rows —
+	 * same row shape as detail_rows() (key/label/value), reusing that exact grammar rather than a
+	 * one-off sentence-plus-icon: a customer/merchant reading "Status → Paid" and "Amount → 0.10€"
+	 * is already fluent in this card's own layout from the pending state, nothing new to parse.
 	 *
-	 * @param string $formatted_amount Already formatted with its currency symbol, e.g. "0.10€" —
-	 *                                  same shape as detail_rows()'s own 'amount' row.
-	 * @return string
+	 * @param object $record As returned by for_order()/for_booking().
+	 * @return array<int,array{key:string,label:string,value:string}>
 	 */
-	private static function paid_message( string $formatted_amount ): string {
-		return sprintf(
-			/* translators: %s: the amount that was paid, already formatted with its currency symbol. */
-			__( 'Paid %s', 'ifthenpay-payments-for-latepoint' ),
-			$formatted_amount
+	private static function paid_rows( object $record ): array {
+		return array(
+			array(
+				'key'   => 'status',
+				'label' => __( 'Status', 'ifthenpay-payments-for-latepoint' ),
+				'value' => __( 'Paid', 'ifthenpay-payments-for-latepoint' ),
+			),
+			array(
+				'key'   => 'amount',
+				'label' => __( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+				'value' => OsMoneyHelper::format_price( $record->amount, true, false ),
+			),
 		);
 	}
 
@@ -251,6 +257,7 @@ class IfthenpayLpReferenceDisplay {
 		// The 'deadline' row moves down into the footer (next to "Powered by", below the dashed
 		// divider) instead of sitting in the entity/reference/amount grid — see split_detail_rows().
 		list( $details, $deadline ) = self::split_detail_rows( $record );
+		$rows                       = $is_paid ? self::paid_rows( $record ) : $details;
 
 		ob_start();
 		?>
@@ -268,24 +275,19 @@ class IfthenpayLpReferenceDisplay {
 					<?php echo esc_html( self::order_badge_text( (string) $record->token ) ); ?>
 				</span>
 			</div>
-			<?php if ( $is_paid ) : ?>
-				<p class="ifthenpay-reference-box-paid-message">
-					<span class="ifthenpay-reference-box-paid-icon" aria-hidden="true">&#10003;</span>
-					<?php echo esc_html( self::paid_message( OsMoneyHelper::format_price( $record->amount, true, false ) ) ); ?>
-				</p>
-			<?php else : ?>
+			<?php if ( ! $is_paid ) : ?>
 				<p class="ifthenpay-reference-box-instructions">
 					<?php echo esc_html( self::payment_instructions( $record->method ) ); ?>
 				</p>
-				<div class="ifthenpay-reference-box-details">
-					<?php foreach ( $details as $row ) : ?>
-						<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-<?php echo esc_attr( $row['key'] ); ?>">
-							<span class="ifthenpay-reference-box-label"><?php echo esc_html( $row['label'] ); ?></span>
-							<span class="ifthenpay-reference-box-value"><?php echo esc_html( $row['value'] ); ?></span>
-						</div>
-					<?php endforeach; ?>
-				</div>
 			<?php endif; ?>
+			<div class="ifthenpay-reference-box-details">
+				<?php foreach ( $rows as $row ) : ?>
+					<div class="ifthenpay-reference-box-row ifthenpay-reference-box-row-<?php echo esc_attr( $row['key'] ); ?>">
+						<span class="ifthenpay-reference-box-label"><?php echo esc_html( $row['label'] ); ?></span>
+						<span class="ifthenpay-reference-box-value"><?php echo esc_html( $row['value'] ); ?></span>
+					</div>
+				<?php endforeach; ?>
+			</div>
 			<div class="ifthenpay-reference-box-footer">
 				<?php if ( ! $is_paid && '' !== $deadline ) : ?>
 					<span class="ifthenpay-reference-box-deadline">
@@ -313,10 +315,13 @@ class IfthenpayLpReferenceDisplay {
 	/**
 	 * One details-grid row, email-safe — a table instead of render_html()'s flex row, styled to
 	 * match its `.ifthenpay-reference-box-row`/`-label`/`-value` counterparts inline since email
-	 * clients never load this plugin's own stylesheet. 'reference' and 'amount' each get the same
-	 * per-key emphasis their CSS counterpart does (monospace; green and larger, respectively).
+	 * clients never load this plugin's own stylesheet. 'reference', 'amount', and 'status' each get
+	 * the same per-key emphasis their CSS counterpart does (monospace; green and larger; green,
+	 * respectively) — 'amount' is shared by both the pending and paid states, so it reads as the
+	 * same "this is the number that matters" row either way, not a different style per state.
 	 *
-	 * @param array{key:string,label:string,value:string} $row One of split_detail_rows()'s $details.
+	 * @param array{key:string,label:string,value:string} $row One of split_detail_rows()'s $details,
+	 *                                                          or paid_rows()'s own rows.
 	 */
 	private static function render_email_detail_row( array $row ): void {
 		$value_style = 'font-weight: 700; font-size: 15px; color: #18181b; text-align: right;';
@@ -324,6 +329,8 @@ class IfthenpayLpReferenceDisplay {
 			$value_style = 'font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; font-weight: 700; font-size: 17px; letter-spacing: 1px; color: #18181b; text-align: right;';
 		} elseif ( 'amount' === $row['key'] ) {
 			$value_style = 'font-weight: 700; font-size: 19px; color: #059669; text-align: right;';
+		} elseif ( 'status' === $row['key'] ) {
+			$value_style = 'font-weight: 700; font-size: 15px; color: #047857; text-align: right;';
 		}
 		?>
 		<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
@@ -366,6 +373,7 @@ class IfthenpayLpReferenceDisplay {
 		$icon    = self::method_icon( $record->method );
 
 		list( $details, $deadline ) = self::split_detail_rows( $record );
+		$rows                       = $is_paid ? self::paid_rows( $record ) : $details;
 
 		$card_style = $is_paid
 			? 'background-color: #ecfdf5; padding: 20px 22px; margin: 0px auto; max-width: 450px; border: 1px solid #a7f3d0; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); font-size: 16px; line-height: 1.5;'
@@ -375,7 +383,7 @@ class IfthenpayLpReferenceDisplay {
 		?>
 		<div style="padding: 20px; background-color: #f0f0f0; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
 			<div style="<?php echo esc_attr( $card_style ); ?>">
-				<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: <?php echo $is_paid ? '4px' : '16px'; ?>;">
+				<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
 					<tr>
 						<td style="text-align: left; vertical-align: middle;">
 							<img
@@ -391,19 +399,14 @@ class IfthenpayLpReferenceDisplay {
 						</td>
 					</tr>
 				</table>
-				<?php if ( $is_paid ) : ?>
-					<p style="margin: 0; color: #047857; font-weight: 600;">
-						<span style="display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; background-color: #10b981; color: #fff; font-size: 11px; margin-right: 6px; vertical-align: middle;">&#10003;</span>
-						<?php echo esc_html( self::paid_message( OsMoneyHelper::format_price( $record->amount, true, false ) ) ); ?>
-					</p>
-				<?php else : ?>
+				<?php if ( ! $is_paid ) : ?>
 					<p style="margin: 0 0 14px; font-size: 12px; color: #71717a; line-height: 1.4;">
 						<?php echo esc_html( self::payment_instructions( $record->method ) ); ?>
 					</p>
-					<?php foreach ( $details as $row ) : ?>
-						<?php self::render_email_detail_row( $row ); ?>
-					<?php endforeach; ?>
 				<?php endif; ?>
+				<?php foreach ( $rows as $row ) : ?>
+					<?php self::render_email_detail_row( $row ); ?>
+				<?php endforeach; ?>
 				<table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #d4d4d8;">
 					<tr>
 						<td style="text-align: left; vertical-align: middle;">
