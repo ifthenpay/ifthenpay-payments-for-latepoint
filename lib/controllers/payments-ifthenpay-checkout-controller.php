@@ -266,7 +266,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 			}
 
 			if ( null !== $confirmation ) {
-				IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation, true );
+				IfthenpayLpTransactionRepository::record_verification( $token, $txid, $confirmation, 'polling', true );
 
 				if ( $confirmation->order_id === $token ) {
 					return $this->paid_response();

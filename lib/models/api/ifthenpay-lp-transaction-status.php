@@ -32,13 +32,16 @@ class IfthenpayLpTransactionStatus {
 	 * Confirms a transaction id with ifthenpay directly.
 	 *
 	 * @param string $transaction_id ifthenpay's own identifier for the payment (our request_id).
-	 * @return object{payment_method:string,amount:string,order_id:string}|null The confirmed
-	 *                      payment method, amount, and the `id` this transaction's Pay By Link was
-	 *                      created with — or null when ifthenpay does not recognise this
-	 *                      transaction id at all (a 404, not an error). Callers must check
-	 *                      `order_id` against their own token and `amount` against their own
-	 *                      stored amount before trusting this as confirmation of a *specific*
-	 *                      payment — existence alone only proves *some* payment completed.
+	 * @return object{payment_method:string,amount:string,order_id:string,raw:array<string,mixed>}|null
+	 *                      The confirmed payment method, amount, and the `id` this transaction's Pay
+	 *                      By Link was created with, plus `raw` (the endpoint's own decoded JSON
+	 *                      body verbatim, for IfthenpayLpTransactionRepository::record_verification()
+	 *                      to keep in method_data alongside the narrower fields derived from it) —
+	 *                      or null when ifthenpay does not recognise this transaction id at all (a
+	 *                      404, not an error). Callers must check `order_id` against their own token
+	 *                      and `amount` against their own stored amount before trusting this as
+	 *                      confirmation of a *specific* payment — existence alone only proves *some*
+	 *                      payment completed.
 	 * @throws IfthenpayLpCredentialException On 401/403 (not expected for this endpoint, but the
 	 *                                        shared client always checks).
 	 * @throws IfthenpayLpTransportException  On a network failure, a 5xx, or a 200 response
@@ -73,6 +76,7 @@ class IfthenpayLpTransactionStatus {
 			'payment_method' => (string) $response['PaymentMethod'],
 			'amount'         => (string) $response['Amount'],
 			'order_id'       => (string) $response['OrderId'],
+			'raw'            => $response,
 		);
 	}
 }

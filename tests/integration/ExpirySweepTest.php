@@ -122,7 +122,7 @@ class ExpirySweepTest extends WP_UnitTestCase {
 
 		// The payment settles for real, after the snapshot above was taken but before the sweep
 		// gets to process it — the exact race window the lock exists to close.
-		IfthenpayLpTransactionRepository::mark_settled( 'tok-race-001' );
+		IfthenpayLpTransactionRepository::mark_settled( 'tok-race-001', 'callback' );
 		OsBookingHelper::change_booking_status( $fixture->booking->id, LATEPOINT_BOOKING_STATUS_APPROVED );
 
 		$method = new ReflectionMethod( IfthenpayLpExpirySweep::class, 'expire_one' );
