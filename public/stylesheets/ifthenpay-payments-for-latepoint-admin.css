@@ -100,6 +100,26 @@
 	margin-bottom: 0.5rem;
 }
 
+/* render_booking_status_warning() — a plain, low-emphasis inline notice, not LatePoint's own
+   `.notice` (its admin wrapper hides any `.notice` that's a direct child, and this one sits deep
+   inside the settings form regardless). Amber, not red: this describes a merchant-facing LatePoint
+   setting worth reviewing, not a broken state of this add-on's own. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-booking-status-warning {
+	margin-bottom: 1rem;
+	padding: 0.75rem 1rem;
+	background-color: #fdf6e3;
+	border: 1px solid #e8d7a0;
+	border-radius: 6px;
+	color: #6b5a2a;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-booking-status-warning a {
+	white-space: nowrap;
+	margin-left: 0.25rem;
+}
+
 #paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading .ifthenpay-method-icon {
 	height: 1.1rem;
 	width: auto;

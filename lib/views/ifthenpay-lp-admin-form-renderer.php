@@ -274,6 +274,7 @@ class IfthenpayLpAdminFormRenderer {
 					<div class="label-desc"><?php echo esc_html__( 'Multibanco and Payshop let customers pay by reference instead of on the spot.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
 				<?php
+				self::render_booking_status_warning();
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
 				self::render_timing_section_intro();
 				self::render_timing_fields(
@@ -310,6 +311,41 @@ class IfthenpayLpAdminFormRenderer {
 				);
 				?>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Warns when a Multibanco/Payshop booking can't block its own slot for the whole time its
+	 * reference stays outstanding — LatePoint only blocks a slot for a booking whose status is in
+	 * `timeslot_blocking_statuses` (`approved` only, by default); a deferred checkout's booking gets
+	 * whatever `default_booking_status` says (also `approved` by default, but a common merchant
+	 * choice for manual-approval businesses is `pending`). If those two disagree, a deferred booking
+	 * sits unpaid *and* unblocked for the entire multi-hour/day reference window — a real
+	 * double-booking risk, and a much longer exposure than LatePoint's own same-session manual-review
+	 * delay. This only ever informs: it reads two LatePoint-owned global settings and links to where
+	 * the merchant can change them (LatePoint → Settings → General), it never touches them itself —
+	 * this add-on doesn't own that setting and shouldn't override a merchant's deliberate choice.
+	 *
+	 * Deliberately does not account for a service's own `override_default_booking_status` — cross-
+	 * referencing every service's own override against the blocking-statuses list for a warning this
+	 * targeted is real added complexity for a smaller slice of merchants; the global default is the
+	 * common case this covers.
+	 */
+	private static function render_booking_status_warning(): void {
+		$default_status    = (string) OsSettingsHelper::get_settings_value( 'default_booking_status', LATEPOINT_BOOKING_STATUS_APPROVED );
+		$blocking_statuses = OsBookingHelper::get_timeslot_blocking_statuses();
+		if ( in_array( $default_status, $blocking_statuses, true ) ) {
+			return;
+		}
+		?>
+		<div class="ifthenpay-booking-status-warning">
+			<?php
+			echo esc_html__( "Your default booking status doesn't block its own time slot, so a Multibanco/Payshop booking can sit unpaid without holding the calendar for as long as its reference stays valid.", 'ifthenpay-payments-for-latepoint' );
+			?>
+			<a href="<?php echo esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'settings', 'general' ) ) ); ?>">
+				<?php echo esc_html__( 'Review in Settings → General', 'ifthenpay-payments-for-latepoint' ); ?>
+			</a>
 		</div>
 		<?php
 	}
