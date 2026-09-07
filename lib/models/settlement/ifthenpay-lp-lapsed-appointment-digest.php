@@ -144,9 +144,9 @@ class IfthenpayLpLapsedAppointmentDigest {
 		$formatted_date = false !== $timestamp ? wp_date( get_option( 'date_format' ), $timestamp ) : $booking->start_date;
 		$formatted_time = false !== $timestamp ? wp_date( get_option( 'time_format' ), $timestamp ) : '';
 
-		// Payshop rows carry no entity (a reference stands alone there), unlike Multibanco's — and
-		// per this add-on's own invariant, reference/entity are opaque strings that may legitimately
-		// be "0" or similar, so this checks for a present entity rather than a truthy one.
+		// Payshop rows carry no entity, unlike Multibanco's (see IfthenpayLpSettlement::build_transaction_notes()'s
+		// own comment on this) — checks for a present entity rather than a truthy one, since
+		// reference/entity are opaque strings that may legitimately be "0" or similar.
 		$reference_record = IfthenpayLpReferenceDisplay::for_order( (int) $order->id );
 		$reference        = $reference_record
 			? ( null !== $reference_record->entity && '' !== $reference_record->entity

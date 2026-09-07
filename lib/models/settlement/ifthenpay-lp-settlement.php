@@ -98,8 +98,8 @@ class IfthenpayLpSettlement {
 
 		$order_id = OsOrderIntentHelper::is_converted( (int) $record->intent_id );
 		if ( ! $order_id ) {
-			// Checkout may simply still be mid-flight (see the file docblock's ordering-tolerance
-			// note) — not a rejection, a reason to have the caller ask again.
+			// Checkout may simply still be mid-flight — not a rejection, a reason to have the caller
+			// ask again (see the callback controller's own handling of this same outcome).
 			return IfthenpayLpSettlementResult::failed( 'order_not_ready' );
 		}
 
@@ -154,9 +154,7 @@ class IfthenpayLpSettlement {
 	 * stamped by the caller, and only once every step here has actually succeeded.
 	 *
 	 * Returns the saved OsTransactionModel rather than firing `latepoint_transaction_created`
-	 * itself — the caller (settle_locked()) fires it, deliberately after mark_settled(), so a
-	 * listener reacting to that event synchronously (e.g. a notification) already sees this add-on's
-	 * own repository row as PAID, not the still-PENDING row that existed a moment earlier.
+	 * itself — see settle_locked()'s own comment on why that event fires only after mark_settled().
 	 *
 	 * @param object       $record     The repository row (see IfthenpayLpTransactionRepository).
 	 * @param OsOrderModel $order      The already-loaded, already-validated order.

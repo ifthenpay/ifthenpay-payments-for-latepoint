@@ -474,7 +474,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				} elseif ( 'transaction' === ( $data_object['model'] ?? '' ) ) {
 					// The transaction_created process (IfthenpayLpProcessSeeder) selects its email
 					// action against a transaction, not an order/booking — resolve to the order
-					// behind it so the same reference box (now showing "Paid.") reaches that email
+					// behind it so the same reference box (now in its paid state) reaches that email
 					// too, reusing for_order() rather than a second lookup path.
 					$transaction = new OsTransactionModel( (int) $data_object['id'] );
 					$record      = $transaction->order_id ? IfthenpayLpReferenceDisplay::for_order( (int) $transaction->order_id ) : null;
@@ -656,8 +656,15 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			// Same reasoning as above: a site that already had this add-on active before the
 			// transaction_created process existed would otherwise never get it, since on_activate()
-			// only fires on a fresh (re)activation, not an in-place plugin update.
-			$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+			// only fires on a fresh (re)activation, not an in-place plugin update. Unlike the two
+			// calls above, though, this one has no cheap internal early-out of its own — every one of
+			// its three outcomes is terminal, so once one has been recorded there is nothing left to
+			// seed, ever again, and the get_option() check below is what keeps this from running a
+			// real OsProcessModel query on every single request forever, including unauthenticated
+			// REST callback requests.
+			if ( ! get_option( 'ifthenpay_lp_process_seed_completed' ) ) {
+				$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+			}
 		}
 
 		public function latepoint_init() {
@@ -719,7 +726,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		/**
 		 * Maps a seed_transaction_created_process() outcome to which one-time admin notice should
 		 * show next render — 'already_exists' sets nothing, so a reactivation that finds either row
-		 * already there stays silent, same as before this method existed.
+		 * already there stays silent, same as before this method existed. Also stamps the
+		 * `ifthenpay_lp_process_seed_completed` option every time, regardless of outcome: all three
+		 * outcomes are terminal (see IfthenpayLpProcessSeeder's own docblock), so init()'s own
+		 * get_option() guard can skip calling the seeder at all from here on.
 		 *
 		 * @param string $outcome As returned by IfthenpayLpProcessSeeder::seed_transaction_created_process().
 		 */
@@ -729,6 +739,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			} elseif ( 'created_disabled' === $outcome ) {
 				update_option( 'ifthenpay_lp_show_process_conflict_notice', true );
 			}
+			update_option( 'ifthenpay_lp_process_seed_completed', true );
 		}
 
 		/**
