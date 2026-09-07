@@ -26,6 +26,16 @@ require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-multib
 require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
+require_once __DIR__ . '/../support/class-os-booking-helper-stub.php';
+require_once __DIR__ . '/../support/class-os-router-helper-stub.php';
+
+// render_pay_later_configuration() (called by render_payments_configuration() below) reads this
+// LatePoint constant as render_booking_status_warning()'s own default fallback; unit tests never
+// boot LatePoint, so it has to be defined by hand here, the same way PaymentTimesTest.php defines
+// its own LATEPOINT_PAYMENT_TIME_* constants.
+if ( ! defined( 'LATEPOINT_BOOKING_STATUS_APPROVED' ) ) {
+	define( 'LATEPOINT_BOOKING_STATUS_APPROVED', 'approved' );
+}
 
 /**
  * Payments configuration render proof.
@@ -40,6 +50,9 @@ final class PaymentsConfigurationTest extends TestCase {
 		Monkey\setUp();
 
 		OsSettingsHelper::$values = array();
+		// Matches LatePoint's own seeded default (database_helper.php) — none of this file's own
+		// tests are about render_booking_status_warning(), so it must never fire here.
+		OsBookingHelper::$timeslot_blocking_statuses = array( 'approved' );
 
 		Functions\stubs(
 			array(
