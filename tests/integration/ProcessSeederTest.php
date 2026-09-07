@@ -17,6 +17,23 @@ require_once __DIR__ . '/../support/class-latepoint-order-fixture.php';
 class ProcessSeederTest extends WP_UnitTestCase {
 
 	/**
+	 * The main plugin file's own init() (its in-place-update catch-up) now also seeds this process
+	 * on every WordPress bootstrap, not just on_activate() — including the one-time bootstrap this
+	 * whole test suite itself runs before any test method's own transaction starts (see
+	 * tests/bootstrap-integration.php), so a process seeded there already exists by the time any
+	 * test here runs. Deleting it up front gives every test in this file its own clean slate,
+	 * independent of that global bootstrap state; WP_UnitTestCase's own per-test rollback restores
+	 * it afterward, so the next test's own setUp() finds (and deletes) it again.
+	 */
+	public function setUp(): void {
+		parent::setUp();
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- test-only cleanup, not a request-path query; LATEPOINT_TABLE_PROCESSES has no user-controlled part, the %s placeholders cover every real value.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM `' . LATEPOINT_TABLE_PROCESSES . '` WHERE event_type = %s AND name = %s', 'transaction_created', 'Payment Received Notification' ) );
+	}
+
+	/**
 	 * A real, saved OsTransactionModel — matches what IfthenpayLpSettlement::apply_state_change()
 	 * itself creates on settlement, not a stub.
 	 *

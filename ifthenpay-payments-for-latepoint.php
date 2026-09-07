@@ -653,6 +653,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			if ( ! wp_next_scheduled( IfthenpayLpLapsedAppointmentDigest::HOOK ) ) {
 				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
+
+			// Same reasoning as above: a site that already had this add-on active before the
+			// transaction_created process existed would otherwise never get it, since on_activate()
+			// only fires on a fresh (re)activation, not an in-place plugin update.
+			if ( IfthenpayLpProcessSeeder::seed_transaction_created_process() ) {
+				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
+			}
 		}
 
 		public function latepoint_init() {
