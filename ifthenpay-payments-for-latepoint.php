@@ -657,9 +657,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			// Same reasoning as above: a site that already had this add-on active before the
 			// transaction_created process existed would otherwise never get it, since on_activate()
 			// only fires on a fresh (re)activation, not an in-place plugin update.
-			if ( IfthenpayLpProcessSeeder::seed_transaction_created_process() ) {
-				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
-			}
+			$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
 		}
 
 		public function latepoint_init() {
@@ -709,35 +707,57 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
 
-			// Idempotent — see IfthenpayLpProcessSeeder's own docblock. Only shows the one-time
-			// admin notice when a process was actually created just now, not on every reactivation.
+			// Idempotent — see IfthenpayLpProcessSeeder's own docblock. record_process_seed_outcome()
+			// only sets a notice option the first time a process is actually created, not on every
+			// reactivation that finds one (ours or the merchant's own) already there.
 			$this->ensure_loaded( 'IfthenpayLpProcessSeeder', '/lib/models/ifthenpay-lp-process-seeder.php' );
-			if ( IfthenpayLpProcessSeeder::seed_transaction_created_process() ) {
-				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
-			}
+			$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
 
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
 		}
 
 		/**
+		 * Maps a seed_transaction_created_process() outcome to which one-time admin notice should
+		 * show next render — 'already_exists' sets nothing, so a reactivation that finds either row
+		 * already there stays silent, same as before this method existed.
+		 *
+		 * @param string $outcome As returned by IfthenpayLpProcessSeeder::seed_transaction_created_process().
+		 */
+		private function record_process_seed_outcome( string $outcome ): void {
+			if ( 'created' === $outcome ) {
+				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
+			} elseif ( 'created_disabled' === $outcome ) {
+				update_option( 'ifthenpay_lp_show_process_conflict_notice', true );
+			}
+		}
+
+		/**
 		 * A one-time, dismiss-on-render notice — no ongoing state to track, unlike a real
-		 * dismissible-forever notice, since `ifthenpay_lp_show_process_seeded_notice` is only ever
-		 * set true right after on_activate() actually created the process (never on a reactivation
-		 * that found one already there), so the option is deleted the first time this renders and
-		 * never set again on its own.
+		 * dismissible-forever notice, since both options record_process_seed_outcome() sets are only
+		 * ever set true right after a process was actually created just now (never on a reactivation
+		 * that found one already there), so each option is deleted the first time its own notice
+		 * renders and never set again on its own.
 		 */
 		public function maybe_show_process_seeded_notice(): void {
-			if ( ! get_option( 'ifthenpay_lp_show_process_seeded_notice' ) ) {
-				return;
+			if ( get_option( 'ifthenpay_lp_show_process_seeded_notice' ) ) {
+				delete_option( 'ifthenpay_lp_show_process_seeded_notice' );
+				printf(
+					'<div class="notice notice-info is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+					esc_html__( 'ifthenpay: a "Payment Received Notification" process was added so customers hear back once a Multibanco or Payshop reference is actually paid.', 'ifthenpay-payments-for-latepoint' ),
+					esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
+					esc_html__( 'Customize it', 'ifthenpay-payments-for-latepoint' )
+				);
 			}
-			delete_option( 'ifthenpay_lp_show_process_seeded_notice' );
 
-			printf(
-				'<div class="notice notice-info is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
-				esc_html__( 'ifthenpay: a "Payment Received Notification" process was added so customers hear back once a Multibanco or Payshop reference is actually paid.', 'ifthenpay-payments-for-latepoint' ),
-				esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
-				esc_html__( 'Customize it', 'ifthenpay-payments-for-latepoint' )
-			);
+			if ( get_option( 'ifthenpay_lp_show_process_conflict_notice' ) ) {
+				delete_option( 'ifthenpay_lp_show_process_conflict_notice' );
+				printf(
+					'<div class="notice notice-warning is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+					esc_html__( 'ifthenpay: you already have an automation set up for payment events, so we added our own "Payment Received Notification" without turning it on — enable it in Automation if you\'d rather use it instead of yours.', 'ifthenpay-payments-for-latepoint' ),
+					esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
+					esc_html__( 'Review both', 'ifthenpay-payments-for-latepoint' )
+				);
+			}
 		}
 
 		public function register_addon( $installed_addons ) {

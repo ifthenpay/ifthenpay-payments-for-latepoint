@@ -18,38 +18,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * One seeding entry point, called from on_activate(). Idempotent the same way LatePoint's own
- * seed_initial_data() is: OsProcessesHelper::check_if_process_exists() matches on (event_type,
- * name), so re-activation never creates a duplicate.
+ * One seeding entry point, called from on_activate() and init(). `transaction_created` is a
+ * LatePoint *core* event, not one this add-on invented — a merchant already using realtime Pay By
+ * Link may well have already built their own "thanks for paying" workflow for it, under whatever
+ * name they chose. Matching only on this seeder's own (event_type, name) pair, the way LatePoint's
+ * own seed_initial_data() matches its own default, would miss that entirely and silently double up
+ * the customer's payment-confirmation emails. So this checks for *any* existing process on the
+ * event first, regardless of name, and never activates a second one on top of it — see
+ * seed_transaction_created_process()'s own docblock for the three outcomes that follow from that.
  */
 class IfthenpayLpProcessSeeder {
 
 	/**
-	 * The process name this seeder owns — also the identity check_if_process_exists() matches on
-	 * alongside event_type, so this string must stay stable across releases (renaming it would make
-	 * a future call here re-seed a second row instead of recognising the first).
+	 * The process name this seeder owns — the identity find_own_process() matches on alongside
+	 * event_type, so this string must stay stable across releases (renaming it would make a future
+	 * call here treat its own prior row as a foreign one instead of recognising it).
 	 */
 	private const PROCESS_NAME = 'Payment Received Notification';
 
 	/**
-	 * Creates the `transaction_created` process if this add-on hasn't already, once. Customer-only:
-	 * OsReplacerHelper::generate_replacement_vars_from_transaction() populates `transaction`,
-	 * `order`, and `customer` merge-tag contexts, but never `agent` — an order can span bookings
-	 * with different agents, so there is no single natural agent recipient the way `booking_created`
-	 * has one. Mirrors OsDatabaseHelper::seed_initial_data()'s own construction
-	 * (latepoint/lib/helpers/database_helper.php) exactly, action-shape included, so this stays a
-	 * process LatePoint's own Processes admin screen can show, edit, and disable like any other.
+	 * Seeds the `transaction_created` process, at most once, respecting whatever the merchant
+	 * already has configured for this event:
 	 *
-	 * @return bool True if a process was created just now; false if one already existed.
+	 * - Nothing exists for this event yet → create ours, active. Returns 'created'.
+	 * - This add-on's own row already exists (any status — a merchant may have disabled it, that's
+	 *   their call to keep) → no-op. Returns 'already_exists'.
+	 * - A *different* process already exists for this event (the merchant's own) → still create
+	 *   ours, so it's there to review/compare in Automation → Workflows, but DISABLED — never two
+	 *   live payment-confirmation emails firing off one settlement. Returns 'created_disabled'.
+	 *
+	 * Customer-only content: OsReplacerHelper::generate_replacement_vars_from_transaction()
+	 * populates `transaction`, `order`, and `customer` merge-tag contexts, but never `agent` — an
+	 * order can span bookings with different agents, so there is no single natural agent recipient
+	 * the way `booking_created` has one. Action-shape otherwise mirrors
+	 * OsDatabaseHelper::seed_initial_data()'s own construction (latepoint/lib/helpers/database_helper.php)
+	 * exactly, so this stays a process LatePoint's own Processes admin screen can show, edit, and
+	 * disable like any other.
+	 *
+	 * @return string One of 'created', 'created_disabled', 'already_exists'.
 	 */
-	public static function seed_transaction_created_process(): bool {
+	public static function seed_transaction_created_process(): string {
+		if ( self::find_own_process() ) {
+			return 'already_exists';
+		}
+
+		$has_foreign_process = self::foreign_process_exists();
+
 		$process             = new OsProcessModel();
 		$process->event_type = 'transaction_created';
 		$process->name       = self::PROCESS_NAME;
-
-		if ( OsProcessesHelper::check_if_process_exists( $process ) ) {
-			return false;
-		}
+		$process->status     = $has_foreign_process ? LATEPOINT_STATUS_DISABLED : LATEPOINT_STATUS_ACTIVE;
 
 		$content = self::email_content();
 		$layout  = OsEmailHelper::get_email_layout( $content );
@@ -77,7 +95,44 @@ class IfthenpayLpProcessSeeder {
 		$process->actions_json             = wp_json_encode( $process_actions );
 		$process->save();
 
-		return true;
+		return $has_foreign_process ? 'created_disabled' : 'created';
+	}
+
+	/**
+	 * This add-on's own previously-seeded row, in whatever status it's in now — found the same way
+	 * OsProcessesHelper::check_if_process_exists() itself matches, by (event_type, name).
+	 */
+	private static function find_own_process(): ?OsProcessModel {
+		$process = ( new OsProcessModel() )->where(
+			array(
+				'event_type' => 'transaction_created',
+				'name'       => self::PROCESS_NAME,
+			)
+		)->set_limit( 1 )->get_results_as_models();
+
+		return ( $process && ! $process->is_new_record() ) ? $process : null;
+	}
+
+	/**
+	 * Whether the merchant already has their own process for this event, under any other name —
+	 * checked before find_own_process() has ruled out "this is just our own row" (see the caller),
+	 * so this only ever runs when it isn't.
+	 */
+	private static function foreign_process_exists(): bool {
+		global $wpdb;
+		// One-time seeding check, not a request-path query; LATEPOINT_TABLE_PROCESSES has no
+		// user-controlled part, and the %s placeholders cover every real value.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM `' . LATEPOINT_TABLE_PROCESSES . '` WHERE event_type = %s AND name != %s',
+				'transaction_created',
+				self::PROCESS_NAME
+			)
+		);
+		// phpcs:enable
+
+		return $count > 0;
 	}
 
 	/**

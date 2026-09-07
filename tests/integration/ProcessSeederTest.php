@@ -29,8 +29,27 @@ class ProcessSeederTest extends WP_UnitTestCase {
 		parent::setUp();
 
 		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- test-only cleanup, not a request-path query; LATEPOINT_TABLE_PROCESSES has no user-controlled part, the %s placeholders cover every real value.
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM `' . LATEPOINT_TABLE_PROCESSES . '` WHERE event_type = %s AND name = %s', 'transaction_created', 'Payment Received Notification' ) );
+		// Every process for this event, not just this add-on's own row by name — several tests here
+		// seed a *foreign*-named one on purpose to prove the conflict-detection path, so a clean
+		// slate has to cover the whole event, not one specific name.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- test-only cleanup, not a request-path query; LATEPOINT_TABLE_PROCESSES has no user-controlled part, the %s placeholder covers the only real value.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM `' . LATEPOINT_TABLE_PROCESSES . '` WHERE event_type = %s', 'transaction_created' ) );
+	}
+
+	/**
+	 * A process under a name this add-on doesn't own — stands in for a merchant's own, hand-built
+	 * "thanks for paying" workflow, however they happened to name it.
+	 *
+	 * @param string $name  Anything other than IfthenpayLpProcessSeeder's own process name.
+	 * @param string $status LATEPOINT_STATUS_ACTIVE or LATEPOINT_STATUS_DISABLED.
+	 */
+	private function seed_foreign_process( string $name = 'My Own Thank You Email', string $status = LATEPOINT_STATUS_ACTIVE ): void {
+		$process               = new OsProcessModel();
+		$process->event_type   = 'transaction_created';
+		$process->name         = $name;
+		$process->status       = $status;
+		$process->actions_json = wp_json_encode( array() );
+		$process->save();
 	}
 
 	/**
@@ -56,8 +75,8 @@ class ProcessSeederTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The one row this seeder owns, found the same way OsProcessesHelper::check_if_process_exists()
-	 * itself matches — by (event_type, name).
+	 * The one row this seeder owns, found the same way IfthenpayLpProcessSeeder's own
+	 * find_own_process() matches — by (event_type, name).
 	 */
 	private function find_seeded_process(): ?OsProcessModel {
 		$process = ( new OsProcessModel() )->where(
@@ -71,20 +90,22 @@ class ProcessSeederTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * First call creates the process; a second call is a no-op, not a duplicate — the same
-	 * idempotency guarantee LatePoint's own seed_initial_data() relies on.
+	 * First call creates the process, active, since nothing else exists for this event yet; a
+	 * second call is a no-op, not a duplicate — the same idempotency guarantee LatePoint's own
+	 * seed_initial_data() relies on.
 	 */
 	public function test_seed_creates_the_process_once(): void {
 		$this->assertNull( $this->find_seeded_process() );
 
-		$this->assertTrue( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+		$this->assertSame( 'created', IfthenpayLpProcessSeeder::seed_transaction_created_process() );
 
 		$process = $this->find_seeded_process();
 		$this->assertNotNull( $process );
 		$this->assertSame( 'transaction_created', $process->event_type );
+		$this->assertSame( LATEPOINT_STATUS_ACTIVE, $process->status );
 		$this->assertNotEmpty( $process->actions_json );
 
-		$this->assertFalse( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+		$this->assertSame( 'already_exists', IfthenpayLpProcessSeeder::seed_transaction_created_process() );
 
 		global $wpdb;
 		// Test-only count, not a request-path query; LATEPOINT_TABLE_PROCESSES has no user-controlled
@@ -99,6 +120,62 @@ class ProcessSeederTest extends WP_UnitTestCase {
 		);
 		// phpcs:enable
 		$this->assertSame( 1, $count );
+	}
+
+	/**
+	 * A merchant who already has their own process for this event, under a different name, never
+	 * gets a second *active* one from us — the real risk this whole design exists to avoid: two
+	 * live payment-confirmation emails firing off one settlement, unannounced. Ours still gets
+	 * created, so it's there to review/compare in Automation → Workflows, but disabled; the
+	 * merchant's own row is left completely untouched.
+	 */
+	public function test_seed_creates_a_disabled_process_when_a_foreign_one_already_exists(): void {
+		$this->seed_foreign_process( 'My Own Thank You Email', LATEPOINT_STATUS_ACTIVE );
+
+		$this->assertSame( 'created_disabled', IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+
+		$ours = $this->find_seeded_process();
+		$this->assertNotNull( $ours );
+		$this->assertSame( LATEPOINT_STATUS_DISABLED, $ours->status );
+
+		$foreign = ( new OsProcessModel() )->where(
+			array(
+				'event_type' => 'transaction_created',
+				'name'       => 'My Own Thank You Email',
+			)
+		)->set_limit( 1 )->get_results_as_models();
+		$this->assertNotNull( $foreign );
+		$this->assertFalse( $foreign->is_new_record() );
+		$this->assertSame( LATEPOINT_STATUS_ACTIVE, $foreign->status );
+	}
+
+	/**
+	 * A foreign process that's itself disabled (a merchant who built one, then turned it off) still
+	 * counts — this isn't about whether the merchant's own automation is currently live, it's about
+	 * respecting that they've already made a deliberate choice for this event at all.
+	 */
+	public function test_seed_creates_a_disabled_process_even_when_the_foreign_one_is_disabled(): void {
+		$this->seed_foreign_process( 'My Own Thank You Email', LATEPOINT_STATUS_DISABLED );
+
+		$this->assertSame( 'created_disabled', IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+		$this->assertSame( LATEPOINT_STATUS_DISABLED, $this->find_seeded_process()->status );
+	}
+
+	/**
+	 * Once our own row exists — active or disabled, whichever path created it — a later call is
+	 * always a no-op, never a second row, regardless of how many foreign processes are also present.
+	 */
+	public function test_seed_is_idempotent_after_creating_a_disabled_process(): void {
+		$this->seed_foreign_process();
+		IfthenpayLpProcessSeeder::seed_transaction_created_process();
+
+		$this->assertSame( 'already_exists', IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- test-only count, not a request-path query; LATEPOINT_TABLE_PROCESSES has no user-controlled part, the %s placeholder covers the only real value.
+		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM `' . LATEPOINT_TABLE_PROCESSES . '` WHERE event_type = %s', 'transaction_created' ) );
+		// Our own row plus the one foreign one seeded above — never a second copy of ours.
+		$this->assertSame( 2, $count );
 	}
 
 	/**
