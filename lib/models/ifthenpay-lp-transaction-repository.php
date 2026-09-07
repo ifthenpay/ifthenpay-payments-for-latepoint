@@ -28,9 +28,11 @@ class IfthenpayLpTransactionRepository {
 	public const METHOD_PAYBYLINK = 'PAYBYLINK';
 
 	/**
-	 * The fully qualified table name.
+	 * The fully qualified table name — public so a caller needing to join against this table
+	 * directly (IfthenpayLpLapsedAppointmentDigest) doesn't have to re-derive `$wpdb->prefix .
+	 * 'ifthenpay_transactions'` on its own.
 	 */
-	private static function table_name(): string {
+	public static function table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'ifthenpay_transactions';
 	}
@@ -203,7 +205,7 @@ class IfthenpayLpTransactionRepository {
 
 		$merged = array_merge( self::decode_method_data( $record ), $data );
 
-		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ) );
+		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ), $record );
 	}
 
 	/**
