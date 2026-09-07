@@ -160,12 +160,15 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
 	 * customer who already paid doesn't need to be told the entity/reference again. The token
 	 * stays: unlike entity/reference, it's still useful after payment (support, reconciliation).
-	 * The "Powered by ifthenpay" footer stays too — an earlier version only rendered the footer
-	 * in the pending branch, silently dropping the branding the moment a reference was paid; the
-	 * now-irrelevant "Pay by" deadline is the only piece that's actually pending-only.
+	 * In their place, a Status/Amount row pair (paid_rows()) — the same label/value grammar the
+	 * pending state's own Entity/Reference/Amount rows already use, not a separate sentence-plus-
+	 * icon component. The "Powered by ifthenpay" footer stays too — an earlier version only
+	 * rendered the footer in the pending branch, silently dropping the branding the moment a
+	 * reference was paid; the now-irrelevant "Pay by" deadline is the only piece that's actually
+	 * pending-only.
 	 */
 	public function test_render_html_hides_details_once_paid(): void {
-		$fixture = ifthenpay_lp_create_order_fixture();
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		$this->seed_deferred_row( $fixture, 'PAID' );
 
 		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
@@ -173,6 +176,9 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'ifthenpay-reference-box-row-status', $html );
+		$this->assertStringContainsString( 'Paid', $html );
+		$this->assertStringContainsString( OsMoneyHelper::format_price( '25.00', true, false ), $html );
 		$this->assertStringContainsString( 'Powered by', $html );
 		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
@@ -217,11 +223,11 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 	/**
 	 * Once paid, the email-safe render also stops exposing the reference/entity, but keeps the
-	 * token and the "Powered by ifthenpay" footer (see render_html()'s own equivalent test for
-	 * why that footer must survive the paid state).
+	 * token, shows the same Status/Amount row pair render_html() shows (see its own equivalent
+	 * test), and keeps the "Powered by ifthenpay" footer.
 	 */
 	public function test_render_email_html_hides_details_once_paid(): void {
-		$fixture = ifthenpay_lp_create_order_fixture();
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		$this->seed_deferred_row( $fixture, 'PAID' );
 
 		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
@@ -229,6 +235,8 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'Paid', $html );
+		$this->assertStringContainsString( OsMoneyHelper::format_price( '25.00', true, false ), $html );
 		$this->assertStringContainsString( 'Powered by', $html );
 		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
