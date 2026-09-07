@@ -159,12 +159,21 @@ class IfthenpayLpReferenceDisplay {
 	}
 
 	/**
-	 * Shown once a record is PAID, in place of the payment instructions.
+	 * Shown once a record is PAID, in place of the payment instructions — carries the amount that
+	 * was actually paid, not just the bare word "Paid.": a merchant's own reconciliation question
+	 * ("paid how much?") shouldn't need opening the order just to answer what this card already
+	 * knows.
 	 *
+	 * @param string $formatted_amount Already formatted with its currency symbol, e.g. "0.10€" —
+	 *                                  same shape as detail_rows()'s own 'amount' row.
 	 * @return string
 	 */
-	private static function paid_message(): string {
-		return __( 'Paid.', 'ifthenpay-payments-for-latepoint' );
+	private static function paid_message( string $formatted_amount ): string {
+		return sprintf(
+			/* translators: %s: the amount that was paid, already formatted with its currency symbol. */
+			__( 'Paid %s', 'ifthenpay-payments-for-latepoint' ),
+			$formatted_amount
+		);
 	}
 
 	/**
@@ -260,7 +269,10 @@ class IfthenpayLpReferenceDisplay {
 				</span>
 			</div>
 			<?php if ( $is_paid ) : ?>
-				<p class="ifthenpay-reference-box-paid-message"><?php echo esc_html( self::paid_message() ); ?></p>
+				<p class="ifthenpay-reference-box-paid-message">
+					<span class="ifthenpay-reference-box-paid-icon" aria-hidden="true">&#10003;</span>
+					<?php echo esc_html( self::paid_message( OsMoneyHelper::format_price( $record->amount, true, false ) ) ); ?>
+				</p>
 			<?php else : ?>
 				<p class="ifthenpay-reference-box-instructions">
 					<?php echo esc_html( self::payment_instructions( $record->method ) ); ?>
@@ -380,7 +392,10 @@ class IfthenpayLpReferenceDisplay {
 					</tr>
 				</table>
 				<?php if ( $is_paid ) : ?>
-					<p style="margin: 0; color: #047857; font-weight: 600;"><?php echo esc_html( self::paid_message() ); ?></p>
+					<p style="margin: 0; color: #047857; font-weight: 600;">
+						<span style="display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; background-color: #10b981; color: #fff; font-size: 11px; margin-right: 6px; vertical-align: middle;">&#10003;</span>
+						<?php echo esc_html( self::paid_message( OsMoneyHelper::format_price( $record->amount, true, false ) ) ); ?>
+					</p>
 				<?php else : ?>
 					<p style="margin: 0 0 14px; font-size: 12px; color: #71717a; line-height: 1.4;">
 						<?php echo esc_html( self::payment_instructions( $record->method ) ); ?>
