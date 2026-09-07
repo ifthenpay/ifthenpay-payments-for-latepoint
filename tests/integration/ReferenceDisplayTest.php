@@ -160,6 +160,9 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
 	 * customer who already paid doesn't need to be told the entity/reference again. The token
 	 * stays: unlike entity/reference, it's still useful after payment (support, reconciliation).
+	 * The "Powered by ifthenpay" footer stays too — an earlier version only rendered the footer
+	 * in the pending branch, silently dropping the branding the moment a reference was paid; the
+	 * now-irrelevant "Pay by" deadline is the only piece that's actually pending-only.
 	 */
 	public function test_render_html_hides_details_once_paid(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -170,6 +173,8 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'Powered by', $html );
+		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
 
 	/**
@@ -212,7 +217,8 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 	/**
 	 * Once paid, the email-safe render also stops exposing the reference/entity, but keeps the
-	 * token.
+	 * token and the "Powered by ifthenpay" footer (see render_html()'s own equivalent test for
+	 * why that footer must survive the paid state).
 	 */
 	public function test_render_email_html_hides_details_once_paid(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -223,6 +229,8 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'Powered by', $html );
+		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
 
 	/**
