@@ -204,12 +204,10 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * finds no row by request_id and is rejected — safe (this payment is already settled, so
 		 * nothing is lost), just an imprecise acknowledgement back to ifthenpay.
 		 *
-		 * Security fix: the previous version wrote CANCELLED/FAILED straight from
-		 * the browser's own $type, with no verification at all — anyone holding a payment_token
-		 * could cancel another customer's in-flight payment, and a customer who closed the modal
-		 * right after paying could have their own successful payment marked FAILED. Now: a row
-		 * already PAID is never downgraded, and ifthenpay's own verification — never the browser's
-		 * self-reported $type — decides whether to settle, for every $type, not only 'success'.
+		 * A row already PAID is never downgraded, and ifthenpay's own verification — never the
+		 * browser's self-reported $type, which anyone holding a payment_token could otherwise send as
+		 * 'cancel' to cancel someone else's in-flight payment — decides whether to settle, for every
+		 * $type, not only 'success'.
 		 *
 		 * Locked on the token once a decision is ready to write (apply_polling_outcome()) — the same
 		 * key IfthenpayLpCallbackRestController::settle_realtime() also locks on, since the inbound
