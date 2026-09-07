@@ -193,16 +193,13 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 		 * same, already-proven realtime path. settle_payment() is for the inbound callback route
 		 * (which only ever fires once an order can exist) and the deferred/manual re-check paths.
 		 *
-		 * Uses record_verification($settle=true) (status PAID + settled_at together, in the same
-		 * write as the method_data record and the method correction) rather than a bare status
-		 * update — $txid itself is recorded in method_data, not the request_id column: request_id is
-		 * ifthenpay's own settlement/refund identifier (IfthenpayLpSettlement's idempotency key),
-		 * a genuinely different value from the transaction id, confirmed never interchangeable
-		 * between the two. This row's own request_id therefore stays whatever it already was — null,
-		 * unless a real async callback for this same realtime payment (the gateway_key stored at
-		 * checkout time lets one authenticate) arrives and populates it. Until then, such a callback
-		 * finds no row by request_id and is rejected — safe (this payment is already settled, so
-		 * nothing is lost), just an imprecise acknowledgement back to ifthenpay.
+		 * Uses record_verification($settle=true) rather than a bare status update, so PAID,
+		 * settled_at, and the method correction land in one write. $txid is stored in method_data,
+		 * never in the request_id column — the two are never interchangeable (see
+		 * IfthenpayLpTransactionStatus's own docblock) — so this row's own request_id stays null
+		 * until a real async callback for the same payment arrives and populates it; until then, such
+		 * a callback simply finds no row and is rejected, harmlessly, since the payment is already
+		 * settled.
 		 *
 		 * A row already PAID is never downgraded, and ifthenpay's own verification — never the
 		 * browser's self-reported $type, which anyone holding a payment_token could otherwise send as
