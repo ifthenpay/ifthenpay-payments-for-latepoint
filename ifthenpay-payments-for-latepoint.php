@@ -139,6 +139,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-process-seeder.php';
 		}
 
 		private function include_cli(): void {
@@ -242,6 +243,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			register_activation_hook( __FILE__, array( $this, 'on_activate' ) );
 			register_deactivation_hook( __FILE__, array( $this, 'on_deactivate' ) );
+
+			add_action( 'admin_notices', array( $this, 'maybe_show_process_seeded_notice' ) );
 		}
 
 		// --- Settings: save-time validation and post-save side effects ----
@@ -450,6 +453,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 					$record = IfthenpayLpReferenceDisplay::for_order( (int) $data_object['id'] );
 				} elseif ( 'booking' === ( $data_object['model'] ?? '' ) ) {
 					$record = IfthenpayLpReferenceDisplay::for_booking( (int) $data_object['id'] );
+				} elseif ( 'transaction' === ( $data_object['model'] ?? '' ) ) {
+					// The transaction_created process (IfthenpayLpProcessSeeder) selects its email
+					// action against a transaction, not an order/booking — resolve to the order
+					// behind it so the same reference box (now showing "Paid.") reaches that email
+					// too, reusing for_order() rather than a second lookup path.
+					$transaction = new OsTransactionModel( (int) $data_object['id'] );
+					$record      = $transaction->order_id ? IfthenpayLpReferenceDisplay::for_order( (int) $transaction->order_id ) : null;
 				}
 				if ( $record ) {
 					break;
@@ -674,7 +684,35 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
 
+			// Idempotent — see IfthenpayLpProcessSeeder's own docblock. Only shows the one-time
+			// admin notice when a process was actually created just now, not on every reactivation.
+			$this->ensure_loaded( 'IfthenpayLpProcessSeeder', '/lib/models/ifthenpay-lp-process-seeder.php' );
+			if ( IfthenpayLpProcessSeeder::seed_transaction_created_process() ) {
+				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
+			}
+
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
+		}
+
+		/**
+		 * A one-time, dismiss-on-render notice — no ongoing state to track, unlike a real
+		 * dismissible-forever notice, since `ifthenpay_lp_show_process_seeded_notice` is only ever
+		 * set true right after on_activate() actually created the process (never on a reactivation
+		 * that found one already there), so the option is deleted the first time this renders and
+		 * never set again on its own.
+		 */
+		public function maybe_show_process_seeded_notice(): void {
+			if ( ! get_option( 'ifthenpay_lp_show_process_seeded_notice' ) ) {
+				return;
+			}
+			delete_option( 'ifthenpay_lp_show_process_seeded_notice' );
+
+			printf(
+				'<div class="notice notice-info is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+				esc_html__( 'ifthenpay: a "Payment Received Notification" process was added so customers hear back once a Multibanco or Payshop reference is actually paid.', 'ifthenpay-payments-for-latepoint' ),
+				esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
+				esc_html__( 'Customize it', 'ifthenpay-payments-for-latepoint' )
+			);
 		}
 
 		public function register_addon( $installed_addons ) {
