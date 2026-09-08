@@ -266,6 +266,46 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * Realtime payments already marked resolved — the mirror listing of find_unclaimed_realtime(),
+	 * for reviewing (and, via mark_unresolved(), undoing) a past resolution made by mistake. Not
+	 * filtered by whether a real LatePoint transaction now claims the token: once resolved, that
+	 * distinction no longer matters to this listing's own purpose.
+	 *
+	 * @return object[]
+	 */
+	public static function find_resolved_realtime(): array {
+		global $wpdb;
+		$table = self::table_name();
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table has no user-controlled part ($wpdb->prefix); the %s placeholders cover every real value.
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM `{$table}`
+				WHERE kind = %s AND status = %s AND resolved_at IS NOT NULL
+				ORDER BY resolved_at DESC",
+				'realtime',
+				'PAID'
+			)
+		);
+		// phpcs:enable
+	}
+
+	/**
+	 * The undo for an accidental mark_resolved() click — re-validates the row is actually currently
+	 * resolved before touching it, the same defensive pattern mark_resolved() itself already follows.
+	 *
+	 * @param string $token Our correlation handle.
+	 */
+	public static function mark_unresolved( string $token ): bool {
+		$record = self::find_by_token( $token );
+		if ( ! $record || 'realtime' !== $record->kind || 'PAID' !== $record->status || null === $record->resolved_at ) { // @phpstan-ignore-line property.notFound
+			return false;
+		}
+
+		return self::update_columns( $token, array( 'resolved_at' => null ), $record );
+	}
+
+	/**
 	 * The customer dashboard's own batch-prefetch: warms find_by_intent_id()'s own wp_cache entry
 	 * for every one of $customer_id's own order intents in 2 queries total, regardless of how many
 	 * bookings that customer has. Without this, for_order()/for_booking() (IfthenpayLpReferenceDisplay)
