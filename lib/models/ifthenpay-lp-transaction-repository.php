@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class IfthenpayLpTransactionRepository {
 
-	private const SCHEMA_VERSION        = '1.2.0';
+	private const SCHEMA_VERSION        = '1.3.0';
 	private const SCHEMA_VERSION_OPTION = 'ifthenpay_lp_transactions_schema_version';
 	private const CACHE_GROUP           = 'ifthenpay_lp_transactions';
 
@@ -64,21 +64,22 @@ class IfthenpayLpTransactionRepository {
 		$sql = "CREATE TABLE {$table} (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			token VARCHAR(255) NOT NULL,
-			request_id VARCHAR(255) DEFAULT NULL,
 			intent_id BIGINT UNSIGNED NOT NULL,
 			kind VARCHAR(20) NOT NULL,
 			method VARCHAR(20) NOT NULL,
 			status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
 			amount DECIMAL(10,2) DEFAULT NULL,
 			gateway_key VARCHAR(255) DEFAULT NULL,
+			request_id VARCHAR(255) DEFAULT NULL,
 			entity VARCHAR(20) DEFAULT NULL,
 			reference VARCHAR(255) DEFAULT NULL,
 			expires_at DATETIME DEFAULT NULL,
 			pin_code VARCHAR(255) DEFAULT NULL,
 			paybylink_url VARCHAR(255) DEFAULT NULL,
+			checkout_snapshot LONGTEXT DEFAULT NULL,
+			resolved_at DATETIME DEFAULT NULL,
 			settled_at DATETIME DEFAULT NULL,
 			settled_by VARCHAR(20) DEFAULT NULL,
-			resolved_at DATETIME DEFAULT NULL,
 			method_data LONGTEXT DEFAULT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -387,11 +388,41 @@ class IfthenpayLpTransactionRepository {
 	 * @return array<string,mixed>
 	 */
 	public static function decode_method_data( object $record ): array {
-		if ( empty( $record->method_data ) ) {
+		return self::decode_json_column( $record->method_data ?? null );
+	}
+
+	/**
+	 * Decodes a record's own checkout_snapshot column, null-safe — the identity/booking info
+	 * OsPaymentsIfthenpayCheckoutController::build_unclaimed_snapshot() captures at checkout time.
+	 * Deliberately its own column, not folded into method_data: the two hold entirely unrelated
+	 * kinds of information — settlement/verification metadata (written by record_verification(),
+	 * read by IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes()) versus a
+	 * checkout-time identity/booking capture (written once at insert, read by the ifthenpay Tools
+	 * page's own Unclaimed Realtime Payments listing) — that happen to both be per-row JSON. Sharing
+	 * one blob for both would only make an already-dense payload harder to reason about, for no real
+	 * benefit: nothing ever needs both at once.
+	 *
+	 * @param object $record As returned by find_by_token()/find_by_request_id().
+	 * @return array<string,mixed>
+	 */
+	public static function decode_checkout_snapshot( object $record ): array {
+		return self::decode_json_column( $record->checkout_snapshot ?? null );
+	}
+
+	/**
+	 * Shared null-safe JSON-column decode — json_decode(null) is itself deprecated as of PHP 8.1,
+	 * and a column can legitimately be empty (nothing has ever written to it) or hold something
+	 * that decodes to anything other than an array.
+	 *
+	 * @param string|null $raw The column's own raw value.
+	 * @return array<string,mixed>
+	 */
+	private static function decode_json_column( ?string $raw ): array {
+		if ( empty( $raw ) ) {
 			return array();
 		}
 
-		$decoded = json_decode( $record->method_data, true );
+		$decoded = json_decode( $raw, true );
 
 		return is_array( $decoded ) ? $decoded : array();
 	}
