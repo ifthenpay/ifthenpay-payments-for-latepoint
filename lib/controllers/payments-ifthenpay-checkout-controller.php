@@ -32,7 +32,18 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				OsStepsHelper::$cart_object,
 				OsStepsHelper::$restrictions,
 				OsStepsHelper::$presets,
-				$booking_url
+				$booking_url,
+				// Every LatePoint-core caller of this method passes its own customer id explicitly
+				// (steps_controller.php, razorpay/stripe/paypal_connect_controller.php) — omitting it
+				// falls back to OsAuthHelper::get_logged_in_customer_id(), which is unconditionally
+				// false whenever a merchant has "hide login/register tabs" enabled
+				// (is_customer_auth_disabled()), even though a real, already-saved guest customer
+				// (OsStepsHelper::set_customer_object() re-loads them by their own resubmitted uuid,
+				// steps_helper.php:1174-1180) is sitting right here. Without this, customer_id stays
+				// empty, OsOrderIntentModel's own presence validation rejects the save, and this
+				// method silently receives an unsaved (id=0) intent — corrupting intent_id downstream
+				// and breaking get_page_url_with_intent()'s own resume link.
+				OsStepsHelper::get_customer_object_id()
 			);
 
 			$this->send_ifthenpay_options( $order_intent, $amount );
