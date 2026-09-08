@@ -315,11 +315,17 @@ class IfthenpayLpTransactionRepository {
 	 * otherwise hit.
 	 *
 	 * @param string $token          Our correlation handle.
-	 * @param string $transaction_id The identifier checked with ifthenpay — a txid for a realtime
-	 *                                payment, this row's own request_id for a deferred one (see
-	 *                                IfthenpayLpTransactionStatus's own docblock on why the two
-	 *                                sometimes coincide and sometimes don't).
-	 * @param object $confirmation   As returned by IfthenpayLpTransactionStatus::check().
+	 * @param string $identifier     The identifier this confirmation was checked against. A real,
+	 *                                ifthenpay-verified txid for the realtime polling and manual
+	 *                                re-check paths — both call IfthenpayLpTransactionStatus::check()
+	 *                                first. NEVER a real txid for the realtime webhook path: ifthenpay
+	 *                                confirmed a Pay By Link webhook's own request_id is not accepted
+	 *                                by the transaction-status endpoint, and no separate "check by
+	 *                                request_id" endpoint exists either — it is a genuinely different,
+	 *                                unrelated identifier. See $identifier_key.
+	 * @param object $confirmation   As returned by IfthenpayLpTransactionStatus::check() for the
+	 *                                verified paths; a locally-built, never-independently-confirmed
+	 *                                stand-in for the webhook path (see settle_realtime_locked()).
 	 * @param string $source         'callback' | 'polling' | 'manual' — same vocabulary as
 	 *                                IfthenpayLpSettlement::settle_payment()'s own $source. Only
 	 *                                written to the row (as settled_by) when $settle is true; the
@@ -329,9 +335,15 @@ class IfthenpayLpTransactionRepository {
 	 * @param bool   $settle         Whether to also mark the row settled when order_id matches —
 	 *                                the realtime polling path settles here directly; manual
 	 *                                re-check settles separately, through settle_payment().
+	 * @param string $identifier_key Which method_data key $identifier is stored under —
+	 *                                'transaction_id' (default) only when it genuinely is one, or a
+	 *                                caller-supplied distinct key otherwise (see the webhook path's
+	 *                                own 'callback_request_id'), so a later reader — see
+	 *                                IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes() —
+	 *                                never has to guess which kind of identifier it found.
 	 * @phpstan-param object{payment_method:string,amount:string,order_id:string,raw?:array<string,mixed>} $confirmation
 	 */
-	public static function record_verification( string $token, string $transaction_id, object $confirmation, string $source, bool $settle = false ): bool {
+	public static function record_verification( string $token, string $identifier, object $confirmation, string $source, bool $settle = false, string $identifier_key = 'transaction_id' ): bool {
 		$record = self::find_by_token( $token );
 		if ( ! $record ) {
 			return false;
@@ -340,7 +352,7 @@ class IfthenpayLpTransactionRepository {
 		$method_data = array_merge(
 			self::decode_method_data( $record ),
 			array(
-				'transaction_id'          => $transaction_id,
+				$identifier_key           => $identifier,
 				'verified_payment_method' => $confirmation->payment_method,
 				'verified_amount'         => $confirmation->amount,
 				'verified_order_id'       => $confirmation->order_id,
