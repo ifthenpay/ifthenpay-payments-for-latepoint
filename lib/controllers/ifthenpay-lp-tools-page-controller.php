@@ -443,8 +443,8 @@ class IfthenpayLpToolsPageController {
 		echo '</tr></thead><tbody>';
 
 		foreach ( $records as $record ) {
-			list( $customer_name, $contact ) = self::unclaimed_customer_and_contact( $record );
 			$method_data                     = IfthenpayLpTransactionRepository::decode_method_data( $record );
+			list( $customer_name, $contact ) = self::unclaimed_customer_and_contact( $method_data );
 
 			echo '<tr>';
 			echo '<td><code>' . esc_html( (string) $record->token ) . '</code></td>';
@@ -477,14 +477,14 @@ class IfthenpayLpToolsPageController {
 	 * Reads the row's own write-time snapshot — never the live order_intent, which LatePoint may
 	 * have reused (and silently overwritten) for a later, unrelated checkout attempt since this
 	 * payment settled. See OsPaymentsIfthenpayCheckoutController::build_unclaimed_snapshot()'s own
-	 * docblock for why that row can't be trusted after the fact.
+	 * docblock for why that row can't be trusted after the fact. Takes the already-decoded
+	 * method_data rather than the row itself — the caller also needs `booking_summary` out of the
+	 * same array, so it decodes once and passes it here instead of this method decoding its own copy.
 	 *
-	 * @param object $record As returned by find_unclaimed_realtime().
+	 * @param array<string,mixed> $data As returned by IfthenpayLpTransactionRepository::decode_method_data().
 	 * @return array{0:string,1:string} [customer name, contact]
 	 */
-	private static function unclaimed_customer_and_contact( object $record ): array {
-		$data = IfthenpayLpTransactionRepository::decode_method_data( $record );
-
+	private static function unclaimed_customer_and_contact( array $data ): array {
 		if ( ! empty( $data['customer_id'] ) ) {
 			$customer = new OsCustomerModel( (int) $data['customer_id'] );
 			if ( ! $customer->is_new_record() ) {
