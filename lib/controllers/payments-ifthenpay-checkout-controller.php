@@ -98,7 +98,21 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 			}
 
 			try {
-				$token       = $intent_model->intent_key;
+				// Never $intent_model->intent_key: LatePoint reuses the identical order_intent row —
+				// same id, same intent_key — across every checkout attempt on the same cart cookie
+				// until it actually converts (OsOrderIntentHelper::create_or_update_order_intent()'s
+				// own reuse path, verified against core; intent_key is only ever set once, in
+				// before_create()). A customer who pays, then loses their connection before the
+				// booking form submits, and retries, would otherwise mint a second live Pay By Link
+				// under the exact same token as the first — a real second charge at ifthenpay whose
+				// local insert() then silently fails on this table's own UNIQUE(token), unnoticed,
+				// with no local record of it ever existing. A fresh token per call is what
+				// build_pay_by_link_payload()'s own 'otp' => 'true' comment already assumes ("each
+				// checkout attempt mints its own") — nothing downstream needs it to equal intent_key:
+				// LatePoint's own read-back is $intent_model->get_payment_data_value('token'), sourced
+				// from whatever this response's own 'token' round-trips through front.js, never
+				// intent_key directly (verified against core's process_payment_by_intent() consumer).
+				$token       = wp_generate_password( 20, false );
 				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
 				$payload     = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
 
@@ -117,7 +131,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 				$api_result = IfthenpayLpPayByLink::create( $gateway_key, $payload );
 
-				IfthenpayLpTransactionRepository::insert(
+				$inserted = IfthenpayLpTransactionRepository::insert(
 					array(
 						'token'         => $token,
 						'intent_id'     => $intent_model->id,
@@ -137,6 +151,20 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						'gateway_key'   => $gateway_key,
 					)
 				);
+
+				// A real Pay By Link now exists at ifthenpay regardless — this only decides whether
+				// the customer is told about it. Reporting success over a row we never actually
+				// stored would leave that live link completely untracked: no callback/polling path
+				// could ever settle it, since neither has a local row to find by token.
+				if ( false === $inserted ) {
+					$this->send_json(
+						array(
+							'status'  => LATEPOINT_STATUS_ERROR,
+							'message' => __( 'Could not start this payment right now. Please try again or contact the site owner.', 'ifthenpay-payments-for-latepoint' ),
+						)
+					);
+					return;
+				}
 
 				$this->send_json(
 					array(
