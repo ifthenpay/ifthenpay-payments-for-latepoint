@@ -316,13 +316,13 @@ class IfthenpayLpToolsPageController {
 			array(
 				__( 'Token', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Request ID', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Method', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Entity', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Reference', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Expires', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Action', 'ifthenpay-payments-for-latepoint' ),
 			) as $heading
 		) {
@@ -343,13 +343,13 @@ class IfthenpayLpToolsPageController {
 			// — never the token above, see IfthenpayLpManualRecheck's own docblock on why the two
 			// are not interchangeable.
 			echo '<td><code>' . esc_html( ! empty( $record->request_id ) ? (string) $record->request_id : '—' ) . '</code></td>';
+			echo '<td>' . esc_html( $customer ? $customer->full_name : '—' ) . '</td>';
+			echo '<td>' . esc_html( self::contact_label( $customer ) ) . '</td>';
 			echo '<td>' . esc_html( (string) $record->method ) . '</td>';
 			echo '<td>' . esc_html( ! empty( $record->entity ) ? (string) $record->entity : '—' ) . '</td>';
 			echo '<td>' . esc_html( ! empty( $record->reference ) ? (string) $record->reference : '—' ) . '</td>';
 			echo '<td>' . esc_html( null !== $record->amount ? OsMoneyHelper::format_price( $record->amount, true, false ) : '—' ) . '</td>';
 			echo '<td>' . esc_html( $record->expires_at ?? '—' ) . '</td>';
-			echo '<td>' . esc_html( $customer ? $customer->full_name : '—' ) . '</td>';
-			echo '<td>' . esc_html( self::contact_label( $customer ) ) . '</td>';
 			echo '<td>';
 			echo '<form method="post" style="display:inline">';
 			wp_nonce_field( self::NONCE_ACTION, 'ifthenpay_lp_tools_nonce' );
@@ -429,12 +429,12 @@ class IfthenpayLpToolsPageController {
 		foreach (
 			array(
 				__( 'Token', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Method', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Settled', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Booking (reconstructed at checkout time)', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Method', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Settled', 'ifthenpay-payments-for-latepoint' ),
 				__( 'Action', 'ifthenpay-payments-for-latepoint' ),
 			) as $heading
 		) {
@@ -443,11 +443,14 @@ class IfthenpayLpToolsPageController {
 		echo '</tr></thead><tbody>';
 
 		foreach ( $records as $record ) {
-			$method_data                     = IfthenpayLpTransactionRepository::decode_method_data( $record );
-			list( $customer_name, $contact ) = self::unclaimed_customer_and_contact( $method_data );
+			$snapshot                        = IfthenpayLpTransactionRepository::decode_checkout_snapshot( $record );
+			list( $customer_name, $contact ) = self::unclaimed_customer_and_contact( $snapshot );
 
 			echo '<tr>';
 			echo '<td><code>' . esc_html( (string) $record->token ) . '</code></td>';
+			echo '<td>' . esc_html( $customer_name ) . '</td>';
+			echo '<td>' . esc_html( $contact ) . '</td>';
+			echo '<td>' . esc_html( ! empty( $snapshot['booking_summary'] ) ? $snapshot['booking_summary'] : '—' ) . '</td>';
 			echo '<td>' . esc_html( (string) $record->method ) . '</td>';
 			echo '<td>' . esc_html( null !== $record->amount ? OsMoneyHelper::format_price( $record->amount, true, false ) : '—' ) . '</td>';
 			echo '<td>' . esc_html(
@@ -456,9 +459,6 @@ class IfthenpayLpToolsPageController {
 					? sprintf( __( '%s ago', 'ifthenpay-payments-for-latepoint' ), human_time_diff( strtotime( (string) $record->settled_at ) ) )
 					: '—'
 			) . '</td>';
-			echo '<td>' . esc_html( $customer_name ) . '</td>';
-			echo '<td>' . esc_html( $contact ) . '</td>';
-			echo '<td>' . esc_html( ! empty( $method_data['booking_summary'] ) ? $method_data['booking_summary'] : '—' ) . '</td>';
 			echo '<td>';
 			echo '<form method="post" style="display:inline">';
 			wp_nonce_field( self::NONCE_ACTION, 'ifthenpay_lp_tools_nonce' );
@@ -478,10 +478,10 @@ class IfthenpayLpToolsPageController {
 	 * have reused (and silently overwritten) for a later, unrelated checkout attempt since this
 	 * payment settled. See OsPaymentsIfthenpayCheckoutController::build_unclaimed_snapshot()'s own
 	 * docblock for why that row can't be trusted after the fact. Takes the already-decoded
-	 * method_data rather than the row itself — the caller also needs `booking_summary` out of the
-	 * same array, so it decodes once and passes it here instead of this method decoding its own copy.
+	 * checkout_snapshot rather than the row itself — the caller also needs `booking_summary` out of
+	 * the same array, so it decodes once and passes it here instead of this method decoding its own copy.
 	 *
-	 * @param array<string,mixed> $data As returned by IfthenpayLpTransactionRepository::decode_method_data().
+	 * @param array<string,mixed> $data As returned by IfthenpayLpTransactionRepository::decode_checkout_snapshot().
 	 * @return array{0:string,1:string} [customer name, contact]
 	 */
 	private static function unclaimed_customer_and_contact( array $data ): array {
