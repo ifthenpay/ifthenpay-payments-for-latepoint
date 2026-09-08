@@ -13,7 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Takes the same lock settle_payment() uses, keyed the same way (the row's own request_id), so a
  * payment settling in the same instant the sweep reaches that row always wins: the sweep re-checks
- * inside the lock and only cancels what is still genuinely unpaid at that moment.
+ * inside the lock and only cancels what is still genuinely unpaid at that moment. cancel_now() is
+ * the same cancellation, on demand — the ifthenpay Tools page's own manual Cancel action, for a row
+ * a merchant has decided isn't getting paid without waiting for expiry.
  */
 class IfthenpayLpExpirySweep {
 
@@ -34,6 +36,38 @@ class IfthenpayLpExpirySweep {
 	}
 
 	/**
+	 * Cancels one deferred row right now, under its own lock acquisition — not gated on expiry, and
+	 * not called from run()'s own loop, so it does not nest inside that loop's own lock. Same
+	 * outcome as a row the sweep itself reaches once expired: every booking on the order cancelled
+	 * (releasing the slot), the row itself marked CANCELLED.
+	 *
+	 * @param string $token Our own correlation handle (the repository row's token column).
+	 * @return bool Whether this call actually cancelled anything — false when the row doesn't
+	 *              exist, has no request_id (a realtime row; nothing here applies to it), is
+	 *              already settled, or is no longer PENDING.
+	 */
+	public static function cancel_now( string $token ): bool {
+		$record = IfthenpayLpTransactionRepository::find_by_token( $token );
+		if ( ! $record || null === $record->request_id ) {
+			return false;
+		}
+
+		try {
+			return IfthenpayLpSettlementLock::with_lock(
+				(string) $record->request_id,
+				static function () use ( $token ) {
+					return self::cancel_locked( $token );
+				}
+			);
+		} catch ( IfthenpayLpLockUnavailableException $e ) {
+			// A concurrent settlement holds this row's lock right now — never silently cancel a
+			// payment that may be settling at this exact moment; the caller can simply try again.
+			unset( $e );
+			return false;
+		}
+	}
+
+	/**
 	 * Handles a single row, under its own lock.
 	 *
 	 * @param object $record A row from find_expired_pending().
@@ -43,7 +77,7 @@ class IfthenpayLpExpirySweep {
 			IfthenpayLpSettlementLock::with_lock(
 				(string) $record->request_id,
 				static function () use ( $record ) {
-					self::expire_locked( $record );
+					self::cancel_locked( (string) $record->token );
 				}
 			);
 		} catch ( IfthenpayLpLockUnavailableException $e ) {
@@ -54,26 +88,29 @@ class IfthenpayLpExpirySweep {
 	}
 
 	/**
-	 * Runs with the lock for $record's own request_id already held.
+	 * Runs with the lock for $token's own request_id already held — shared by run()'s own per-row
+	 * handling (expire_one()) and the on-demand cancel_now(), each of which acquires that lock
+	 * itself before calling here, so this never acquires one of its own.
 	 *
-	 * @param object $record As passed to expire_one() — re-read fresh here regardless, since
-	 *                       anything read before the lock may already be stale.
+	 * @param string $token Re-read fresh here regardless of how the caller found it, since anything
+	 *                      read before the lock may already be stale.
+	 * @return bool Whether this call actually cancelled anything.
 	 */
-	private static function expire_locked( object $record ): void {
-		$fresh = IfthenpayLpTransactionRepository::find_by_token( (string) $record->token );
+	private static function cancel_locked( string $token ): bool {
+		$fresh = IfthenpayLpTransactionRepository::find_by_token( $token );
 		if ( ! $fresh || null !== $fresh->settled_at || 'PENDING' !== $fresh->status ) {
-			// Already settled (payment won the race) or already handled by an earlier sweep.
-			return;
+			// Already settled (payment won the race) or already handled by an earlier call.
+			return false;
 		}
 
 		$order_id = OsOrderIntentHelper::is_converted( (int) $fresh->intent_id );
 		if ( ! $order_id ) {
-			return;
+			return false;
 		}
 
 		$order = new OsOrderModel( $order_id );
 		if ( $order->is_new_record() ) {
-			return;
+			return false;
 		}
 
 		foreach ( $order->get_bookings_from_order_items( true ) as $booking ) {
@@ -83,5 +120,7 @@ class IfthenpayLpExpirySweep {
 		}
 
 		IfthenpayLpTransactionRepository::update_status( $fresh->token, 'CANCELLED' );
+
+		return true;
 	}
 }
