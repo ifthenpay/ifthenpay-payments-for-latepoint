@@ -211,7 +211,7 @@ class RealtimeCheckoutTokenTest extends WP_UnitTestCase {
 
 		$result = $this->send_ifthenpay_options( $intent, '25.00' );
 		$record = IfthenpayLpTransactionRepository::find_by_token( $result['token'] );
-		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+		$data   = IfthenpayLpTransactionRepository::decode_checkout_snapshot( $record );
 
 		$this->assertArrayNotHasKey( 'customer_id', $data );
 		$this->assertSame( 'Jane Doe', $data['customer_name'] );
@@ -231,7 +231,7 @@ class RealtimeCheckoutTokenTest extends WP_UnitTestCase {
 
 		$result = $this->send_ifthenpay_options( $intent, '25.00' );
 		$record = IfthenpayLpTransactionRepository::find_by_token( $result['token'] );
-		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+		$data   = IfthenpayLpTransactionRepository::decode_checkout_snapshot( $record );
 
 		$this->assertSame( $intent->customer_id, $data['customer_id'] );
 		$this->assertArrayNotHasKey( 'customer_name', $data );
@@ -257,7 +257,7 @@ class RealtimeCheckoutTokenTest extends WP_UnitTestCase {
 		$method->invoke( $controller, $intent, '25.00' );
 
 		$record = IfthenpayLpTransactionRepository::find_by_token( $controller->captured['token'] );
-		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+		$data   = IfthenpayLpTransactionRepository::decode_checkout_snapshot( $record );
 
 		$this->assertSame( $fixture->customer->id, $data['customer_id'] );
 		$this->assertArrayNotHasKey( 'booking_summary', $data );

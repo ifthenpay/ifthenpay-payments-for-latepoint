@@ -144,28 +144,31 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 				$inserted = IfthenpayLpTransactionRepository::insert(
 					array(
-						'token'         => $token,
-						'intent_id'     => $intent_model->id,
-						'kind'          => 'realtime',
-						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+						'token'             => $token,
+						'intent_id'         => $intent_model->id,
+						'kind'              => 'realtime',
+						'method'            => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
 						// Same formatted value already sent to ifthenpay in $payload — lets
 						// IfthenpayLpSettlement::settle_locked() actually run its amount-mismatch
 						// guard for a realtime payment, same as it already does for a deferred one;
 						// that guard is a no-op whenever a record's own amount is null.
-						'amount'        => $payload['amount'],
-						'paybylink_url' => $api_result->redirect_url,
-						'pin_code'      => $api_result->pin_code,
+						'amount'            => $payload['amount'],
+						'paybylink_url'     => $api_result->redirect_url,
+						'pin_code'          => $api_result->pin_code,
 						// Needed so the inbound callback route (ifthenpay-lp/v1/callback) can
 						// authenticate a real async notification for this payment, on gateways
 						// where ifthenpay also sends one for realtime methods — without this, every
 						// such callback would fail anti-phishing verification against an empty key.
-						'gateway_key'   => $gateway_key,
+						'gateway_key'       => $gateway_key,
 						// Captured now, never re-derived later from the shared order/transaction
 						// intent — see build_unclaimed_snapshot()'s own docblock for why that would be
-						// unreliable. Feeds IfthenpayLpTransactionRepository::find_unclaimed_realtime(),
-						// the ifthenpay Tools page's own listing for a realtime payment that settled
-						// but was never claimed by a real booking.
-						'method_data'   => wp_json_encode( self::build_unclaimed_snapshot( $intent_model ) ),
+						// unreliable. Its own column, not method_data: the two hold entirely unrelated
+						// kinds of information (settlement/verification metadata vs. a checkout-time
+						// identity/booking capture) — see
+						// IfthenpayLpTransactionRepository::decode_checkout_snapshot()'s own docblock.
+						// Feeds find_unclaimed_realtime(), the ifthenpay Tools page's own listing for a
+						// realtime payment that settled but was never claimed by a real booking.
+						'checkout_snapshot' => wp_json_encode( self::build_unclaimed_snapshot( $intent_model ) ),
 					)
 				);
 
