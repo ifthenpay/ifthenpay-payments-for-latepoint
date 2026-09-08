@@ -165,6 +165,29 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * Every still-outstanding deferred payment, regardless of expiry — the ifthenpay Tools page's
+	 * own listing, so a merchant/support agent can see and manually re-check one without needing
+	 * its token ahead of time. Soonest-to-expire first: the ones most worth checking before the
+	 * expiry sweep would cancel them.
+	 *
+	 * @return object[]
+	 */
+	public static function find_pending_deferred(): array {
+		global $wpdb;
+		$table = self::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- $table has no user-controlled part (built from $wpdb->prefix); values are placeholders.
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table has no user-controlled part (built from $wpdb->prefix); the %s placeholders cover every real value.
+				"SELECT * FROM `{$table}` WHERE status = %s AND kind = %s ORDER BY expires_at IS NULL, expires_at ASC",
+				'PENDING',
+				'deferred'
+			)
+		);
+	}
+
+	/**
 	 * The customer dashboard's own batch-prefetch: warms find_by_intent_id()'s own wp_cache entry
 	 * for every one of $customer_id's own order intents in 2 queries total, regardless of how many
 	 * bookings that customer has. Without this, for_order()/for_booking() (IfthenpayLpReferenceDisplay)
