@@ -16,6 +16,7 @@
 
 // phpcs:ignore Squiz.Commenting.FileComment.Missing -- docblock above is the file comment; the sniff misclassifies it when a require is the first statement.
 require_once __DIR__ . '/../support/class-ifthenpay-lp-testable-checkout-controller.php';
+require_once __DIR__ . '/../support/class-latepoint-order-fixture.php';
 require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 
 /**
@@ -157,5 +158,108 @@ class RealtimeCheckoutTokenTest extends WP_UnitTestCase {
 
 		$first_record = IfthenpayLpTransactionRepository::find_by_token( $first['token'] );
 		$this->assertSame( 'PAID', $first_record->status ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * A guest order-booking checkout — customer_id empty on the intent — snapshots the raw contact
+	 * fields already sitting on OsStepsHelper::$customer_object (the same state
+	 * get_order_ifthenpay_options() leaves it in via set_required_objects(), before this add-on's
+	 * own controller ever runs), plus a booking summary naming the real service in the cart. Never
+	 * re-derived later from the order_intent — see build_unclaimed_snapshot()'s own docblock.
+	 */
+	public function test_guest_order_checkout_snapshots_raw_contact_and_booking_info(): void {
+		$service           = new OsServiceModel();
+		$service->name     = 'Deep Tissue Massage';
+		$service->duration = 60;
+		$service->save();
+
+		OsStepsHelper::$customer_object             = new OsCustomerModel();
+		OsStepsHelper::$customer_object->first_name = 'Jane';
+		OsStepsHelper::$customer_object->last_name  = 'Doe';
+		OsStepsHelper::$customer_object->email      = 'jane.doe@example.test';
+		OsStepsHelper::$customer_object->phone      = '+351911111111';
+
+		// order_intents.customer_id is NOT NULL at the DB level, so a genuinely customer_id-less row
+		// can never actually be saved — real code never hits that either: an unsaved-with-empty-
+		// customer_id OsOrderIntentModel (id=0) is exactly what a guest checkout holds in memory
+		// before it's ever persisted. Save with a throwaway customer_id first only to obtain a real
+		// id (our own intent_id column is itself NOT NULL), then blank the in-memory property — the
+		// same "empty at the moment send_ifthenpay_options() reads it" state either way, since
+		// build_unclaimed_snapshot() only ever reads the live property, never re-queries the row.
+		$placeholder_customer             = new OsCustomerModel();
+		$placeholder_customer->first_name = 'Placeholder';
+		$placeholder_customer->last_name  = 'Customer';
+		$placeholder_customer->email      = 'ifthenpay-lp-placeholder-' . wp_generate_password( 8, false ) . '@example.com';
+		$placeholder_customer->save();
+
+		$intent                  = new OsOrderIntentModel();
+		$intent->customer_id     = $placeholder_customer->id;
+		$intent->cart_items_data = wp_json_encode(
+			array(
+				array(
+					'variant'   => LATEPOINT_ITEM_VARIANT_BOOKING,
+					'item_data' => array(
+						'service_id' => $service->id,
+						'start_date' => '2026-10-01',
+						'start_time' => 600, // 10:00.
+					),
+				),
+			)
+		);
+		$intent->save();
+		$intent->customer_id = null;
+
+		$result = $this->send_ifthenpay_options( $intent, '25.00' );
+		$record = IfthenpayLpTransactionRepository::find_by_token( $result['token'] );
+		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+
+		$this->assertArrayNotHasKey( 'customer_id', $data );
+		$this->assertSame( 'Jane Doe', $data['customer_name'] );
+		$this->assertSame( 'jane.doe@example.test', $data['customer_email'] );
+		$this->assertSame( '+351911111111', $data['customer_phone'] );
+		$this->assertStringContainsString( 'Deep Tissue Massage', $data['booking_summary'] );
+		$this->assertStringContainsString( '2026-10-01', $data['booking_summary'] );
+	}
+
+	/**
+	 * An already-logged-in customer (or a guest whose customer_id already resolved to a real,
+	 * saved row) snapshots only customer_id — no need for the raw-field fallback, and no reason to
+	 * duplicate data a real OsCustomerModel row already holds.
+	 */
+	public function test_logged_in_customer_snapshots_only_customer_id(): void {
+		$intent = $this->create_order_intent();
+
+		$result = $this->send_ifthenpay_options( $intent, '25.00' );
+		$record = IfthenpayLpTransactionRepository::find_by_token( $result['token'] );
+		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+
+		$this->assertSame( $intent->customer_id, $data['customer_id'] );
+		$this->assertArrayNotHasKey( 'customer_name', $data );
+	}
+
+	/**
+	 * The invoice/transaction path (get_transaction_ifthenpay_options(), a direct payment against an
+	 * existing invoice, not a fresh booking) always has a real customer_id — and has no booking to
+	 * summarize at all, since nothing new is being booked.
+	 */
+	public function test_transaction_intent_path_snapshots_customer_id_only_no_booking_summary(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+
+		$intent                = new OsTransactionIntentModel();
+		$intent->order_id      = $fixture->order->id;
+		$intent->customer_id   = $fixture->customer->id;
+		$intent->charge_amount = '25.00';
+		$intent->save();
+
+		$controller = ( new ReflectionClass( IfthenpayLpTestableCheckoutController::class ) )->newInstanceWithoutConstructor();
+		$method     = new ReflectionMethod( IfthenpayLpTestableCheckoutController::class, 'send_ifthenpay_options' );
+		$method->setAccessible( true );
+		$method->invoke( $controller, $intent, '25.00' );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( $controller->captured['token'] );
+		$data   = IfthenpayLpTransactionRepository::decode_method_data( $record );
+
+		$this->assertSame( $fixture->customer->id, $data['customer_id'] );
+		$this->assertArrayNotHasKey( 'booking_summary', $data );
 	}
 }

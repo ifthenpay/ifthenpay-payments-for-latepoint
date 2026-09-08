@@ -120,3 +120,24 @@ function ifthenpay_lp_insert_pending_transaction_row( object $fixture, string $r
 		)
 	);
 }
+
+/**
+ * Inserts a bare row directly into LatePoint core's own `{prefix}latepoint_transactions` table — a
+ * real transaction, never created through this add-on's own settlement path. Only
+ * IfthenpayLpTransactionRepository::find_unclaimed_realtime()'s own tests need this: it proves a
+ * realtime ifthenpay_transactions row was genuinely claimed by checking for a real LatePoint
+ * transaction with the matching token, so the "claimed" test case needs one of those to exist.
+ *
+ * @param string $token The token this row's own `token` column must match, to count as "claimed".
+ */
+function ifthenpay_lp_insert_latepoint_transaction( string $token ): void {
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- test-only fixture helper, not production code.
+	$wpdb->insert(
+		LATEPOINT_TABLE_TRANSACTIONS,
+		array(
+			'token'  => $token,
+			'status' => LATEPOINT_TRANSACTION_STATUS_SUCCEEDED,
+		)
+	);
+}
