@@ -160,6 +160,12 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 						// where ifthenpay also sends one for realtime methods — without this, every
 						// such callback would fail anti-phishing verification against an empty key.
 						'gateway_key'   => $gateway_key,
+						// Captured now, never re-derived later from the shared order/transaction
+						// intent — see build_unclaimed_snapshot()'s own docblock for why that would be
+						// unreliable. Feeds IfthenpayLpTransactionRepository::find_unclaimed_realtime(),
+						// the ifthenpay Tools page's own listing for a realtime payment that settled
+						// but was never claimed by a real booking.
+						'method_data'   => wp_json_encode( self::build_unclaimed_snapshot( $intent_model ) ),
 					)
 				);
 
@@ -200,6 +206,91 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					)
 				);
 			}
+		}
+
+		/**
+		 * Identity/booking snapshot for a realtime payment, captured now rather than re-derived
+		 * later from the shared order/transaction intent. LatePoint reuses the identical
+		 * order_intent row (same id) across every checkout attempt on the same cart cookie until it
+		 * actually converts, and on that reuse path unconditionally overwrites both `customer_id`
+		 * (sourced from session/login state, not the cart — OsOrderIntentHelper::create_or_update_order_intent())
+		 * and `cart_items_data`, with no persisted history. A later attempt — even by a genuinely
+		 * different person on a shared/kiosk browser — can silently overwrite both fields, so reading
+		 * either back off the intent after the fact is unreliable. This snapshot is what
+		 * IfthenpayLpTransactionRepository::find_unclaimed_realtime() actually shows a merchant —
+		 * never the live intent row.
+		 *
+		 * @param object $intent_model An OrderIntent or TransactionIntent instance.
+		 * @return array<string,mixed>
+		 */
+		private static function build_unclaimed_snapshot( $intent_model ): array {
+			$snapshot = array();
+
+			if ( ! empty( $intent_model->customer_id ) ) {
+				// Reliable once non-empty for either intent type: the invoice/transaction path
+				// always sets it from the invoice's own existing order
+				// (OsTransactionIntentHelper::create_or_update_transaction_intent()); on the
+				// order-booking path it's only ever non-empty for an already-logged-in customer.
+				$snapshot['customer_id'] = (int) $intent_model->customer_id;
+			} elseif ( $intent_model instanceof OsOrderIntentModel ) {
+				// A guest order-booking checkout: OsStepsHelper::set_customer_object() (already run,
+				// via set_required_objects() in get_order_ifthenpay_options()) builds a real
+				// OsCustomerModel with the submitted name/email/phone but deliberately does not save
+				// it — "will be saved on the confirmation step" — so customer_id above is empty even
+				// though the identity itself is already known. get_customer_object() is the only
+				// reliable read of it at this exact point; same pattern LatePoint core's own
+				// razorpay_connect_controller.php uses at the equivalent point in its own checkout.
+				$customer                   = OsStepsHelper::get_customer_object();
+				$snapshot['customer_name']  = $customer->full_name;
+				$snapshot['customer_email'] = $customer->email;
+				$snapshot['customer_phone'] = $customer->phone;
+			}
+
+			if ( $intent_model instanceof OsOrderIntentModel ) {
+				$snapshot['booking_summary'] = self::summarize_cart_items( (string) $intent_model->cart_items_data );
+			}
+
+			return $snapshot;
+		}
+
+		/**
+		 * A best-effort, human-readable line per booking item in the cart at this exact moment — raw
+		 * item_data parsing, not build_cart_object()/OsCartItemModel::build_original_object_from_item_data():
+		 * cart_items_data is already in hand as a string here, and only display strings are needed,
+		 * not a real booking object. Multiple items (a multi-service cart) are joined, not just the
+		 * first — a merchant resolving this with the customer needs the whole picture.
+		 *
+		 * @param string $cart_items_data The intent's own cart_items_data column value.
+		 */
+		private static function summarize_cart_items( string $cart_items_data ): string {
+			$items = json_decode( $cart_items_data, true );
+			if ( ! is_array( $items ) ) {
+				return '';
+			}
+
+			$lines = array();
+			foreach ( $items as $item ) {
+				if ( ( $item['variant'] ?? '' ) !== LATEPOINT_ITEM_VARIANT_BOOKING ) {
+					continue;
+				}
+
+				$data         = $item['item_data'] ?? array();
+				$service_name = '';
+				if ( ! empty( $data['service_id'] ) ) {
+					$service      = new OsServiceModel( (int) $data['service_id'] );
+					$service_name = $service->is_new_record() ? '' : $service->name;
+				}
+
+				$lines[] = sprintf(
+					/* translators: 1: service name, 2: appointment date, 3: appointment time */
+					__( '%1$s on %2$s @ %3$s', 'ifthenpay-payments-for-latepoint' ),
+					'' !== $service_name ? $service_name : __( 'Unknown service', 'ifthenpay-payments-for-latepoint' ),
+					$data['start_date'] ?? '?',
+					isset( $data['start_time'] ) ? OsTimeHelper::minutes_to_hours_and_minutes( (int) $data['start_time'] ) : '?'
+				);
+			}
+
+			return implode( '; ', $lines );
 		}
 
 		/**

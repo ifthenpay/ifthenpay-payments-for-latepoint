@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class IfthenpayLpTransactionRepository {
 
-	private const SCHEMA_VERSION        = '1.1.0';
+	private const SCHEMA_VERSION        = '1.2.0';
 	private const SCHEMA_VERSION_OPTION = 'ifthenpay_lp_transactions_schema_version';
 	private const CACHE_GROUP           = 'ifthenpay_lp_transactions';
 
@@ -78,6 +78,7 @@ class IfthenpayLpTransactionRepository {
 			paybylink_url VARCHAR(255) DEFAULT NULL,
 			settled_at DATETIME DEFAULT NULL,
 			settled_by VARCHAR(20) DEFAULT NULL,
+			resolved_at DATETIME DEFAULT NULL,
 			method_data LONGTEXT DEFAULT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -185,6 +186,65 @@ class IfthenpayLpTransactionRepository {
 				'deferred'
 			)
 		);
+	}
+
+	/**
+	 * A realtime row still counts as "in flight" for this long after settling before it's eligible
+	 * to be flagged unclaimed — long enough that a customer's own browser has certainly either
+	 * finished submitting the booking form or genuinely died trying, not so long that a merchant
+	 * loses real time noticing an actual double-charge.
+	 */
+	private const UNCLAIMED_GRACE_PERIOD_SECONDS = 15 * MINUTE_IN_SECONDS;
+
+	/**
+	 * Realtime payments that settled PAID but were never claimed by a real LatePoint transaction —
+	 * the customer's own browser died before convert_to_order() ran (or, in the worst case, a retry
+	 * on the same order_intent went on to pay and convert separately, leaving this one a genuine,
+	 * unrecorded-anywhere-else second charge — see IfthenpayLpTransactionRepository's own callers in
+	 * payments-ifthenpay-checkout-controller.php for why intent_key reuse used to make this
+	 * possible). `settled_at` past the grace period excludes a checkout still genuinely mid-submit.
+	 *
+	 * Joined by token against LatePoint core's own transactions table — verified reliable:
+	 * OsPaymentsHelper::process_payment_for_order_intent()/process_payment_for_transaction_intent()
+	 * both set `$transaction->token` unconditionally from this add-on's own `charge_id` return value
+	 * (payments_helper.php:359-360, :405-406), which is exactly the token this add-on minted for
+	 * this row (IfthenpayLpPaymentProcessor::process_payment_by_intent()) — a match there proves the
+	 * row genuinely was claimed by a real booking/order, not merely that some order_intent nearby
+	 * eventually converted.
+	 *
+	 * @return object[]
+	 */
+	public static function find_unclaimed_realtime(): array {
+		global $wpdb;
+		$table    = self::table_name();
+		$lp_table = LATEPOINT_TABLE_TRANSACTIONS;
+		$cutoff   = gmdate( 'Y-m-d H:i:s', time() - self::UNCLAIMED_GRACE_PERIOD_SECONDS );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- both table names have no user-controlled part ($table from $wpdb->prefix; LATEPOINT_TABLE_TRANSACTIONS is LatePoint core's own constant); the %s placeholders cover every real value.
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT t.* FROM `{$table}` t
+				WHERE t.kind = %s AND t.status = %s AND t.resolved_at IS NULL
+				AND t.settled_at IS NOT NULL AND t.settled_at < %s
+				AND NOT EXISTS ( SELECT 1 FROM `{$lp_table}` lt WHERE lt.token = t.token )
+				ORDER BY t.settled_at ASC",
+				'realtime',
+				'PAID',
+				$cutoff
+			)
+		);
+		// phpcs:enable
+	}
+
+	/**
+	 * Stops a row appearing in find_unclaimed_realtime() without touching status/settled_at or
+	 * anything about the payment itself — the underlying paid row and its history stay exactly as
+	 * they are, this only records that a merchant has manually resolved it with their customer.
+	 *
+	 * @param string $token Our correlation handle.
+	 */
+	public static function mark_resolved( string $token ): bool {
+		return self::update_columns( $token, array( 'resolved_at' => current_time( 'mysql', true ) ) );
 	}
 
 	/**

@@ -67,6 +67,7 @@ class IfthenpayLpToolsPageController {
 
 		self::render_callback_section();
 		self::render_pending_payments_section();
+		self::render_unclaimed_realtime_section();
 
 		echo '</div>';
 	}
@@ -104,6 +105,10 @@ class IfthenpayLpToolsPageController {
 
 		if ( 'cancel_payment' === $action ) {
 			return self::handle_cancel_payment( sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ) );
+		}
+
+		if ( 'mark_resolved' === $action ) {
+			return self::handle_mark_resolved( sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ) );
 		}
 
 		return null;
@@ -184,6 +189,28 @@ class IfthenpayLpToolsPageController {
 		return array(
 			'type'    => 'error',
 			'message' => __( 'Could not cancel this payment — it may have just settled, or already been handled.', 'ifthenpay-payments-for-latepoint' ),
+		);
+	}
+
+	/**
+	 * Dismisses a row from the Unclaimed Realtime Payments listing once a merchant has resolved it
+	 * with their customer — no confirmation dialog, unlike Cancel: nothing here is destroyed, the
+	 * underlying paid row and its history stay exactly as they are.
+	 *
+	 * @param string $token The repository row's own token, as submitted by the row's own form.
+	 * @return array{type:string,message:string}
+	 */
+	private static function handle_mark_resolved( string $token ): array {
+		if ( IfthenpayLpTransactionRepository::mark_resolved( $token ) ) {
+			return array(
+				'type'    => 'success',
+				'message' => __( 'Marked resolved.', 'ifthenpay-payments-for-latepoint' ),
+			);
+		}
+
+		return array(
+			'type'    => 'error',
+			'message' => __( 'Could not mark this payment resolved. Please try again.', 'ifthenpay-payments-for-latepoint' ),
 		);
 	}
 
@@ -379,5 +406,98 @@ class IfthenpayLpToolsPageController {
 		$parts = array_filter( array( $customer->email, $customer->phone ) );
 
 		return array() !== $parts ? implode( ' / ', $parts ) : '—';
+	}
+
+	/**
+	 * A realtime payment that settled PAID but was never claimed by a real LatePoint booking —
+	 * customer's browser died before convert_to_order() ran, or (worst case) a retry paid and
+	 * converted separately, leaving this row a genuine second charge. No Recheck/Cancel here: the
+	 * payment is already confirmed, and cancelling would be wrong — the only real action is a
+	 * merchant resolving it with their customer directly, then dismissing the row.
+	 */
+	private static function render_unclaimed_realtime_section(): void {
+		$records = IfthenpayLpTransactionRepository::find_unclaimed_realtime();
+
+		echo '<h2>' . esc_html__( 'Unclaimed Realtime Payments', 'ifthenpay-payments-for-latepoint' ) . '</h2>';
+
+		if ( array() === $records ) {
+			echo '<p>' . esc_html__( 'Nothing unclaimed.', 'ifthenpay-payments-for-latepoint' ) . '</p>';
+			return;
+		}
+
+		echo '<table class="widefat striped"><thead><tr>';
+		foreach (
+			array(
+				__( 'Token', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Method', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Settled', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Booking (reconstructed at checkout time)', 'ifthenpay-payments-for-latepoint' ),
+				__( 'Action', 'ifthenpay-payments-for-latepoint' ),
+			) as $heading
+		) {
+			echo '<th>' . esc_html( $heading ) . '</th>';
+		}
+		echo '</tr></thead><tbody>';
+
+		foreach ( $records as $record ) {
+			list( $customer_name, $contact ) = self::unclaimed_customer_and_contact( $record );
+			$method_data                     = IfthenpayLpTransactionRepository::decode_method_data( $record );
+
+			echo '<tr>';
+			echo '<td><code>' . esc_html( (string) $record->token ) . '</code></td>';
+			echo '<td>' . esc_html( (string) $record->method ) . '</td>';
+			echo '<td>' . esc_html( null !== $record->amount ? OsMoneyHelper::format_price( $record->amount, true, false ) : '—' ) . '</td>';
+			echo '<td>' . esc_html(
+				! empty( $record->settled_at )
+					/* translators: %s: human-readable time difference, e.g. "2 hours" */
+					? sprintf( __( '%s ago', 'ifthenpay-payments-for-latepoint' ), human_time_diff( strtotime( (string) $record->settled_at ) ) )
+					: '—'
+			) . '</td>';
+			echo '<td>' . esc_html( $customer_name ) . '</td>';
+			echo '<td>' . esc_html( $contact ) . '</td>';
+			echo '<td>' . esc_html( ! empty( $method_data['booking_summary'] ) ? $method_data['booking_summary'] : '—' ) . '</td>';
+			echo '<td>';
+			echo '<form method="post" style="display:inline">';
+			wp_nonce_field( self::NONCE_ACTION, 'ifthenpay_lp_tools_nonce' );
+			echo '<input type="hidden" name="ifthenpay_lp_tools_action" value="mark_resolved" />';
+			echo '<input type="hidden" name="token" value="' . esc_attr( (string) $record->token ) . '" />';
+			submit_button( __( 'Mark Resolved', 'ifthenpay-payments-for-latepoint' ), 'secondary small', 'submit', false );
+			echo '</form>';
+			echo '</td>';
+			echo '</tr>';
+		}
+
+		echo '</tbody></table>';
+	}
+
+	/**
+	 * Reads the row's own write-time snapshot — never the live order_intent, which LatePoint may
+	 * have reused (and silently overwritten) for a later, unrelated checkout attempt since this
+	 * payment settled. See OsPaymentsIfthenpayCheckoutController::build_unclaimed_snapshot()'s own
+	 * docblock for why that row can't be trusted after the fact.
+	 *
+	 * @param object $record As returned by find_unclaimed_realtime().
+	 * @return array{0:string,1:string} [customer name, contact]
+	 */
+	private static function unclaimed_customer_and_contact( object $record ): array {
+		$data = IfthenpayLpTransactionRepository::decode_method_data( $record );
+
+		if ( ! empty( $data['customer_id'] ) ) {
+			$customer = new OsCustomerModel( (int) $data['customer_id'] );
+			if ( ! $customer->is_new_record() ) {
+				return array( $customer->full_name, self::contact_label( $customer ) );
+			}
+		}
+
+		if ( ! empty( $data['customer_name'] ) ) {
+			$contact_parts = array_filter( array( $data['customer_email'] ?? '', $data['customer_phone'] ?? '' ) );
+
+			return array( $data['customer_name'], array() !== $contact_parts ? implode( ' / ', $contact_parts ) : '—' );
+		}
+
+		return array( '—', '—' );
 	}
 }
