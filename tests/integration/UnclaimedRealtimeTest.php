@@ -1,10 +1,11 @@
 <?php
 /**
- * Proves IfthenpayLpTransactionRepository::find_unclaimed_realtime()/mark_resolved() — the
- * ifthenpay Tools page's own "Unclaimed Realtime Payments" listing, for a realtime payment that
- * settled PAID but was never claimed by a real LatePoint transaction (the customer's browser died
- * before convert_to_order() ran, or a retry paid and converted separately, leaving this one a
- * genuine second charge). One test per guarantee the detection query and the resolve action make.
+ * Proves IfthenpayLpTransactionRepository::find_unclaimed_realtime()/mark_resolved(), and their
+ * own mirror pair find_resolved_realtime()/mark_unresolved() — the ifthenpay Tools page's own
+ * "Unclaimed Realtime Payments" listing, for a realtime payment that settled PAID but was never
+ * claimed by a real LatePoint transaction (the customer's browser died before convert_to_order()
+ * ran, or a retry paid and converted separately, leaving this one a genuine second charge). One
+ * test per guarantee the detection queries and the resolve/unresolve actions make.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -143,5 +144,62 @@ class UnclaimedRealtimeTest extends WP_UnitTestCase {
 
 		$after = IfthenpayLpTransactionRepository::find_by_token( $token );
 		$this->assertNotNull( $after->resolved_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * A row marked resolved shows up in find_resolved_realtime() — the mirror listing.
+	 */
+	public function test_find_resolved_realtime_includes_a_resolved_row(): void {
+		$token = $this->seed_unclaimed_row();
+		IfthenpayLpTransactionRepository::mark_resolved( $token );
+
+		$tokens = wp_list_pluck( IfthenpayLpTransactionRepository::find_resolved_realtime(), 'token' );
+
+		$this->assertContains( $token, $tokens );
+	}
+
+	/**
+	 * A row that's still unclaimed (never resolved) must not show up in the Resolved listing — the
+	 * two listings are mutually exclusive by resolved_at, not just two views of the same set.
+	 */
+	public function test_find_resolved_realtime_excludes_a_still_unclaimed_row(): void {
+		$token = $this->seed_unclaimed_row();
+
+		$tokens = wp_list_pluck( IfthenpayLpTransactionRepository::find_resolved_realtime(), 'token' );
+
+		$this->assertNotContains( $token, $tokens );
+	}
+
+	/**
+	 * The mark_unresolved() call is the undo for a row resolved by mistake: it drops out of the
+	 * Resolved listing, resolved_at goes back to null, and it reappears in find_unclaimed_realtime()
+	 * — proving the two listings really do share the same underlying resolved_at column, not a
+	 * separate flag each half updates independently.
+	 */
+	public function test_mark_unresolved_reverses_mark_resolved(): void {
+		$token = $this->seed_unclaimed_row();
+		IfthenpayLpTransactionRepository::mark_resolved( $token );
+
+		$this->assertTrue( IfthenpayLpTransactionRepository::mark_unresolved( $token ) );
+
+		$resolved_tokens = wp_list_pluck( IfthenpayLpTransactionRepository::find_resolved_realtime(), 'token' );
+		$this->assertNotContains( $token, $resolved_tokens );
+
+		$unclaimed_tokens = wp_list_pluck( IfthenpayLpTransactionRepository::find_unclaimed_realtime(), 'token' );
+		$this->assertContains( $token, $unclaimed_tokens );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( $token );
+		$this->assertNull( $record->resolved_at ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * The mark_unresolved() call re-validates the row is actually currently resolved before touching
+	 * it, the same defensive pattern mark_resolved() itself already follows — a row that was never
+	 * resolved must not be affected by a stale or hand-crafted request.
+	 */
+	public function test_mark_unresolved_rejects_a_row_that_was_never_resolved(): void {
+		$token = $this->seed_unclaimed_row();
+
+		$this->assertFalse( IfthenpayLpTransactionRepository::mark_unresolved( $token ) );
 	}
 }

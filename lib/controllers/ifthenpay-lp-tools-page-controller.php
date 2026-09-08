@@ -111,6 +111,10 @@ class IfthenpayLpToolsPageController {
 			return self::handle_mark_resolved( sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ) );
 		}
 
+		if ( 'unresolve_payment' === $action ) {
+			return self::handle_unresolve_payment( sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ) );
+		}
+
 		return null;
 	}
 
@@ -211,6 +215,28 @@ class IfthenpayLpToolsPageController {
 		return array(
 			'type'    => 'error',
 			'message' => __( 'Could not mark this payment resolved. Please try again.', 'ifthenpay-payments-for-latepoint' ),
+		);
+	}
+
+	/**
+	 * The undo for a row marked resolved by mistake — puts it back in the default Unclaimed
+	 * listing. Same no-confirmation-dialog reasoning as handle_mark_resolved(): nothing here is
+	 * destroyed either.
+	 *
+	 * @param string $token The repository row's own token, as submitted by the row's own form.
+	 * @return array{type:string,message:string}
+	 */
+	private static function handle_unresolve_payment( string $token ): array {
+		if ( IfthenpayLpTransactionRepository::mark_unresolved( $token ) ) {
+			return array(
+				'type'    => 'success',
+				'message' => __( 'Marked unresolved — back on the Unclaimed list.', 'ifthenpay-payments-for-latepoint' ),
+			);
+		}
+
+		return array(
+			'type'    => 'error',
+			'message' => __( 'Could not mark this payment unresolved. Please try again.', 'ifthenpay-payments-for-latepoint' ),
 		);
 	}
 
@@ -414,30 +440,46 @@ class IfthenpayLpToolsPageController {
 	 * converted separately, leaving this row a genuine second charge. No Recheck/Cancel here: the
 	 * payment is already confirmed, and cancelling would be wrong — the only real action is a
 	 * merchant resolving it with their customer directly, then dismissing the row.
+	 *
+	 * Also renders the Resolved view (?ifthenpay_lp_view=resolved) behind the same tabs — a plain
+	 * GET switch, not a mutation, so it needs no nonce: reviewing past resolutions, and undoing one
+	 * marked resolved by mistake (mark_unresolved()), is why find_resolved_realtime() exists at all.
 	 */
 	private static function render_unclaimed_realtime_section(): void {
-		$records = IfthenpayLpTransactionRepository::find_unclaimed_realtime();
+		$viewing_resolved = isset( $_GET['ifthenpay_lp_view'] ) && 'resolved' === sanitize_text_field( wp_unslash( $_GET['ifthenpay_lp_view'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a read-only view switch, not a mutation; every actual mutation on this page is its own nonce-checked POST.
 
 		echo '<h2>' . esc_html__( 'Unclaimed Realtime Payments', 'ifthenpay-payments-for-latepoint' ) . '</h2>';
+		self::render_realtime_view_tabs( $viewing_resolved );
+
+		$records = $viewing_resolved
+			? IfthenpayLpTransactionRepository::find_resolved_realtime()
+			: IfthenpayLpTransactionRepository::find_unclaimed_realtime();
 
 		if ( array() === $records ) {
-			echo '<p>' . esc_html__( 'Nothing unclaimed.', 'ifthenpay-payments-for-latepoint' ) . '</p>';
+			echo '<p>' . esc_html(
+				$viewing_resolved
+					? __( 'No resolved payments yet.', 'ifthenpay-payments-for-latepoint' )
+					: __( 'Nothing unclaimed.', 'ifthenpay-payments-for-latepoint' )
+			) . '</p>';
 			return;
 		}
 
+		$headings = array(
+			__( 'Token', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Booking (reconstructed at checkout time)', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Method', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
+			__( 'Settled', 'ifthenpay-payments-for-latepoint' ),
+		);
+		if ( $viewing_resolved ) {
+			$headings[] = __( 'Resolved', 'ifthenpay-payments-for-latepoint' );
+		}
+		$headings[] = __( 'Action', 'ifthenpay-payments-for-latepoint' );
+
 		echo '<table class="widefat striped"><thead><tr>';
-		foreach (
-			array(
-				__( 'Token', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Customer', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Contact', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Booking (reconstructed at checkout time)', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Method', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Amount', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Settled', 'ifthenpay-payments-for-latepoint' ),
-				__( 'Action', 'ifthenpay-payments-for-latepoint' ),
-			) as $heading
-		) {
+		foreach ( $headings as $heading ) {
 			echo '<th>' . esc_html( $heading ) . '</th>';
 		}
 		echo '</tr></thead><tbody>';
@@ -453,24 +495,58 @@ class IfthenpayLpToolsPageController {
 			echo '<td>' . esc_html( ! empty( $snapshot['booking_summary'] ) ? $snapshot['booking_summary'] : '—' ) . '</td>';
 			echo '<td>' . esc_html( (string) $record->method ) . '</td>';
 			echo '<td>' . esc_html( null !== $record->amount ? OsMoneyHelper::format_price( $record->amount, true, false ) : '—' ) . '</td>';
-			echo '<td>' . esc_html(
-				! empty( $record->settled_at )
-					/* translators: %s: human-readable time difference, e.g. "2 hours" */
-					? sprintf( __( '%s ago', 'ifthenpay-payments-for-latepoint' ), human_time_diff( strtotime( (string) $record->settled_at ) ) )
-					: '—'
-			) . '</td>';
+			echo '<td>' . esc_html( self::human_age( $record->settled_at ) ) . '</td>';
+			if ( $viewing_resolved ) {
+				echo '<td>' . esc_html( self::human_age( $record->resolved_at ) ) . '</td>';
+			}
 			echo '<td>';
 			echo '<form method="post" style="display:inline">';
 			wp_nonce_field( self::NONCE_ACTION, 'ifthenpay_lp_tools_nonce' );
-			echo '<input type="hidden" name="ifthenpay_lp_tools_action" value="mark_resolved" />';
+			echo '<input type="hidden" name="ifthenpay_lp_tools_action" value="' . esc_attr( $viewing_resolved ? 'unresolve_payment' : 'mark_resolved' ) . '" />';
 			echo '<input type="hidden" name="token" value="' . esc_attr( (string) $record->token ) . '" />';
-			submit_button( __( 'Mark Resolved', 'ifthenpay-payments-for-latepoint' ), 'secondary small', 'submit', false );
+			submit_button(
+				$viewing_resolved ? __( 'Unresolve', 'ifthenpay-payments-for-latepoint' ) : __( 'Mark Resolved', 'ifthenpay-payments-for-latepoint' ),
+				'secondary small',
+				'submit',
+				false
+			);
 			echo '</form>';
 			echo '</td>';
 			echo '</tr>';
 		}
 
 		echo '</tbody></table>';
+	}
+
+	/**
+	 * The Unclaimed/Resolved tab switch — a plain link toggling ?ifthenpay_lp_view, WP admin's own
+	 * `.subsubsub` convention (Posts list "All | Mine | Published | ..."), so it reads as native
+	 * chrome rather than a bespoke control.
+	 *
+	 * @param bool $viewing_resolved Which tab is currently active.
+	 */
+	private static function render_realtime_view_tabs( bool $viewing_resolved ): void {
+		$unclaimed_url = remove_query_arg( 'ifthenpay_lp_view' );
+		$resolved_url  = add_query_arg( 'ifthenpay_lp_view', 'resolved' );
+
+		echo '<ul class="subsubsub">';
+		echo '<li><a href="' . esc_url( $unclaimed_url ) . '"' . ( $viewing_resolved ? '' : ' class="current"' ) . '>' . esc_html__( 'Unclaimed', 'ifthenpay-payments-for-latepoint' ) . '</a> |</li>';
+		echo ' <li><a href="' . esc_url( $resolved_url ) . '"' . ( $viewing_resolved ? ' class="current"' : '' ) . '>' . esc_html__( 'Resolved', 'ifthenpay-payments-for-latepoint' ) . '</a></li>';
+		echo '</ul><br class="clear" />';
+	}
+
+	/**
+	 * Shared human_time_diff() formatting for both the Settled and Resolved columns.
+	 *
+	 * @param string|null $datetime A MySQL datetime, or null/empty if not yet set.
+	 */
+	private static function human_age( ?string $datetime ): string {
+		if ( empty( $datetime ) ) {
+			return '—';
+		}
+
+		/* translators: %s: human-readable time difference, e.g. "2 hours" */
+		return sprintf( __( '%s ago', 'ifthenpay-payments-for-latepoint' ), human_time_diff( strtotime( $datetime ) ) );
 	}
 
 	/**
