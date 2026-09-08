@@ -212,6 +212,13 @@ class IfthenpayLpTransactionRepository {
 	 * row genuinely was claimed by a real booking/order, not merely that some order_intent nearby
 	 * eventually converted.
 	 *
+	 * Accepted cost, not an oversight: LatePoint core's own transactions table declares `token` as
+	 * plain `TEXT` with no index at all, so the NOT EXISTS below is an unindexed scan of that table —
+	 * one holding every payment this site has ever processed, across every processor, not only
+	 * ifthenpay's own. Not fixable without a core schema change. Bounded in practice by this query's
+	 * own outer row count staying small (the grace period and `resolved_at IS NULL` filters already
+	 * limit that), same reasoning find_pending_deferred()'s own missing index already accepts.
+	 *
 	 * @return object[]
 	 */
 	public static function find_unclaimed_realtime(): array {
@@ -240,11 +247,21 @@ class IfthenpayLpTransactionRepository {
 	 * Stops a row appearing in find_unclaimed_realtime() without touching status/settled_at or
 	 * anything about the payment itself — the underlying paid row and its history stay exactly as
 	 * they are, this only records that a merchant has manually resolved it with their customer.
+	 * Re-validates the row is actually the kind of thing find_unclaimed_realtime() would surface
+	 * before touching it — the same defensive pattern every other mutation this table's own callers
+	 * make (cancel_now()'s own cancel_locked(), IfthenpayLpManualRecheck::run()) already follows;
+	 * without it, a stale or hand-crafted token could stamp resolved_at on a row this listing was
+	 * never actually showing.
 	 *
 	 * @param string $token Our correlation handle.
 	 */
 	public static function mark_resolved( string $token ): bool {
-		return self::update_columns( $token, array( 'resolved_at' => current_time( 'mysql', true ) ) );
+		$record = self::find_by_token( $token );
+		if ( ! $record || 'realtime' !== $record->kind || 'PAID' !== $record->status || null !== $record->resolved_at ) { // @phpstan-ignore-line property.notFound
+			return false;
+		}
+
+		return self::update_columns( $token, array( 'resolved_at' => current_time( 'mysql', true ) ), $record );
 	}
 
 	/**
