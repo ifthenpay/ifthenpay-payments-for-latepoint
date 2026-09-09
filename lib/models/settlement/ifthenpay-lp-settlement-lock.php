@@ -49,7 +49,7 @@ class IfthenpayLpSettlementLock {
 	 */
 	public static function with_lock( string $lock_key, callable $work ) {
 		global $wpdb;
-		$name = self::mysql_lock_name( $lock_key );
+		$name = self::mysql_lock_name( $lock_key ); // phpcs:ignore PHPCompatibility.Extensions.RemovedExtensions.mysql_DeprecatedRemoved -- method name match, not the removed ext.
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- GET_LOCK() is a session primitive, not a cacheable data query.
 		$acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, self::LOCK_TIMEOUT_SECONDS ) );
