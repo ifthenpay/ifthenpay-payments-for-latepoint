@@ -7,8 +7,6 @@ class IfthenpayEmailHelper {
 
 	const SUPPORT_EMAIL = 'suporte@ifthenpay.com';
 
-	public function __construct() {}
-
 	/**
 	 * Sends activation email to support.
 	 *
@@ -26,13 +24,11 @@ class IfthenpayEmailHelper {
 	 * @return bool True if sent successfully, false otherwise.
 	 */
 	public static function send_activation_email( array $data ): bool {
-		// Build email subject
 		$subject = sprintf(
 			'[dev_ifthenpay] [%s]: Ativação de Serviço',
 			strtoupper( sanitize_text_field( $data['entity'] ) )
 		);
 
-		// Email body items
 		$items = array(
 			'Chave de acesso ao backoffice:' => esc_html( $data['backoffice_key'] ),
 			'Gateway Key:'                   => esc_html( $data['gateway_key'] ),
@@ -48,7 +44,6 @@ class IfthenpayEmailHelper {
 			'Atualizar Conta Cliente:'       => 'Após adicionar o método não precisa tomar mais nenhuma ação, este método ficará disponível para seleção na página de configuração da extensão.',
 		);
 
-		// HTML Body
 		ob_start();
 		?>
 		<div style="
@@ -104,14 +99,12 @@ class IfthenpayEmailHelper {
 		<?php
 		$body = ob_get_clean();
 
-		// Headers
 		$host    = wp_parse_url( $data['site_url'], PHP_URL_HOST );
 		$headers = array(
 			'Content-Type: text/html; charset=UTF-8',
 			'From: ' . esc_html( $data['site_name'] ) . ' <no-reply@' . $host . '>',
 		);
 
-		// Send email
 		return wp_mail( self::SUPPORT_EMAIL, $subject, $body, $headers );
 	}
 }

@@ -4,7 +4,7 @@ Tags: ifthenpay, latepoint, payments, booking, invoices
 Requires at least: 6.5
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 3.0.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -34,7 +34,7 @@ All settings are made in LatePoint. The plugin is built so store owners can mana
 
 == Requirements ==
 * An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
-* A Dynamic Gateway Key (request this from ifthenpay support/helpdesk).
+* A Static Gateway Key provisioned for the LatePoint context (request this from ifthenpay support/helpdesk).
 * The payment methods you want enabled on that Gateway Key (our helpdesk team will guide you).
 * WordPress 6.5+ and PHP 7.4+, and LatePoint installed and activated.
 * HTTPS (SSL) enabled on your site.
@@ -47,15 +47,25 @@ All settings are made in LatePoint. The plugin is built so store owners can mana
 
 == Frequently Asked Questions ==
 
-= What do I need to get started? =  
-* A valid ifthenpay account (register at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/))  
-* LatePoint plugin active  
+= What do I need to get started? =
+* A valid ifthenpay account (register at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/))
+* LatePoint plugin active
 * WordPress 6.5+ and PHP 7.4+
 
-= How do I configure it? =  
-1. Go to **LatePoint → Settings → Payments**.  
-2. Enable the ifthenpay gateway, enter your Backoffice Key & Gateway Key, click **Sync**.  
-3. Select the payment methods (including invoices) you want to offer.
+= How do I get my Backoffice Key? =
+Your Backoffice Key is issued by ifthenpay once you sign up and your contract is validated at [ifthenpay.com/aderir](https://ifthenpay.com/aderir/) — it's the same key used by ifthenpay's other website and app integrations. If you've already signed up but don't have it to hand, [ifthenpay support](https://helpdesk.ifthenpay.com) can resend it.
+
+= How do I get a Gateway Key for LatePoint? =
+A Gateway Key must be provisioned specifically for the **LatePoint** context before this plugin can use it — a Gateway Key created for a different platform (e.g. a generic website or another CMS) will not appear here, even with a valid Backoffice Key. Ask [ifthenpay support](https://helpdesk.ifthenpay.com) to provision a Gateway Key for LatePoint on your account, then pick which payment methods (Multibanco, MB WAY, Payshop, cards, …) should be enabled on it — they'll guide you through activation for each. Once that's done, the plugin's settings page picks it up automatically; there is nothing to enter by hand beyond the Backoffice Key itself.
+
+= How do I configure it? =
+1. Go to **LatePoint → Settings → Payments**.
+2. Enter your Backoffice Key and click **Connect** — this checks it against ifthenpay and shows your available Gateway Key(s).
+3. Pick a Gateway Key, select the payment methods (including invoices) you want to offer, then save.
+4. Save again any time you change the Gateway Key — this also re-registers the payment notification (callback) URL ifthenpay uses to confirm a payment automatically; see below.
+
+= Does ifthenpay need access back into my site? =
+Yes — after a Gateway Key is saved, the plugin registers a payment notification URL with ifthenpay (`https://yoursite.com/wp-json/ifthenpay/v1/callback`) so a payment can be confirmed automatically once it's completed. This happens automatically; there's nothing to copy or paste. If your server sits behind a firewall, WAF, or security plugin that blocks unfamiliar inbound requests, allow POST requests to that URL path through — otherwise a completed payment may not be confirmed automatically. If registration itself fails (for example, your site isn't reachable from the internet yet), the settings page shows which Gateway Key failed and why, without needing to re-enter anything.
 
 = How does the payment process work? =  
 Payments are processed securely through ifthenpay's pay-by-link system. Customers select a payment method during booking, and a secure payment page opens for completion. Once paid, the status is verified and the booking is confirmed automatically.
@@ -102,6 +112,12 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Changelog ==
 
+= 3.0.0 =
+* Changed: Backoffice Key and Gateway Key configuration reworked — the Backoffice Key is now validated against ifthenpay directly when you save it, and the Gateway Key list and available payment methods are read live instead of cached from a separate "Connect" step.
+* Changed: The callback URL ifthenpay uses to confirm payments is now registered automatically whenever you save a Gateway Key, with the result shown on the settings page if it fails.
+* Changed: ifthenpay payment methods are no longer offered at checkout unless the saved Gateway Key is currently valid, even if the processor itself is turned on.
+* Fixed: Payment records now use one shared table instead of a single-purpose one; existing history is kept, not deleted, during the update.
+
 = 2.1.1 =
 * Changed: Payment charge reference is now the payment token instead of the ifthenpay transaction ID, so merchants can reconcile payments more easily.
 * Fixed: Increased the payment status verification timeout from 10s to 45s to give slower payment methods enough time to confirm before giving up.
@@ -132,6 +148,9 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 * Initial stable release.
 
 == Upgrade Notice ==
+
+= 3.0.0 =
+Reconfiguration required: after updating, open the ifthenpay settings in LatePoint and reconnect your Backoffice Key and Gateway Key. The previous Gateway Key is not carried over automatically, and no ifthenpay payment method will be offered at checkout until this is done.
 
 = 2.1.1 =
 Payments now reconcile by token for easier merchant bookkeeping; longer payment confirmation timeout; formatting cleanup.

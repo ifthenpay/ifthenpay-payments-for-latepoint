@@ -1,0 +1,5 @@
+{
+    "PinCode": "1234",
+    "PinpayUrl": "https://pay.ifthenpay.com/pinpay/pin/1234",
+    "RedirectUrl": "https://pay.ifthenpay.com/pinpay/redirect/1234"
+}

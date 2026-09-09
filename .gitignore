@@ -17,9 +17,12 @@
 .DS_Store
 Thumbs.db
 
-# PHPUnit or other local config
-phpunit.xml
-phpunit.xml.dist
+# Local planning bundle — never committed to this repo
+/.claude/
+/specs/
+
+# PHPUnit local override only — the committed configs are tests/*.dist
+/phpunit.xml
 /tests/.wp-core
 
 # Misc cache

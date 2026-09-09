@@ -1,0 +1,11 @@
+[
+  {"Entity": "MB", "Method": "MULTIBANCO", "Position": 1, "IsVisible": true, "SmallImageUrl": "https://example.test/mb.png", "DescriptionEN": "Multibanco reference"},
+  {"Entity": "MBWAY", "Method": "MBWAY", "Position": 2, "IsVisible": true, "SmallImageUrl": "https://example.test/mbway.png", "DescriptionEN": "MB WAY"},
+  {"Entity": "PAYSHOP", "Method": "PAYSHOP", "Position": 3, "IsVisible": true, "SmallImageUrl": "https://example.test/payshop.png", "DescriptionEN": "Payshop"},
+  {"Entity": "CCARD", "Method": "VISA / MASTERCARD", "Position": 4, "IsVisible": true, "SmallImageUrl": "https://example.test/ccard.png", "DescriptionEN": "Card"},
+  {"Entity": "COFIDIS", "Method": "COFIDIS PAY", "Position": 5, "IsVisible": false, "SmallImageUrl": "https://example.test/cofidis.png", "DescriptionEN": "Cofidis Pay"},
+  {"Entity": "GOOGLE", "Method": "GOOGLE PAY", "Position": 6, "IsVisible": true, "SmallImageUrl": "https://example.test/google.png", "DescriptionEN": "Google Pay"},
+  {"Entity": "APPLE", "Method": "APPLE PAY", "Position": 7, "IsVisible": true, "SmallImageUrl": "https://example.test/apple.png", "DescriptionEN": "Apple Pay"},
+  {"Entity": "PIX", "Method": "PIX", "Position": 8, "IsVisible": true, "SmallImageUrl": "https://example.test/pix.png", "DescriptionEN": "Pix"},
+  {"Entity": "BIZUM", "Method": "BIZUM", "Position": 9, "IsVisible": false, "SmallImageUrl": "https://example.test/bizum.png", "DescriptionEN": "Bizum"}
+]

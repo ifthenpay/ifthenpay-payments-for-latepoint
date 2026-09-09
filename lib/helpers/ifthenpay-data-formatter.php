@@ -5,17 +5,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class IfthenpayDataFormatter {
 
-
-	/**
-	 * Formats the list of gateway keys into a flat associative array.
-	 *
-	 * @param array $raw Raw list of gateways from the API.
-	 * @return array Associative array [ Alias => GatewayKey ].
-	 */
-	public static function format_gateway_keys( array $raw ): array {
-		return array_column( $raw, 'GatewayKey', 'Alias' );
-	}
-
 	/**
 	 * Formats the available payment methods array from the ifthenpay API.
 	 *
@@ -34,7 +23,6 @@ class IfthenpayDataFormatter {
 				continue;
 			}
 
-			// Filter out invisible methods
 			if ( ! ( $entry['IsVisible'] ?? true ) ) {
 				continue;
 			}
@@ -47,42 +35,9 @@ class IfthenpayDataFormatter {
 			);
 		}
 
-		// Sort by position ascending
 		uasort( $methods, fn( $a, $b ) => $a['position'] <=> $b['position'] );
 
 		return $methods;
-	}
-
-	/**
-	 * Turn a flat list of account records into a map of
-	 * Entidade => [ Alias => Conta ] for dropdowns.
-	 *
-	 * Numeric Entidade values become "MB".
-	 *
-	 * @param array<int,array{Alias:string,Conta:string,Entidade:string,SubEntidade:string}> $accounts
-	 * @return array<string,array<string,string>>
-	 */
-	public static function format_payment_accounts( array $accounts ): array {
-		$result = array();
-
-		foreach ( $accounts as $acct ) {
-			if ( empty( $acct['Alias'] ) || empty( $acct['Conta'] ) ) {
-				continue;
-			}
-
-			// numeric Entidade → MB
-			$ent = is_numeric( $acct['Entidade'] ) ? 'MB' : $acct['Entidade'];
-
-			// initialize bucket if first time
-			if ( ! isset( $result[ $ent ] ) ) {
-				$result[ $ent ] = array();
-			}
-
-			// map alias => conta
-			$result[ $ent ][ $acct['Alias'] ] = $acct['Conta'];
-		}
-
-		return $result;
 	}
 
 	/**
@@ -93,20 +48,15 @@ class IfthenpayDataFormatter {
 	 * @return array
 	 */
 	public static function build_pay_by_link_payload( $intent, $token, $amount ) {
-		// Basic fields
 		$payload = array(
 			'id'              => $token,
 			'amount'          => self::format_amount( $amount ),
 			'description'     => self::build_description( $intent ),
 			'lang'            => self::get_language(),
-			// 'expiredate'      => self::get_expire_date(),
 			'accounts'        => self::build_accounts_string(),
 			'selected_method' => self::get_selected_method(),
-			// 'btnCloseUrl'     => home_url('/'),
-			// 'btnCloseLabel'   => OsSettingsHelper::get_settings_value('ifthenpay_gateway_close_text', __('Close', 'ifthenpay-payments-for-latepoint')),
 		);
 
-		// Return URLs embedding token
 		$base                   = home_url( '/' );
 		$payload['success_url'] = add_query_arg(
 			array(
@@ -165,58 +115,53 @@ class IfthenpayDataFormatter {
 	}
 
 	/**
-	 * Compute expire date based on admin 'ifthenpay_deadline'.
-	 */
-	private static function get_expire_date(): string {
-		$days = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_deadline' );
-		return gmdate( 'Ymd', strtotime( "+{$days} days" ) );
-	}
-
-	/**
-	 * Serialize checked accounts into "A|B;C|D" format.
+	 * Serialize enabled methods into "METHOD|account;METHOD|account" format, the shape Pay By
+	 * Link's own `accounts` field expects. The settings page stores only which methods are
+	 * enabled, not their account keys — those come from the same live gateway dataset the
+	 * settings page itself reads, matched here against the saved Gateway Key. Multibanco and
+	 * Payshop are excluded even if enabled: they are deferred-reference methods PBL never offers,
+	 * and a merchant can enable them today for a future deferred flow this plugin doesn't have yet.
 	 */
 	private static function build_accounts_string(): string {
-		// 1. Pull the raw setting (might be JSON)
-		$raw = OsSettingsHelper::get_settings_value(
-			'ifthenpay_payment_methods_configuration',
-			array()
-		);
+		// Drops the settings page's always-present hidden fallback entry (an empty string — see
+		// IfthenpayAdminFormRenderer::render_payments_configuration()), the same as that page's own
+		// read of this setting does.
+		$saved           = (array) OsSettingsHelper::get_settings_value( 'ifthenpay_payment_methods_configuration', array() );
+		$enabled_methods = array_values( array_filter( $saved, static fn( $value ) => is_string( $value ) && '' !== $value ) );
+		$gateway_key     = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key', '' );
+		$backoffice_key  = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key', '' );
 
-		// 2. Decode if it’s a JSON string
-		if ( is_string( $raw ) ) {
-			$decoded = json_decode( $raw, true );
-			$config  = is_array( $decoded ) ? $decoded : array();
-		} else {
-			$config = (array) $raw;
+		if ( array() === $enabled_methods || '' === $gateway_key || '' === $backoffice_key ) {
+			return '';
 		}
 
-		// 3. Filter only checked + non‐empty accounts
+		$dataset              = IfthenpayLpGatewayDataset::get( $backoffice_key );
+		$accounts_for_gateway = null === $dataset ? array() : ( $dataset['accounts'][ $gateway_key ] ?? array() );
+
 		$parts = array();
-		foreach ( $config as $method_code => $entry ) {
-			if (
-				is_array( $entry )
-				&& ! empty( $entry['checked'] )
-				&& ! empty( $entry['selected_account'] )
-			) {
-				// Collapse whitespace around the "|" and trim
-				$parts[] = preg_replace( '/\s*\|\s*/', '|', trim( $entry['selected_account'] ) );
+		foreach ( $enabled_methods as $method_code ) {
+			if ( IfthenpayLpPayByLinkMethodEligibility::is_listed_in_pay_by_link( $method_code ) && isset( $accounts_for_gateway[ $method_code ] ) ) {
+				$parts[] = $method_code . '|' . $accounts_for_gateway[ $method_code ];
 			}
 		}
 
-		// 4. Join with semicolons
 		return implode( ';', $parts );
 	}
 
 	/**
-	 * Determine selected method position from default and available methods.
+	 * The saved default method's position in the live method catalog, the shape Pay By Link's
+	 * own `selected_method` field expects. Only MBWAY, credit card, and Pix are valid values here
+	 * — Multibanco, Payshop, Google Pay, and Apple Pay are not, even though the last two are valid
+	 * `accounts` entries.
 	 */
 	private static function get_selected_method(): string {
-		$default   = OsSettingsHelper::get_settings_value( 'ifthenpay_default_method', '' );
-		$raw       = OsSettingsHelper::get_settings_value( 'ifthenpay_available_methods', array() );
-		$available = is_string( $raw ) ? maybe_unserialize( $raw ) : (array) $raw;
-		if ( isset( $available[ $default ]['position'] ) ) {
-			return (string) $available[ $default ]['position'];
+		$default = (string) OsSettingsHelper::get_settings_value( 'ifthenpay_default_method', '' );
+		if ( '' === $default || ! IfthenpayLpPayByLinkMethodEligibility::is_eligible_as_default( $default ) ) {
+			return '';
 		}
-		return '';
+
+		$catalog = IfthenpayLpMethodCatalog::get();
+
+		return isset( $catalog[ $default ]['position'] ) ? (string) $catalog[ $default ]['position'] : '';
 	}
 }
