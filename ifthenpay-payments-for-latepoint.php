@@ -88,6 +88,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-gateway-dataset.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-pay-by-link.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-multibanco-reference.php';
+			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-payshop-reference.php';
 			include_once __DIR__ . '/lib/models/api/ifthenpay-lp-callback-registration.php';
 		}
 
@@ -100,6 +101,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
 			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-payshop-validity-validation.php';
+			include_once __DIR__ . '/lib/models/validation/ifthenpay-lp-payshop-lead-time-validation.php';
 		}
 
 		/**
@@ -136,6 +139,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-manual-recheck.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-expiry-sweep.php';
 			include_once __DIR__ . '/lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php';
+			include_once __DIR__ . '/lib/models/ifthenpay-lp-process-seeder.php';
 		}
 
 		private function include_cli(): void {
@@ -190,6 +194,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_action( 'latepoint_model_validate', array( $this, 'validate_backoffice_key_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_validity_on_save' ), 10, 3 );
 			add_action( 'latepoint_model_validate', array( $this, 'validate_multibanco_lead_time_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_payshop_validity_on_save' ), 10, 3 );
+			add_action( 'latepoint_model_validate', array( $this, 'validate_payshop_lead_time_on_save' ), 10, 3 );
 
 			// Post-save and non-blocking — see register_callback_on_settings_updated()'s own docblock.
 			add_action( 'latepoint_settings_updated', array( $this, 'register_callback_on_settings_updated' ) );
@@ -205,11 +211,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		/**
-		 * The callback route and the two WP-Cron jobs — a class *constant* reference
-		 * (`IfthenpayLpExpirySweep::HOOK`, `IfthenpayLpLapsedAppointmentDigest::HOOK`) is not safe
-		 * here, unlike everywhere else in this file: init_hooks() runs before includes() has loaded
-		 * either class, and PHP resolves a constant immediately, not lazily. The literal hook-name
-		 * strings below must therefore match those constants' own values exactly.
+		 * The callback route and the two WP-Cron jobs — the one place in this file where a class
+		 * *constant* reference isn't safe (see init_hooks()'s own note on why). The literal
+		 * hook-name strings below must match `IfthenpayLpExpirySweep::HOOK` and
+		 * `IfthenpayLpLapsedAppointmentDigest::HOOK`'s own values exactly.
 		 */
 		private function register_cron_hooks(): void {
 			add_action( 'rest_api_init', array( 'IfthenpayLpCallbackRestController', 'register_routes' ) );
@@ -219,16 +224,14 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 		/**
 		 * Customer-facing surfaces for a deferred payment's own reference — see
-		 * IfthenpayLpReferenceDisplay's own docblock for what each hook receives.
-		 */
-
-		/**
-		 * Two of these hooks are a confirmation-step/dashboard-tile pair, the other two a
-		 * full-summary-lightbox pair — both pairs fire with the exact same single argument
-		 * (OsOrderModel or OsBookingModel, confirmed against LatePoint core's own do_action()
-		 * calls), so one callback per model type covers both call sites in each pair.
+		 * IfthenpayLpReferenceDisplay's own docblock for what each hook receives. Two of these
+		 * hooks are a confirmation-step/dashboard-tile pair, the other two a full-summary-lightbox
+		 * pair — both pairs fire with the exact same single argument (OsOrderModel or
+		 * OsBookingModel, confirmed against LatePoint core's own do_action() calls), so one
+		 * callback per model type covers both call sites in each pair.
 		 */
 		private function register_reference_display_hooks(): void {
+			add_action( 'latepoint_customer_dashboard_before_appointments', array( $this, 'prime_reference_cache_for_dashboard' ) );
 			add_action( 'latepoint_step_confirmation_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_order_full_summary_head_info_after', array( $this, 'render_reference_on_confirmation_step' ) );
 			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
@@ -241,6 +244,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			register_activation_hook( __FILE__, array( $this, 'on_activate' ) );
 			register_deactivation_hook( __FILE__, array( $this, 'on_deactivate' ) );
+
+			add_action( 'admin_notices', array( $this, 'maybe_show_process_seeded_notice' ) );
 		}
 
 		// --- Settings: save-time validation and post-save side effects ----
@@ -320,6 +325,40 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		/**
+		 * Same hook, same shape as validate_multibanco_validity_on_save() — Payshop's own setting,
+		 * not shared with Multibanco's.
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_payshop_validity_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_payshop_validity_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpPayshopValidityValidation::check( (string) $model->value );
+			if ( null !== $error ) {
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
+		 * Same hook, same shape as validate_multibanco_lead_time_on_save() — Payshop's own setting,
+		 * not shared with Multibanco's.
+		 *
+		 * @param mixed $model The model instance being saved; only OsSettingsModel is relevant here.
+		 */
+		public function validate_payshop_lead_time_on_save( $model ) {
+			if ( ! ( $model instanceof OsSettingsModel ) || 'ifthenpay_payshop_lead_time_days' !== $model->name ) {
+				return;
+			}
+
+			$error = IfthenpayLpPayshopLeadTimeValidation::check( (string) $model->value );
+			if ( null !== $error ) {
+				$model->add_error( 'validation', $error );
+			}
+		}
+
+		/**
 		 * Fires after every settings save (see SettingsController::update()) — registers the
 		 * callback URL only when a Gateway Key was actually part of this save. Outcome is stored
 		 * by IfthenpayLpCallbackRegistration itself, for add_settings_fields() to surface on the
@@ -349,6 +388,23 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 		}
 
 		// --- Reference display: confirmation step, dashboard, summaries, email ---
+
+		/**
+		 * Fires once, before LatePoint's own per-booking dashboard tile loop starts — warms this
+		 * add-on's own transaction-lookup cache for every one of this customer's outstanding deferred
+		 * rows in 2 queries total, so render_reference_on_dashboard_tile()'s own per-tile lookup
+		 * (fired once per booking, right after this) hits cache instead of the database. See
+		 * IfthenpayLpTransactionRepository::prime_cache_for_customer()'s own docblock for what this
+		 * does and doesn't cover.
+		 *
+		 * @param OsCustomerModel $customer As passed by the hook.
+		 */
+		public function prime_reference_cache_for_dashboard( $customer ) {
+			if ( ! ( $customer instanceof OsCustomerModel ) ) {
+				return;
+			}
+			IfthenpayLpTransactionRepository::prime_cache_for_customer( (int) $customer->id );
+		}
 
 		/**
 		 * Prints the reference box on the booking confirmation step.
@@ -415,6 +471,13 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 					$record = IfthenpayLpReferenceDisplay::for_order( (int) $data_object['id'] );
 				} elseif ( 'booking' === ( $data_object['model'] ?? '' ) ) {
 					$record = IfthenpayLpReferenceDisplay::for_booking( (int) $data_object['id'] );
+				} elseif ( 'transaction' === ( $data_object['model'] ?? '' ) ) {
+					// The transaction_created process (IfthenpayLpProcessSeeder) selects its email
+					// action against a transaction, not an order/booking — resolve to the order
+					// behind it so the same reference box (now in its paid state) reaches that email
+					// too, reusing for_order() rather than a second lookup path.
+					$transaction = new OsTransactionModel( (int) $data_object['id'] );
+					$record      = $transaction->order_id ? IfthenpayLpReferenceDisplay::for_order( (int) $transaction->order_id ) : null;
 				}
 				if ( $record ) {
 					break;
@@ -590,6 +653,18 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			if ( ! wp_next_scheduled( IfthenpayLpLapsedAppointmentDigest::HOOK ) ) {
 				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
+
+			// Same reasoning as above: a site that already had this add-on active before the
+			// transaction_created process existed would otherwise never get it, since on_activate()
+			// only fires on a fresh (re)activation, not an in-place plugin update. Unlike the two
+			// calls above, though, this one has no cheap internal early-out of its own — every one of
+			// its three outcomes is terminal, so once one has been recorded there is nothing left to
+			// seed, ever again, and the get_option() check below is what keeps this from running a
+			// real OsProcessModel query on every single request forever, including unauthenticated
+			// REST callback requests.
+			if ( ! get_option( 'ifthenpay_lp_process_seed_completed' ) ) {
+				$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+			}
 		}
 
 		public function latepoint_init() {
@@ -639,7 +714,61 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				wp_schedule_event( time(), 'daily', IfthenpayLpLapsedAppointmentDigest::HOOK );
 			}
 
+			// Idempotent — see IfthenpayLpProcessSeeder's own docblock. record_process_seed_outcome()
+			// only sets a notice option the first time a process is actually created, not on every
+			// reactivation that finds one (ours or the merchant's own) already there.
+			$this->ensure_loaded( 'IfthenpayLpProcessSeeder', '/lib/models/ifthenpay-lp-process-seeder.php' );
+			$this->record_process_seed_outcome( IfthenpayLpProcessSeeder::seed_transaction_created_process() );
+
 			update_option( 'latepoint-payments-ifthenpay_addon_db_version', $this->db_version );
+		}
+
+		/**
+		 * Maps a seed_transaction_created_process() outcome to which one-time admin notice should
+		 * show next render — 'already_exists' sets nothing, so a reactivation that finds either row
+		 * already there stays silent, same as before this method existed. Also stamps the
+		 * `ifthenpay_lp_process_seed_completed` option every time, regardless of outcome: all three
+		 * outcomes are terminal (see IfthenpayLpProcessSeeder's own docblock), so init()'s own
+		 * get_option() guard can skip calling the seeder at all from here on.
+		 *
+		 * @param string $outcome As returned by IfthenpayLpProcessSeeder::seed_transaction_created_process().
+		 */
+		private function record_process_seed_outcome( string $outcome ): void {
+			if ( 'created' === $outcome ) {
+				update_option( 'ifthenpay_lp_show_process_seeded_notice', true );
+			} elseif ( 'created_disabled' === $outcome ) {
+				update_option( 'ifthenpay_lp_show_process_conflict_notice', true );
+			}
+			update_option( 'ifthenpay_lp_process_seed_completed', true );
+		}
+
+		/**
+		 * A one-time, dismiss-on-render notice — no ongoing state to track, unlike a real
+		 * dismissible-forever notice, since both options record_process_seed_outcome() sets are only
+		 * ever set true right after a process was actually created just now (never on a reactivation
+		 * that found one already there), so each option is deleted the first time its own notice
+		 * renders and never set again on its own.
+		 */
+		public function maybe_show_process_seeded_notice(): void {
+			if ( get_option( 'ifthenpay_lp_show_process_seeded_notice' ) ) {
+				delete_option( 'ifthenpay_lp_show_process_seeded_notice' );
+				printf(
+					'<div class="notice notice-info is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+					esc_html__( 'ifthenpay: a "Payment Received Notification" process was added so customers hear back once a Multibanco or Payshop reference is actually paid.', 'ifthenpay-payments-for-latepoint' ),
+					esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
+					esc_html__( 'Customize it', 'ifthenpay-payments-for-latepoint' )
+				);
+			}
+
+			if ( get_option( 'ifthenpay_lp_show_process_conflict_notice' ) ) {
+				delete_option( 'ifthenpay_lp_show_process_conflict_notice' );
+				printf(
+					'<div class="notice notice-warning is-dismissible"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+					esc_html__( 'ifthenpay: you already have an automation set up for payment events, so we added our own "Payment Received Notification" without turning it on — enable it in Automation if you\'d rather use it instead of yours.', 'ifthenpay-payments-for-latepoint' ),
+					esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'processes', 'index' ) ) ),
+					esc_html__( 'Review both', 'ifthenpay-payments-for-latepoint' )
+				);
+			}
 		}
 
 		public function register_addon( $installed_addons ) {

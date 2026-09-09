@@ -3,8 +3,8 @@
  * Which ifthenpay payment methods this add-on supports, and which of those are actually usable
  * right now for the merchant's current settings — every `latepoint_*payment_method*` /
  * `latepoint_*payment_time*` filter callback this add-on registers. Extracted out of the main
- * addon class so "is Multibanco offered at checkout" is answerable (and testable) without the
- * full LatePoint bootstrap.
+ * addon class so "is Multibanco or Payshop offered at checkout" is answerable (and testable)
+ * without the full LatePoint bootstrap.
  *
  * @package ifthenpay-payments-for-latepoint
  */
@@ -30,6 +30,12 @@ class IfthenpayLpPaymentMethodAvailability {
 	public const DEFAULT_MULTIBANCO_LEAD_TIME_DAYS = 2;
 
 	/**
+	 * Same reasoning as DEFAULT_MULTIBANCO_LEAD_TIME_DAYS, own constant since the two settings are
+	 * independent.
+	 */
+	public const DEFAULT_PAYSHOP_LEAD_TIME_DAYS = 2;
+
+	/**
 	 * This add-on's supported methods, unconditionally — whether or not they're currently usable.
 	 * See usable_supported_payment_methods() for the filtered, "offer this at checkout" version.
 	 *
@@ -42,16 +48,22 @@ class IfthenpayLpPaymentMethodAvailability {
 			'ifthenpay_gateway'    => array(
 				'name'      => 'ifthenpay Gateway',
 				'label'     => 'ifthenpay Gateway',
-				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-gateway.png',
 				'code'      => 'ifthenpay_checkout',
 				'time_type' => 'now',
 			),
 			'ifthenpay_multibanco' => array(
 				'name'      => __( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
 				'label'     => __( 'Multibanco reference', 'ifthenpay-payments-for-latepoint' ),
-				// No dedicated Multibanco asset shipped yet; reuses the processor's own symbol.
-				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay_simbolo.png',
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'multibanco-brand.png',
 				'code'      => 'ifthenpay_multibanco',
+				'time_type' => 'later',
+			),
+			'ifthenpay_payshop'    => array(
+				'name'      => __( 'Payshop', 'ifthenpay-payments-for-latepoint' ),
+				'label'     => __( 'Payshop reference', 'ifthenpay-payments-for-latepoint' ),
+				'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'payshop-brand.png',
+				'code'      => 'ifthenpay_payshop',
 				'time_type' => 'later',
 			),
 		);
@@ -67,7 +79,7 @@ class IfthenpayLpPaymentMethodAvailability {
 		$payment_processors[ self::PROCESSOR_CODE ] = array(
 			'code'      => self::PROCESSOR_CODE,
 			'name'      => __( 'ifthenpay', 'ifthenpay-payments-for-latepoint' ),
-			'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'processor-logo.png',
+			'image_url' => IfthenpayPaymentsForLatepoint::images_url() . 'ifthenpay-brand.png',
 		);
 		return $payment_processors;
 	}
@@ -109,22 +121,30 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
-	 * Multibanco needs more than a usable gateway key: the merchant must have checked "MB" in
-	 * Payment Methods (IfthenpayLpAdminFormRenderer::get_saved_enabled_methods() — one setting
-	 * covers both the "Pay Now" and "Pay Later" sections, the split there is display-only), the
-	 * selected gateway must actually carry an MB account, and the current checkout's own
-	 * appointment must not be sooner than the merchant's minimum lead time
+	 * A deferred method (Multibanco, Payshop) needs more than a usable gateway key: the merchant
+	 * must have checked the method's own code in Payment Methods
+	 * (IfthenpayLpAdminFormRenderer::get_saved_enabled_methods() — one setting covers both the
+	 * "Pay Now" and "Pay Later" sections, the split there is display-only), the selected gateway
+	 * must actually carry an account for that method, and the current checkout's own appointment
+	 * must not be sooner than the merchant's own minimum lead time for it
 	 * (is_appointment_far_enough_out()). Otherwise the method would be offered at checkout only to
 	 * fail at reference-creation time with a confusing error, or produce a reference with no real
-	 * payment window.
+	 * payment window. One gate serves every deferred method — each caller passes its own method
+	 * code and lead-time setting, the same way is_appointment_far_enough_out() itself is already
+	 * parameterized, since the check itself never differs between methods, only the values.
 	 *
 	 * A dataset fetch failure fails open, same reasoning as is_gateway_key_usable(): an outage
 	 * must not take checkout down for an otherwise valid setup. If it recurs at the moment of
-	 * checkout, IfthenpayLpPaymentProcessor::process_deferred_payment_by_intent() fails that one
-	 * attempt gracefully instead.
+	 * checkout, IfthenpayLpPaymentProcessor's own deferred-payment methods fail that one attempt
+	 * gracefully instead.
+	 *
+	 * @param string $method_code       The ifthenpay account-map code, e.g. 'MB', 'PAYSHOP'.
+	 * @param string $lead_time_setting The merchant setting to read (in whole days).
+	 * @param int    $lead_time_default Used when the setting is missing, or below $lead_time_min.
+	 * @param int    $lead_time_min     The setting's own validator floor.
 	 */
-	private static function is_multibanco_usable(): bool {
-		if ( ! in_array( 'MB', IfthenpayLpAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
+	private static function is_deferred_method_usable( string $method_code, string $lead_time_setting, int $lead_time_default, int $lead_time_min ): bool {
+		if ( ! in_array( $method_code, IfthenpayLpAdminFormRenderer::get_saved_enabled_methods(), true ) ) {
 			return false;
 		}
 
@@ -134,7 +154,7 @@ class IfthenpayLpPaymentMethodAvailability {
 			return false;
 		}
 
-		if ( ! self::is_appointment_far_enough_out() ) {
+		if ( ! self::is_appointment_far_enough_out( $lead_time_setting, $lead_time_default, $lead_time_min ) ) {
 			return false;
 		}
 
@@ -143,7 +163,7 @@ class IfthenpayLpPaymentMethodAvailability {
 			return true;
 		}
 
-		return isset( $dataset['accounts'][ $gateway_key ]['MB'] );
+		return isset( $dataset['accounts'][ $gateway_key ][ $method_code ] );
 	}
 
 	/**
@@ -153,7 +173,7 @@ class IfthenpayLpPaymentMethodAvailability {
 	 * to every method configured on the gateway account itself, silently ignoring this merchant's
 	 * own Payment Methods selection (IfthenpayLpDataFormatter::build_accounts_string()'s own
 	 * docblock). Offering the method at checkout only to reject it once the customer picks it is the
-	 * same failure mode is_multibanco_usable() exists to avoid, so this mirrors it: gate list
+	 * same failure mode is_deferred_method_usable() exists to avoid, so this mirrors it: gate list
 	 * membership on the same live account data, rather than surfacing the failure only once the
 	 * customer has already committed to this method.
 	 *
@@ -183,9 +203,11 @@ class IfthenpayLpPaymentMethodAvailability {
 	}
 
 	/**
-	 * Below the merchant's own minimum lead time, Multibanco is not offered at checkout at all — a
-	 * reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock on why
-	 * "days" is a calendar distance, not a rolling 24h window).
+	 * Below a merchant's own minimum lead time, a deferred method is not offered at checkout at
+	 * all — a reference needs a real payment window (IfthenpayLpAppointmentLeadTime's own docblock
+	 * on why "days" is a calendar distance, not a rolling 24h window). Shared by every
+	 * is_deferred_method_usable() call, each passing its own setting name, default and floor — the
+	 * settings are independent per method, but the check itself is identical.
 	 *
 	 * Only touches cart state for a request that is genuinely mid-checkout: a cart cookie must
 	 * already exist (OsCartsHelper::get_cart_uuid()) before reconstructing it — this filter also
@@ -196,8 +218,15 @@ class IfthenpayLpPaymentMethodAvailability {
 	 * No cart yet, or a cart with no booking item in it — nothing to gate against — fails open,
 	 * same reasoning as every other check in this class: an inconclusive state must never itself be
 	 * why checkout breaks.
+	 *
+	 * @param string $setting_name The merchant setting to read (in whole days).
+	 * @param int    $default_days Used when the setting is missing, or below $min_days.
+	 * @param int    $min_days     The setting's own validator floor (e.g.
+	 *                             IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS) — a value below
+	 *                             it can only mean it was saved before that floor existed, or
+	 *                             written outside the validator, never a deliberate "no minimum".
 	 */
-	private static function is_appointment_far_enough_out(): bool {
+	private static function is_appointment_far_enough_out( string $setting_name, int $default_days, int $min_days ): bool {
 		if ( empty( OsCartsHelper::get_cart_uuid() ) ) {
 			return true;
 		}
@@ -207,13 +236,9 @@ class IfthenpayLpPaymentMethodAvailability {
 			return true;
 		}
 
-		$minimum = (int) OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_lead_time_days', self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS );
-		if ( $minimum < IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS ) {
-			// IfthenpayLpMultibancoLeadTimeValidation blocks a save below its own MIN_DAYS, so this
-			// only catches a value saved before that floor existed, or written outside the
-			// validator — a missing or zero setting must never mean "no minimum" (same reasoning as
-			// IfthenpayLpPaymentProcessor's own validity-days fallback).
-			$minimum = self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS;
+		$minimum = (int) OsSettingsHelper::get_settings_value( $setting_name, $default_days );
+		if ( $minimum < $min_days ) {
+			$minimum = $default_days;
 		}
 
 		return $days_until >= $minimum;
@@ -221,11 +246,12 @@ class IfthenpayLpPaymentMethodAvailability {
 
 	/**
 	 * This add-on's supported methods, filtered down to the ones actually usable right now —
-	 * ifthenpay_gateway additionally needs is_pay_by_link_usable(), ifthenpay_multibanco
-	 * additionally needs is_multibanco_usable(). Both fail the same way for the same reason: no
-	 * live account behind the merchant's own selection means neither should reach checkout only to
-	 * fail once picked. Shared by both the payment-times filter and the enabled-methods filter so
-	 * the two can never disagree about which methods are currently offered.
+	 * ifthenpay_gateway additionally needs is_pay_by_link_usable(), ifthenpay_multibanco and
+	 * ifthenpay_payshop additionally need is_deferred_method_usable(), each with its own method
+	 * code and lead-time setting. All three fail the same way for the same reason: no live account
+	 * behind the merchant's own selection means none of them should reach checkout only to fail
+	 * once picked. Shared by both the payment-times filter and the enabled-methods filter so the
+	 * two can never disagree about which methods are currently offered.
 	 *
 	 * @return array<string,array<string,mixed>>
 	 */
@@ -238,8 +264,11 @@ class IfthenpayLpPaymentMethodAvailability {
 		if ( isset( $methods['ifthenpay_gateway'] ) && ! self::is_pay_by_link_usable() ) {
 			unset( $methods['ifthenpay_gateway'] );
 		}
-		if ( isset( $methods['ifthenpay_multibanco'] ) && ! self::is_multibanco_usable() ) {
+		if ( isset( $methods['ifthenpay_multibanco'] ) && ! self::is_deferred_method_usable( 'MB', 'ifthenpay_multibanco_lead_time_days', self::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS, IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS ) ) {
 			unset( $methods['ifthenpay_multibanco'] );
+		}
+		if ( isset( $methods['ifthenpay_payshop'] ) && ! self::is_deferred_method_usable( 'PAYSHOP', 'ifthenpay_payshop_lead_time_days', self::DEFAULT_PAYSHOP_LEAD_TIME_DAYS, IfthenpayLpPayshopLeadTimeValidation::MIN_DAYS ) ) {
+			unset( $methods['ifthenpay_payshop'] );
 		}
 
 		return $methods;

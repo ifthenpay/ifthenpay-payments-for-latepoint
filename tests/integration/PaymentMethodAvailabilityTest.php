@@ -158,4 +158,73 @@ class PaymentMethodAvailabilityTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'ifthenpay_multibanco', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
 		$this->assertArrayNotHasKey( 'ifthenpay_gateway', $payment_times[ LATEPOINT_PAYMENT_TIME_NOW ] );
 	}
+
+	/**
+	 * MODERN-GATEWAY carries a live PAYSHOP account — enabling it is enough on its own for Payshop
+	 * to be offered, same shape as Multibanco's own gate.
+	 */
+	public function test_payshop_is_offered_when_enabled_with_a_live_account(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'MODERN-GATEWAY' );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+
+		$payment_times = IfthenpayLpPaymentMethodAvailability::add_enabled_payment_methods_to_payment_times( $this->empty_payment_times() );
+
+		$this->assertArrayHasKey( 'ifthenpay_payshop', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+	}
+
+	/**
+	 * LEGACY-GATEWAY carries no PAYSHOP account at all (only a static Multibanco key) — enabling
+	 * PAYSHOP for it is a configuration nobody can actually pay through, so it must not be offered.
+	 */
+	public function test_payshop_is_hidden_when_the_gateway_has_no_payshop_account(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'LEGACY-GATEWAY' );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+
+		$payment_times = IfthenpayLpPaymentMethodAvailability::add_enabled_payment_methods_to_payment_times( $this->empty_payment_times() );
+
+		$this->assertArrayNotHasKey( 'ifthenpay_payshop', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+	}
+
+	/**
+	 * MODERN-GATEWAY has a live PAYSHOP account, but the merchant never checked "PAYSHOP" in
+	 * Payment Methods — a real account existing is not enough on its own.
+	 */
+	public function test_payshop_is_hidden_when_not_enabled(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'MODERN-GATEWAY' );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'MB' ) );
+
+		$payment_times = IfthenpayLpPaymentMethodAvailability::add_enabled_payment_methods_to_payment_times( $this->empty_payment_times() );
+
+		$this->assertArrayNotHasKey( 'ifthenpay_payshop', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+	}
+
+	/**
+	 * An ifthenpay outage while fetching the gateway dataset must not itself remove Payshop from
+	 * an otherwise valid setup — same fail-open reasoning as every other gate in this class.
+	 */
+	public function test_payshop_stays_offered_when_the_gateway_dataset_fetch_fails(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'MODERN-GATEWAY' );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'PAYSHOP' ) );
+
+		remove_filter( 'pre_http_request', array( $this, 'mock_ifthenpay_http' ), 10 );
+		add_filter( 'pre_http_request', array( $this, 'fail_gateway_fetch' ), 10, 3 );
+
+		$payment_times = IfthenpayLpPaymentMethodAvailability::add_enabled_payment_methods_to_payment_times( $this->empty_payment_times() );
+
+		$this->assertArrayHasKey( 'ifthenpay_payshop', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+	}
+
+	/**
+	 * Regression: gating Payshop independently must not change how Multibanco is decided — both
+	 * enabled, MODERN-GATEWAY has live accounts for both, so both are offered side by side.
+	 */
+	public function test_multibanco_and_payshop_are_independent(): void {
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_gateway_key', 'MODERN-GATEWAY' );
+		OsSettingsHelper::save_setting_by_name( 'ifthenpay_payment_methods_configuration', array( 'MB', 'PAYSHOP' ) );
+
+		$payment_times = IfthenpayLpPaymentMethodAvailability::add_enabled_payment_methods_to_payment_times( $this->empty_payment_times() );
+
+		$this->assertArrayHasKey( 'ifthenpay_multibanco', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+		$this->assertArrayHasKey( 'ifthenpay_payshop', $payment_times[ LATEPOINT_PAYMENT_TIME_LATER ] );
+	}
 }

@@ -92,8 +92,8 @@ function ifthenpay_lp_create_order_fixture( array $overrides = array() ): object
 
 /**
  * Inserts an IfthenpayLpTransactionRepository row for a fixture built by
- * ifthenpay_lp_create_order_fixture(), the way IfthenpayLpPaymentProcessor::process_deferred_payment_by_intent() eventually
- * will — PENDING, unsettled, linked by the order intent's own id.
+ * ifthenpay_lp_create_order_fixture(), the way IfthenpayLpPaymentProcessor's own deferred
+ * processing methods eventually will — PENDING, unsettled, linked by the order intent's own id.
  *
  * @phpstan-param object{customer: OsCustomerModel, order_intent: OsOrderIntentModel, order: OsOrderModel, order_item: OsOrderItemModel, booking: OsBookingModel, invoice: OsInvoiceModel} $fixture
  *

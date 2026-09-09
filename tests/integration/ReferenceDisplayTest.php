@@ -42,6 +42,32 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A real, real-looking Payshop row for a converted order — no entity, unlike Multibanco's.
+	 *
+	 * @phpstan-param object{customer: OsCustomerModel, order_intent: OsOrderIntentModel, order: OsOrderModel, order_item: OsOrderItemModel, booking: OsBookingModel, invoice: OsInvoiceModel} $fixture
+	 *
+	 * @param object $fixture As returned by ifthenpay_lp_create_order_fixture().
+	 * @param string $status  Repository row status; defaults to still-PENDING.
+	 */
+	private function seed_deferred_payshop_row( object $fixture, string $status = 'PENDING' ): void {
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-display-' . $fixture->order->id,
+				'request_id'  => 'REQ-DISPLAY-' . $fixture->order->id,
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'deferred',
+				'method'      => 'PAYSHOP',
+				'status'      => $status,
+				'amount'      => $fixture->invoice->charge_amount,
+				'gateway_key' => 'TEST-GW-KEY-0001',
+				'entity'      => null,
+				'reference'   => '987654321',
+				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+			)
+		);
+	}
+
+	/**
 	 * Finds the deferred record for a real order.
 	 */
 	public function test_for_order_finds_the_deferred_record(): void {
@@ -79,7 +105,8 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The rendered box shows entity, reference, amount, and the token while still pending.
+	 * The rendered box shows entity, reference (grouped in 3-character chunks for readability),
+	 * amount, and the token while still pending.
 	 */
 	public function test_render_html_shows_details_while_pending(): void {
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
@@ -89,17 +116,59 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
 
 		$this->assertStringContainsString( '11990', $html );
-		$this->assertStringContainsString( '123456789', $html );
+		$this->assertStringContainsString( '123 456 789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+	}
+
+	/**
+	 * A Multibanco record's own copy — its instructions mention the Multibanco ATM/Entity, proving
+	 * this isn't a single template shared with Payshop; the method itself is identified by the
+	 * header badge's own logo (method_icon()), not by text.
+	 */
+	public function test_render_html_uses_multibancos_own_copy(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		$this->seed_deferred_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringContainsString( 'alt="Multibanco"', $html );
+		$this->assertStringContainsString( 'Multibanco ATM', $html );
+		$this->assertStringContainsString( 'ifthenpay-reference-box-row-entity', $html );
+	}
+
+	/**
+	 * A Payshop record's own copy: no Entity row at all (Payshop references stand alone), and
+	 * instructions naming a Payshop agent or CTT rather than an ATM.
+	 */
+	public function test_render_html_shows_payshops_own_copy_without_an_entity_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_payshop_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_html( $record );
+
+		$this->assertStringContainsString( 'alt="Payshop"', $html );
+		$this->assertStringContainsString( 'Payshop agent or CTT', $html );
+		$this->assertStringContainsString( '987 654 321', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringNotContainsString( 'ifthenpay-reference-box-row-entity', $html );
+		$this->assertStringNotContainsString( 'Multibanco', $html );
 	}
 
 	/**
 	 * Once paid, the box no longer exposes the reference/entity as something to act on — a
 	 * customer who already paid doesn't need to be told the entity/reference again. The token
 	 * stays: unlike entity/reference, it's still useful after payment (support, reconciliation).
+	 * In their place, a Status/Amount row pair (paid_rows()) — the same label/value grammar the
+	 * pending state's own Entity/Reference/Amount rows already use, not a separate sentence-plus-
+	 * icon component. The "Powered by ifthenpay" footer stays too — an earlier version only
+	 * rendered the footer in the pending branch, silently dropping the branding the moment a
+	 * reference was paid; the now-irrelevant "Pay by" deadline is the only piece that's actually
+	 * pending-only.
 	 */
 	public function test_render_html_hides_details_once_paid(): void {
-		$fixture = ifthenpay_lp_create_order_fixture();
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		$this->seed_deferred_row( $fixture, 'PAID' );
 
 		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
@@ -107,11 +176,18 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'ifthenpay-reference-box-row-status', $html );
+		$this->assertStringContainsString( 'Paid', $html );
+		$this->assertStringContainsString( OsMoneyHelper::format_price( '25.00', true, false ), $html );
+		$this->assertStringContainsString( 'Powered by', $html );
+		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
 
 	/**
-	 * The email-safe render shows the same details as the browser one while still pending — via
-	 * OsPriceBreakdownHelper's own inline-styled row, not this plugin's CSS classes.
+	 * The email-safe render shows the same details as the browser one while still pending — as
+	 * inline-styled tables matching render_html()'s own card, not this plugin's CSS classes (which
+	 * no inbox would ever load), and with the reference grouped the same way render_html() groups
+	 * it.
 	 */
 	public function test_render_email_html_shows_details_while_pending(): void {
 		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
@@ -121,17 +197,37 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
 
 		$this->assertStringContainsString( '11990', $html );
-		$this->assertStringContainsString( '123456789', $html );
+		$this->assertStringContainsString( '123 456 789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
 		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $html );
 	}
 
 	/**
+	 * The email-safe render also shows Payshop's own copy — no Entity row, and instructions
+	 * naming a Payshop agent or CTT.
+	 */
+	public function test_render_email_html_shows_payshops_own_copy_without_an_entity_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
+		$this->seed_deferred_payshop_row( $fixture );
+
+		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
+		$html   = IfthenpayLpReferenceDisplay::render_email_html( $record );
+
+		$this->assertStringContainsString( 'alt="Payshop"', $html );
+		$this->assertStringContainsString( 'Payshop agent or CTT', $html );
+		$this->assertStringContainsString( '987 654 321', $html );
+		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringNotContainsString( 'Entity', $html );
+		$this->assertStringNotContainsString( 'Multibanco', $html );
+	}
+
+	/**
 	 * Once paid, the email-safe render also stops exposing the reference/entity, but keeps the
-	 * token.
+	 * token, shows the same Status/Amount row pair render_html() shows (see its own equivalent
+	 * test), and keeps the "Powered by ifthenpay" footer.
 	 */
 	public function test_render_email_html_hides_details_once_paid(): void {
-		$fixture = ifthenpay_lp_create_order_fixture();
+		$fixture = ifthenpay_lp_create_order_fixture( array( 'amount' => '25.00' ) );
 		$this->seed_deferred_row( $fixture, 'PAID' );
 
 		$record = IfthenpayLpReferenceDisplay::for_order( $fixture->order->id );
@@ -139,6 +235,10 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '123456789', $html );
 		$this->assertStringContainsString( 'tok-display-' . $fixture->order->id, $html );
+		$this->assertStringContainsString( 'Paid', $html );
+		$this->assertStringContainsString( OsMoneyHelper::format_price( '25.00', true, false ), $html );
+		$this->assertStringContainsString( 'Powered by', $html );
+		$this->assertStringNotContainsString( 'Pay by:', $html );
 	}
 
 	/**
@@ -172,7 +272,7 @@ class ReferenceDisplayTest extends WP_UnitTestCase {
 		$result = $LATEPOINT_ADDON_PAYMENTS_IFTHENPAY->append_reference_to_email_content( $action );
 
 		$this->assertStringContainsString( 'Thanks for your booking.', $result->prepared_data_for_run['content'] );
-		$this->assertStringContainsString( '123456789', $result->prepared_data_for_run['content'] );
+		$this->assertStringContainsString( '123 456 789', $result->prepared_data_for_run['content'] );
 		// Email clients never load this plugin's stylesheet — CSS-class markup would render as
 		// bare, unstyled text (the bug this whole render_email_html() path exists to fix).
 		$this->assertStringNotContainsString( 'ifthenpay-reference-box', $result->prepared_data_for_run['content'] );

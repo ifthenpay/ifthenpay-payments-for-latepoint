@@ -1,7 +1,8 @@
 .ifp-overlay {
 	position: fixed;
 	inset: 0;
-	background: rgb(0 0 0 / 60%);
+	background: rgb(0 0 0 / 50%);
+	backdrop-filter: blur(2px);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -22,12 +23,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: #fff3cd;
-	color: #856404;
+	background: #fffbeb;
+	color: #92400e;
 	padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px;
-	border-bottom: 1px solid #ffeeba;
+	border-bottom: 1px solid #fde68a;
 	box-sizing: border-box;
-	box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
 	position: relative;
 }
 
@@ -42,22 +42,25 @@
 
 .ifp-close {
 	margin-left: 20px;
-	background: #333;
-	color: #fff;
+	background: transparent;
+	color: #71717a;
 	width: 32px;
 	height: 32px;
 	border: none;
-	border-radius: 50%;
+	border-radius: 8px;
 	font-size: 18px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	transition: background 0.2s ease;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease;
 }
 
 .ifp-close:hover {
-	background: #555;
+	background: #f4f4f5;
+	color: #18181b;
 }
 
 .ifp-iframe {
@@ -79,10 +82,10 @@
 
 .ifp-spinner-overlay::after {
 	content: "";
-	width: 40px;
-	height: 40px;
-	border: 4px solid #ddd;
-	border-top-color: #333;
+	width: 32px;
+	height: 32px;
+	border: 3px solid #e4e4e7;
+	border-top-color: #18181b;
 	border-radius: 50%;
 	animation: ifp-spin 0.8s linear infinite;
 }
@@ -100,38 +103,44 @@
  */
 .ifthenpay-reference-box {
 	margin: 16px 0;
-	padding: 16px 18px;
-	border: 1px solid #e2e5f1;
-	border-radius: 8px;
-	background: #f7f8fc;
+	padding: 20px 22px;
+	border: 1px solid #ececef;
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: 0 4px 12px rgb(0 0 0 / 6%);
 }
 
 .ifthenpay-reference-box.is-paid {
-	background: #f2f9f3;
-	border-color: #d3ecd6;
+	background: #ecfdf5;
+	border-color: #a7f3d0;
 }
 
-.ifthenpay-reference-box-title {
-	margin: 0 0 12px;
-	font-size: 15px;
-	font-weight: 600;
-	color: #14161d;
+.ifthenpay-reference-box-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 0 16px;
 }
 
-.ifthenpay-reference-box.is-paid .ifthenpay-reference-box-title {
-	margin-bottom: 4px;
+.ifthenpay-reference-box-mark {
+	display: block;
+	flex: none;
+	height: 24px;
+	width: auto;
 }
 
-.ifthenpay-reference-box-paid-message {
-	margin: 0;
-	color: #2e7d32;
-	font-weight: 600;
+.ifthenpay-reference-box-order-id {
+	font-size: 12px;
+	font-weight: 500;
+	color: #a1a1aa;
+	white-space: nowrap;
 }
 
 .ifthenpay-reference-box-details {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 }
 
 .ifthenpay-reference-box-row {
@@ -142,42 +151,67 @@
 }
 
 .ifthenpay-reference-box-label {
-	color: #7c85a3;
-	font-size: 13px;
+	color: #71717a;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
 }
 
 .ifthenpay-reference-box-value {
-	font-weight: 600;
-	color: #14161d;
+	font-weight: 700;
+	font-size: 15px;
+	color: #18181b;
 	text-align: right;
 }
 
 .ifthenpay-reference-box-row-reference .ifthenpay-reference-box-value {
 	font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-	font-size: 16px;
-	letter-spacing: 0.5px;
+	font-size: 17px;
+	letter-spacing: 1px;
+}
+
+.ifthenpay-reference-box-row-amount .ifthenpay-reference-box-value {
+	color: #059669;
+	font-size: 19px;
+}
+
+.ifthenpay-reference-box-row-status .ifthenpay-reference-box-value {
+	color: #047857;
 }
 
 .ifthenpay-reference-box-instructions {
-	margin: 0 0 12px;
+	margin: 0 0 14px;
 	font-size: 12px;
-	color: #7c85a3;
+	color: #71717a;
 	line-height: 1.4;
 }
 
 .ifthenpay-reference-box-footer {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 6px;
-	margin-top: 12px;
-	padding-top: 10px;
-	border-top: 1px solid #e2e5f1;
+	gap: 12px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px dashed #d4d4d8;
 }
 
-.ifthenpay-reference-box-footer span {
+.ifthenpay-reference-box-deadline {
+	font-size: 12px;
+	font-weight: 600;
+	color: #dc2626;
+}
+
+.ifthenpay-reference-box-powered-by {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.ifthenpay-reference-box-powered-by span {
 	font-size: 11px;
-	color: #a8afc4;
+	color: #a1a1aa;
 }
 
 .ifthenpay-reference-box-brand {

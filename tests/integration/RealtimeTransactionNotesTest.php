@@ -41,7 +41,12 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A realtime, PAID row with a recorded txid gets its transaction's notes backfilled.
+	 * A realtime, PAID row with a recorded txid gets its transaction's notes backfilled — with the
+	 * *real* source it was settled through (the row's own `settled_by` column, set by
+	 * IfthenpayLpTransactionRepository::mark_settled()/record_verification() at settlement time),
+	 * here simulating a webhook-settled row specifically: proving this isn't hardcoded to "polling"
+	 * regardless of which mechanism actually confirmed the payment (a real bug an earlier version
+	 * had).
 	 */
 	public function test_backfills_notes_for_a_realtime_paid_transaction(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -52,6 +57,7 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 				'kind'        => 'realtime',
 				'method'      => 'MBWAY',
 				'status'      => 'PAID',
+				'settled_by'  => 'callback',
 				'method_data' => wp_json_encode( array( 'transaction_id' => 'TXID-NOTES-001' ) ),
 			)
 		);
@@ -60,21 +66,23 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 		IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes( $transaction );
 
 		$reloaded = new OsTransactionModel( $transaction->id );
-		$this->assertSame( "ifthenpay transaction ID: TXID-NOTES-001\nSettled via: polling", $reloaded->notes );
+		$this->assertSame( "ifthenpay transaction ID: TXID-NOTES-001\nSettled via: callback", $reloaded->notes );
 	}
 
 	/**
-	 * A transaction with no recorded txid still gets a note, just without that line.
+	 * A transaction with no recorded txid still gets a note, just without that line — a
+	 * polling-settled row this time, proving the source isn't tied to whether a txid was recorded.
 	 */
 	public function test_backfills_notes_without_a_txid_line_when_none_was_recorded(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
 		IfthenpayLpTransactionRepository::insert(
 			array(
-				'token'     => 'tok-realtime-no-txid',
-				'intent_id' => $fixture->order_intent->id,
-				'kind'      => 'realtime',
-				'method'    => 'MBWAY',
-				'status'    => 'PAID',
+				'token'      => 'tok-realtime-no-txid',
+				'intent_id'  => $fixture->order_intent->id,
+				'kind'       => 'realtime',
+				'method'     => 'MBWAY',
+				'status'     => 'PAID',
+				'settled_by' => 'polling',
 			)
 		);
 		$transaction = $this->create_transaction( $fixture, 'tok-realtime-no-txid' );
@@ -83,6 +91,30 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 
 		$reloaded = new OsTransactionModel( $transaction->id );
 		$this->assertSame( 'Settled via: polling', $reloaded->notes );
+	}
+
+	/**
+	 * A row settled before the `settled_by` column existed (or otherwise null) falls back to a
+	 * source-agnostic label rather than asserting a specific mechanism ("polling") that was never
+	 * actually recorded — the exact gap the earlier hardcoded version papered over.
+	 */
+	public function test_backfills_a_source_agnostic_note_when_settled_by_is_missing(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'     => 'tok-realtime-legacy',
+				'intent_id' => $fixture->order_intent->id,
+				'kind'      => 'realtime',
+				'method'    => 'MBWAY',
+				'status'    => 'PAID',
+			)
+		);
+		$transaction = $this->create_transaction( $fixture, 'tok-realtime-legacy' );
+
+		IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes( $transaction );
+
+		$reloaded = new OsTransactionModel( $transaction->id );
+		$this->assertSame( 'Settled via: ifthenpay confirmation', $reloaded->notes );
 	}
 
 	/**

@@ -65,6 +65,66 @@
 	display: inline;
 }
 
+/* The shared "Timing" heading + explanation (render_timing_section_intro()) — said once, not
+   repeated per method — gets a top divider to separate it from the method list above. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-heading {
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #e3e6ea;
+}
+
+/* Each method's own Timing block (render_timing_fields()) repeats the same icon shown for it in
+   .ifthenpay-methods-list above, inline with its own name, so which block belongs to which method
+   reads at a glance. Only field notes carry the numbers here — the explanation lives once in
+   .ifthenpay-timing-heading above — so both methods' notes stay on one line regardless of which
+   method's numbers are longer, and the two methods' rows line up instead of disaligning when one
+   note wraps and the other doesn't. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method {
+	margin-top: 1rem;
+}
+
+/* A plain divider between Multibanco's and Payshop's own Timing blocks — the shared heading
+   above already separates the method list from Multibanco's; this just keeps Payshop's block
+   from running straight into Multibanco's numbers with no visual break. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method + .ifthenpay-timing-method {
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #e3e6ea;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+
+/* render_booking_status_warning() — a plain, low-emphasis inline notice, not LatePoint's own
+   `.notice` (its admin wrapper hides any `.notice` that's a direct child, and this one sits deep
+   inside the settings form regardless). Amber, not red: this describes a merchant-facing LatePoint
+   setting worth reviewing, not a broken state of this add-on's own. */
+#paymentProcessorToggler_ifthenpay .ifthenpay-booking-status-warning {
+	margin-bottom: 1rem;
+	padding: 0.75rem 1rem;
+	background-color: #fdf6e3;
+	border: 1px solid #e8d7a0;
+	border-radius: 6px;
+	color: #6b5a2a;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-booking-status-warning a {
+	white-space: nowrap;
+	margin-left: 0.25rem;
+}
+
+#paymentProcessorToggler_ifthenpay .ifthenpay-timing-method-heading .ifthenpay-method-icon {
+	height: 1.1rem;
+	width: auto;
+}
+
 /* The Default Method note's own muted caption — matches `.label-with-description .label-desc`'s
    colour/size, but that native class only applies under its own heading, which this note doesn't
    have. */
