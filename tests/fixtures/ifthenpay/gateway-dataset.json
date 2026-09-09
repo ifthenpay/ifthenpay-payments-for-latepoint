@@ -1,0 +1,34 @@
+[
+  {
+    "Alias": "LEGACY-GATEWAY",
+    "GatewayKey": "LEGACY-GATEWAY",
+    "Gateway_Tipo": "LEGACY-GATEWAY#|#LatePoint",
+    "Tipo": "LatePoint",
+    "VatNumber": "000000000",
+    "APPLE": "",
+    "BIZUM": "",
+    "CCARD": "",
+    "COFIDIS": "",
+    "GOOGLE": "",
+    "MBWAY": "",
+    "PAYSHOP": "",
+    "PIX": "",
+    "Multibanco": "11687 | 991"
+  },
+  {
+    "Alias": "MODERN-GATEWAY",
+    "GatewayKey": "MODERN-GATEWAY",
+    "Gateway_Tipo": "MODERN-GATEWAY#|#LatePoint",
+    "Tipo": "LatePoint",
+    "VatNumber": "000000000",
+    "APPLE": "APPLE | ACC-000001",
+    "BIZUM": "",
+    "CCARD": "CCARD | ACC-000002",
+    "COFIDIS": "COFIDIS | ACC-000003",
+    "GOOGLE": "GOOGLE | ACC-000004",
+    "MBWAY": "MBWAY | ACC-000005",
+    "PAYSHOP": "PAYSHOP | ACC-000006",
+    "PIX": "PIX | ACC-000007",
+    "Multibanco": "MB | ACC-000008"
+  }
+]

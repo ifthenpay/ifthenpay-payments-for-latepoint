@@ -1,4 +1,3 @@
-/* Full-screen dark backdrop */
 .ifp-overlay {
 	position: fixed;
 	inset: 0;
@@ -9,7 +8,6 @@
 	z-index: 2147483647;
 }
 
-/* Full-screen modal container */
 .ifp-container {
 	position: relative;
 	width: 100vw;
@@ -20,21 +18,19 @@
 	flex-direction: column;
 }
 
-/* Header bar: warning + close button */
 .ifp-header {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: #fff3cd; /* yellowish header */
-	color: #856404; /* darker warning text */
-	padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px; /* reduced vertical padding */
-	border-bottom: 1px solid #ffeeba; /* matching border */
+	background: #fff3cd;
+	color: #856404;
+	padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px;
+	border-bottom: 1px solid #ffeeba;
 	box-sizing: border-box;
 	box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
 	position: relative;
 }
 
-/* Warning text centered */
 .ifp-warning-text {
 	flex: 1;
 	text-align: center;
@@ -44,10 +40,9 @@
 	margin: 0;
 }
 
-/* Close button aligned in flow */
 .ifp-close {
 	margin-left: 20px;
-	background: #333; /* dark button */
+	background: #333;
 	color: #fff;
 	width: 32px;
 	height: 32px;
@@ -65,7 +60,6 @@
 	background: #555;
 }
 
-/* Embedded checkout pane */
 .ifp-iframe {
 	flex: 1;
 	border: none;
@@ -73,7 +67,6 @@
 	height: 100%;
 }
 
-/* Spinner overlay */
 .ifp-spinner-overlay {
 	position: absolute;
 	inset: 0;

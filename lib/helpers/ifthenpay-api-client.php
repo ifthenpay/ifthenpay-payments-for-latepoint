@@ -3,153 +3,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * The one thing left here: polling a payment's status by transaction ID, used by
+ * verifyPaymentWithRetry() in the controller. Not migrated to IfthenpayLpApiClient — the
+ * `/gateway/transaction/status` endpoint it calls was never independently verified live the way
+ * every other operation this plugin depends on was; it is inherited as-is from the pre-revamp
+ * plugin. It is also entangled with a known, unfixed authorization gap in
+ * update_payment_repo_by_modal_url(), which trusts a client-supplied transaction ID without
+ * confirming it belongs to the booking being confirmed — migrating this one call in isolation
+ * would look like a fix without being one. Both need fixing together, as their own piece of work.
+ * Do not add new callers here.
+ */
 class IfthenpayAPIClient {
 
-	// Public API base and endpoints
 	const BASE_API_PUBLIC             = 'https://api.ifthenpay.com';
-	const ENDPOINT_AVAILABLE_METHODS  = '/gateway/methods/available';
-	const ENDPOINT_PAY_BY_LINK        = '/gateway/pinpay';
 	const ENDPOINT_TRANSACTION_STATUS = '/gateway/transaction/status';
-
-	// Multibanco entities/subentities (single URL constant)
-	const ENTITIES_SUBENTIDADES_URL = 'https://www.ifthenpay.com/IfmbWS/ifmbws.asmx/getEntidadeSubentidadeJsonV2';
-
-	// Mobile gateway endpoints
-	const BASE_API_MOBILE              = 'https://ifthenpay.com/IfmbWS/ifthenpaymobile.asmx';
-	const ENDPOINT_GATEWAY_KEYS        = '/GetGatewayKeys';
-	const ENDPOINT_ACCOUNTS_BY_GATEWAY = '/GetAccountsByGatewayKey';
-
-	/** @var string Backoffice key */
-	private static $key;
-
-	/**
-	 * Store and verify the Backoffice key (must have at least one valid Entidade + SubEntidade).
-	 *
-	 * @param string $key
-	 * @throws Exception
-	 */
-	public static function set_key( string $key ): void {
-		self::$key = sanitize_text_field( $key );
-		self::validate_key_or_fail();
-	}
-
-	/**
-	 * @throws Exception If the key is malformed or not recognised by the remote API.
-	 */
-	private static function validate_key_or_fail(): void {
-		// 1. Sanitize and normalize
-		$key = sanitize_text_field( self::$key );
-
-		// 2. Server-side format check: 1234-5678-9012-3456
-		$pattern = '/^\d{4}(?:-\d{4}){3}$/';
-		if ( ! preg_match( $pattern, $key ) ) {
-			throw new Exception(
-				esc_html__( 'Invalid Backoffice Key format. Expected 1234-5678-9012-3456.', 'ifthenpay-payments-for-latepoint' )
-			);
-		}
-
-		// 3. Fetch entities/sub-entities from the external service
-		$endpoint = sprintf(
-			'%s?chavebackoffice=%s',
-			self::ENTITIES_SUBENTIDADES_URL,
-			urlencode( $key )
-		);
-		$response = self::get( $endpoint );
-
-		if ( ! is_array( $response ) || empty( $response ) ) {
-			throw new Exception(
-				esc_html__( 'Unexpected response when validating Backoffice Key.', 'ifthenpay-payments-for-latepoint' )
-			);
-		}
-
-		// 4. Look for at least one valid Entidade + SubEntidade
-		foreach ( $response as $item ) {
-			$has_entity  = ! empty( $item['Entidade'] );
-			$has_subents = ! empty( $item['SubEntidade'] ) && is_array( $item['SubEntidade'] );
-
-			if ( $has_entity && $has_subents ) {
-				return; // ✅ key is valid
-			}
-		}
-
-		// 5. If we fall through, nothing matched
-		throw new Exception(
-			esc_html__( 'Backoffice Key not recognized or has no entities. Please contact support.', 'ifthenpay-payments-for-latepoint' )
-		);
-	}
-
-	/**
-	 * Retrieves the Gateway Keys associated with the Backoffice Key.
-	 *
-	 * @return array
-	 */
-	public static function get_gateway_keys(): array {
-		$url      = self::BASE_API_MOBILE
-			. self::ENDPOINT_GATEWAY_KEYS
-			. '?backofficekey=' . urlencode( self::$key );
-		$response = self::get( $url );
-
-		if ( ! is_array( $response ) || empty( $response ) ) {
-			throw new Exception(
-				esc_html__( 'No Gateway Keys found for this Backoffice Key. Please contact ifthenpay to activate a gateway.', 'ifthenpay-payments-for-latepoint' )
-			);
-		}
-
-		return $response;
-	}
-
-	/**
-	 * Retrieves available payment accounts by gateway key.
-	 *
-	 * @param string $gateway_key
-	 * @return array
-	 */
-	public static function get_payment_accounts_by_gateway( string $gateway_key ): array {
-		$url = self::BASE_API_MOBILE
-			. self::ENDPOINT_ACCOUNTS_BY_GATEWAY
-			. '?backofficekey=' . urlencode( self::$key )
-			. '&gatewayKey=' . urlencode( $gateway_key );
-
-		return self::get( $url );
-	}
-
-	/**
-	 * Retrieves all globally available payment methods.
-	 *
-	 * @return array
-	 */
-	public static function get_available_payment_methods(): array {
-		$url = self::BASE_API_PUBLIC
-			. self::ENDPOINT_AVAILABLE_METHODS;
-
-		return self::get( $url );
-	}
-
-	/**
-	 * Create a “Pay by Link” on ifthenpay.
-	 *
-	 * @param string $gateway_key
-	 * @param array  $payload
-	 * @return object { pin_code, pinpay_url, redirect_url }
-	 * @throws Exception
-	 */
-	public static function create_pay_by_link( string $gateway_key, array $payload ) {
-		$url = rtrim( self::BASE_API_PUBLIC, '/' )
-			. self::ENDPOINT_PAY_BY_LINK
-			. '/' . rawurlencode( $gateway_key );
-
-		$response = self::post( $url, $payload );
-
-		if ( empty( $response['PinCode'] ) || empty( $response['PinpayUrl'] ) || empty( $response['RedirectUrl'] ) ) {
-			throw new Exception( esc_html__( 'Invalid response from ifthenpay Pay-by-Link API.', 'ifthenpay-payments-for-latepoint' ) );
-		}
-
-		return (object) array(
-			'pin_code'     => $response['PinCode'],
-			'pinpay_url'   => $response['PinpayUrl'],
-			'redirect_url' => $response['RedirectUrl'],
-		);
-	}
 
 	/**
 	 * Get payment status by Transaction ID.
@@ -183,33 +51,6 @@ class IfthenpayAPIClient {
 
 		if ( ! is_array( $decoded ) && ! is_bool( $decoded ) ) {
 			throw new Exception( esc_html__( 'Invalid response (GET) from ifthenpay API.', 'ifthenpay-payments-for-latepoint' ) );
-		}
-
-		return $decoded;
-	}
-
-	/**
-	 * POST request helper.
-	 *
-	 * @throws Exception
-	 */
-	private static function post( string $url, array $data ): array {
-		$args = array(
-			'headers' => array( 'Content-Type' => 'application/json' ),
-			'body'    => wp_json_encode( $data ),
-			'timeout' => 10,
-		);
-
-		$resp = wp_remote_post( $url, $args );
-		if ( is_wp_error( $resp ) ) {
-			throw new Exception( esc_html( $resp->get_error_message() ) );
-		}
-
-		$body    = wp_remote_retrieve_body( $resp );
-		$decoded = json_decode( $body, true );
-
-		if ( ! is_array( $decoded ) ) {
-			throw new Exception( esc_html__( 'Invalid JSON from ifthenpay API.', 'ifthenpay-payments-for-latepoint' ) );
 		}
 
 		return $decoded;
