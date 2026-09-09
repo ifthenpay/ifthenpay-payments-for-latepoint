@@ -35,3 +35,13 @@ foreach ( $lib_files as $file ) {
 		continue;
 	}
 }
+
+// The main plugin class itself (IfthenpayPaymentsForLatepoint) — outside lib/, so the loop above
+// never reaches it. Its own bottom-of-file guard calls get_option(), undefined here, and throws;
+// by then the class declaration above it has already registered, so the catch below only
+// discards that one unreachable-in-this-process side effect, not the class itself.
+try {
+	require_once __DIR__ . '/../ifthenpay-payments-for-latepoint.php';
+} catch ( \Throwable $e ) {
+	unset( $e );
+}

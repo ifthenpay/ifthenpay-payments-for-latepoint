@@ -1,0 +1,1 @@
+amount=25.00&reference=lp-order-tok-abc123&apk=VEVTVC1HVy1LRVktMDAwMQ%3D%3D&method=MB&request_id=REQ-VALID-0001

@@ -17,9 +17,9 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 		/**
 		 * Preview a Backoffice Key before it is saved: format-check, remote verification, then
 		 * render the gateway/method config exactly as it would look once saved. Saves nothing —
-		 * the real, authoritative save runs through the settings page's own save, validated by
-		 * `validate_backoffice_key_on_save()` in the main plugin file. This is why there is no
-		 * failure-path settings cleanup here: nothing was written, so there is nothing to unwind.
+		 * the authoritative save runs through the settings page's own save, validated by
+		 * `validate_backoffice_key_on_save()` in the main plugin file, so there is no failure-path
+		 * cleanup to do here.
 		 *
 		 * @return void Sends JSON with status, message, and form HTML.
 		 */
@@ -48,17 +48,17 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 			}
 
 			$dataset     = IfthenpayLpGatewayDataset::get( $key );
-			$notice      = IfthenpayAdminFormRenderer::get_connection_notice( $dataset );
+			$notice      = IfthenpayLpAdminFormRenderer::get_connection_notice( $dataset );
 			$gatewaykeys = $dataset['gatewaykeys'] ?? array();
 
 			// Nothing to configure without a gateway key — same as the page's own render, an empty
 			// Gateway Key row and an all-"No accounts" method list would only repeat what the
 			// notice above already says.
 			$html                 = '';
-			$selected_gateway_key = IfthenpayAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
+			$selected_gateway_key = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key( $gatewaykeys );
 			if ( array() !== $gatewaykeys ) {
 				ob_start();
-				IfthenpayAdminFormRenderer::render_payments_configuration(
+				IfthenpayLpAdminFormRenderer::render_payments_configuration(
 					$selected_gateway_key,
 					$dataset['accounts'] ?? array(),
 					IfthenpayLpMethodCatalog::get() ?? array()
@@ -73,7 +73,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 					// The Gateway Key row lives inside the Backoffice Configuration section this
 					// response never otherwise touches — sent separately so the admin script can
 					// refresh just that row instead of the whole section.
-					'gateway_key_html' => IfthenpayAdminFormRenderer::render_gateway_key_row( $gatewaykeys, $selected_gateway_key ),
+					'gateway_key_html' => IfthenpayLpAdminFormRenderer::render_gateway_key_row( $gatewaykeys, $selected_gateway_key ),
 					'notice'           => $notice,
 					'inline_data'      => array(
 						'accounts' => $dataset['accounts'] ?? array(),
@@ -119,8 +119,8 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 			$wp_user = wp_get_current_user();
 
 			$payload = array(
-				'gateway_key'       => sanitize_text_field( $this->params['gateway_key'] ),
-				'entity'            => sanitize_text_field( $this->params['entity'] ),
+				'gateway_key'       => sanitize_text_field( $this->params['gateway_key'] ?? '' ),
+				'entity'            => sanitize_text_field( $this->params['entity'] ?? '' ),
 				'backoffice_key'    => OsSettingsHelper::get_settings_value( 'ifthenpay_backoffice_key' ),
 				'customer_email'    => $wp_user->data->user_email,
 				'site_url'          => home_url( '/' ),
@@ -130,7 +130,7 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 				'plugin_version'    => IFTHENPAY_PLUGIN_VERSION,
 			);
 
-			$sent = IfthenpayEmailHelper::send_activation_email( $payload );
+			$sent = IfthenpayLpEmailHelper::send_activation_email( $payload );
 
 			if ( $sent ) {
 				$this->send_json(
@@ -147,6 +147,34 @@ if ( ! class_exists( 'OsPaymentsIfthenpaySettingsController' ) ) :
 					)
 				);
 			}
+		}
+
+		/**
+		 * Manual recovery for a missed or failed inbound callback — not in
+		 * `action_access['public']`, so this keeps this controller's own default (LatePoint's
+		 * `settings__edit` capability), same as every other action here. The actual decision is
+		 * IfthenpayLpManualRecheck::run() — shared with the WP-CLI equivalent — this method only
+		 * maps its outcome to a merchant-facing message.
+		 *
+		 * @return void Sends JSON with status and message.
+		 */
+		public function recheck_payment() {
+			$outcome = IfthenpayLpManualRecheck::run( sanitize_text_field( $this->params['token'] ?? '' ) );
+
+			$this->send_json( self::recheck_response_for( $outcome['outcome'] ) );
+		}
+
+		/**
+		 * Maps an IfthenpayLpManualRecheck::run() outcome to a response.
+		 *
+		 * @param string $outcome One of IfthenpayLpManualRecheck's own constants.
+		 * @return array{status:string,message:string}
+		 */
+		private static function recheck_response_for( string $outcome ): array {
+			return array(
+				'status'  => IfthenpayLpManualRecheck::SETTLED === $outcome ? LATEPOINT_STATUS_SUCCESS : LATEPOINT_STATUS_ERROR,
+				'message' => IfthenpayLpManualRecheck::default_message_for( $outcome ),
+			);
 		}
 	}
 

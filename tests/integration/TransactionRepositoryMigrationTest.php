@@ -96,14 +96,10 @@ class TransactionRepositoryMigrationTest extends WP_UnitTestCase {
 		// The in-flight payment still settles: it exists in the new table, findable by token.
 		$migrated = IfthenpayLpTransactionRepository::find_by_token( 'legacy-inflight' );
 		$this->assertNotNull( $migrated );
-		// @phpstan-ignore-next-line property.notFound (find_by_token() returns a raw $wpdb->get_row() stdClass, same untyped-object pattern the rest of the codebase uses)
-		$this->assertSame( 'realtime', $migrated->kind );
-		// @phpstan-ignore-next-line property.notFound (see note above)
-		$this->assertSame( IfthenpayLpTransactionRepository::METHOD_PAYBYLINK, $migrated->method );
-		// @phpstan-ignore-next-line property.notFound (see note above)
-		$this->assertSame( 'PENDING', $migrated->status );
-		// @phpstan-ignore-next-line property.notFound (see note above)
-		$this->assertSame( 'https://pay.example/legacy-inflight', $migrated->paybylink_url );
+		$this->assertSame( 'realtime', $migrated->kind ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( IfthenpayLpTransactionRepository::METHOD_PAYBYLINK, $migrated->method ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'PENDING', $migrated->status ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'https://pay.example/legacy-inflight', $migrated->paybylink_url ); // @phpstan-ignore-line property.notFound
 
 		// The already-settled row is not duplicated into the new table...
 		$this->assertNull( IfthenpayLpTransactionRepository::find_by_token( 'legacy-settled' ) );

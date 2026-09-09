@@ -9,6 +9,11 @@ class LatepointPaymentsIfthenpayFront {
 		spinnerOverlay: 'ifp-spinner-overlay',
 	};
 
+	// ~45s total, matching the previous server-side blocking retry budget — SIBS (MBWAY) in
+	// particular can take a while to confirm a payment back to ifthenpay.
+	static POLL_INTERVAL_MS = 3000;
+	static POLL_MAX_ATTEMPTS = 15;
+
 	constructor() {
 		jQuery(() => this.init());
 	}
@@ -57,7 +62,10 @@ class LatepointPaymentsIfthenpayFront {
 				'json'
 			);
 		} catch {
-			return { status: 'error', message: latepoint_helper.ifthenpay_translations.request_failed };
+			return {
+				status: 'error',
+				message: latepoint_helper.ifthenpay_translations.request_failed,
+			};
 		}
 	}
 
@@ -137,6 +145,43 @@ class LatepointPaymentsIfthenpayFront {
 			});
 	}
 
+	// Our own endpoint reads our own stored payment state; it only falls back to asking ifthenpay
+	// directly when that state isn't settled yet. A `pending: true` response means neither has
+	// resolved this yet, so we ask again rather than treat it as a failure.
+	async pollPaymentStatus(token, status, txid) {
+		for (
+			let attempt = 0;
+			attempt < LatepointPaymentsIfthenpayFront.POLL_MAX_ATTEMPTS;
+			attempt++
+		) {
+			const resp = await this.request(
+				latepoint_helper.ifthenpay_check_status_route,
+				{
+					payment_token: token,
+					ifthenpay_return: status,
+					txid,
+				}
+			);
+
+			if (!resp.pending) {
+				return resp;
+			}
+
+			await new Promise((resolve) =>
+				setTimeout(
+					resolve,
+					LatepointPaymentsIfthenpayFront.POLL_INTERVAL_MS
+				)
+			);
+		}
+
+		return {
+			status: 'error',
+			message:
+				latepoint_helper.ifthenpay_translations.verification_timeout,
+		};
+	}
+
 	async verify(type, $form, token, status, txid, $modal) {
 		const $container = $modal.find(
 			`.${LatepointPaymentsIfthenpayFront.CLS.container}`
@@ -145,14 +190,7 @@ class LatepointPaymentsIfthenpayFront {
 			`<div class="${LatepointPaymentsIfthenpayFront.CLS.spinnerOverlay}"></div>`
 		).appendTo($container);
 
-		const resp = await this.request(
-			latepoint_helper.ifthenpay_check_status_route,
-			{
-				payment_token: token,
-				ifthenpay_return: status,
-				txid,
-			}
-		);
+		const resp = await this.pollPaymentStatus(token, status, txid);
 
 		$spin.remove();
 		$modal.remove();

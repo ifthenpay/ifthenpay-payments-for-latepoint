@@ -182,8 +182,7 @@ class LatepointPaymentsIfthenpayAdmin {
 		this.updateDefaultMethodOptions();
 	}
 
-	// Switching gateways client-side needs to update the account key shown next to each method's
-	// name too, or a merchant would keep seeing a different gateway's key.
+	// Keeps the account key shown next to a method's name in sync with the selected gateway.
 	updateAccountKeyDisplay($row, accountKey) {
 		const $content = $row.find('.ifthenpay-method-content');
 		let $key = $content.find('.ifthenpay-method-account-key');

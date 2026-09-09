@@ -1,0 +1,1 @@
+amount=49.90&reference=lp-order-tok-rt7788&apk=VEVTVC1HVy1LRVktMDAwMQ%3D%3D&method=PAYBYLINK&request_id=REQ-VALID-RT-0002

@@ -11,7 +11,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-legacy-settings-cleanup.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-legacy-settings-cleanup.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 
 /**

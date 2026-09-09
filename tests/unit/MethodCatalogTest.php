@@ -11,12 +11,10 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-api-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-credential-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-transport-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-api-client.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-data-formatter.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-method-catalog.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-exceptions.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-api-client.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-data-formatter.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-method-catalog.php';
 require_once __DIR__ . '/../support/class-wp-error-stub.php';
 require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 
@@ -26,11 +24,15 @@ require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 final class MethodCatalogTest extends TestCase {
 
 	/**
-	 * Boots Brain Monkey and stubs the WP functions the client/catalog always touch.
+	 * Boots Brain Monkey and stubs the WP functions the client/catalog always touch. Also resets
+	 * IfthenpayLpMethodCatalog's own per-request in-memory cache — a static property that would
+	 * otherwise leak the first test's result into every test after it (see
+	 * ifthenpay_lp_reset_method_catalog_cache()'s own docblock).
 	 */
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+		ifthenpay_lp_reset_method_catalog_cache();
 
 		Functions\stubs(
 			array(

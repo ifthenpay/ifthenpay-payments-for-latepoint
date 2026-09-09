@@ -1,13 +1,13 @@
 <?php
 /**
- * Proves IfthenpayAdminFormRenderer::render_payments_configuration(): a gateway record carries at
+ * Proves IfthenpayLpAdminFormRenderer::render_payments_configuration(): a gateway record carries at
  * most one account per method — verified live against ifthenpay's own API — so a method's
  * checkbox (LatePoint's own OsFormHelper::checkbox_field()) is natively `disabled` exactly when
  * the selected gateway has no account for it. Nothing beyond the enabled method codes is stored;
- * IfthenpayDataFormatter looks the account key up live at checkout time instead. Also proves the
+ * IfthenpayLpDataFormatter looks the account key up live at checkout time instead. Also proves the
  * always-present hidden fallback field this method renders alongside the real checkboxes, and that
  * its own empty-string value never reads back as an enabled method (see
- * IfthenpayDataFormatter::build_accounts_string() for the same guard on the checkout-time read of
+ * IfthenpayLpDataFormatter::build_accounts_string() for the same guard on the checkout-time read of
  * this same setting).
  *
  * @package ifthenpay-payments-for-latepoint
@@ -17,8 +17,13 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-admin-form-renderer.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-pay-by-link-method-eligibility.php';
+require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-lp-admin-form-renderer.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-pay-by-link-method-eligibility.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-payment-processor.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/ifthenpay-lp-payment-method-availability.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
 
@@ -61,7 +66,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array( 'GATEWAY-1' => array( 'MBWAY' => 'HLP-000001' ) ),
 			array(
@@ -89,7 +94,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array( 'GATEWAY-1' => array( 'MBWAY' => 'HLP-000001' ) ),
 			array(
@@ -117,7 +122,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MBWAY' );
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array( 'GATEWAY-1' => array( 'MBWAY' => 'HLP-000001' ) ),
 			array(
@@ -143,7 +148,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array(),
 			array(
@@ -173,7 +178,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( 'MBWAY' );
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array(), // No accounts at all for GATEWAY-1.
 			array(
@@ -200,7 +205,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array(
 				'GATEWAY-1' => array(
@@ -269,14 +274,14 @@ final class PaymentsConfigurationTest extends TestCase {
 		}
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array(
 				'GATEWAY-1' => array(
-					'MB'    => 'MB | HLP-000001',
-					'MBWAY' => 'MBWAY | HLP-000002',
-					'CCARD' => 'CCARD | HLP-000003',
-					'PIX'   => 'PIX | HLP-000004',
+					'MB'    => 'HLP-000001',
+					'MBWAY' => 'HLP-000002',
+					'CCARD' => 'HLP-000003',
+					'PIX'   => 'HLP-000004',
 				),
 			),
 			$catalog
@@ -306,7 +311,7 @@ final class PaymentsConfigurationTest extends TestCase {
 	 * one — so the merchant sees the full set of possible defaults up front, not an empty dropdown
 	 * that only grows as boxes are checked. Each option's text is the method's own display name,
 	 * matching its checkbox row above — not its account key, which would read as a duplicate once
-	 * the two are placed side by side in the same dropdown ("PIX" next to "PIX | HLP-000004" reads
+	 * the two are placed side by side in the same dropdown ("PIX" next to "HLP-000004" reads
 	 * like two different things when they're the same one).
 	 */
 	public function test_default_method_lists_eligible_methods_even_when_not_enabled(): void {
@@ -338,7 +343,7 @@ final class PaymentsConfigurationTest extends TestCase {
 	 */
 	public function test_hidden_reset_field_is_always_present(): void {
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array(),
 			array(
@@ -365,7 +370,7 @@ final class PaymentsConfigurationTest extends TestCase {
 		OsSettingsHelper::$values['ifthenpay_payment_methods_configuration'] = array( '' );
 
 		ob_start();
-		IfthenpayAdminFormRenderer::render_payments_configuration(
+		IfthenpayLpAdminFormRenderer::render_payments_configuration(
 			'GATEWAY-1',
 			array( 'GATEWAY-1' => array( 'MBWAY' => 'HLP-000001' ) ),
 			array(

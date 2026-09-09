@@ -62,9 +62,7 @@ class TransactionRepositoryTest extends WP_UnitTestCase {
 		$found = IfthenpayLpTransactionRepository::find_by_request_id( 'LOOKUP-REQUEST-ID' );
 
 		$this->assertNotNull( $found );
-		// @phpstan-ignore-next-line property.notFound (find_by_request_id() returns a raw $wpdb->get_row() stdClass, same untyped-object pattern the rest of the codebase uses)
-		$this->assertSame( 'PAYSHOP', $found->method );
-		// @phpstan-ignore-next-line property.notFound (see note above)
-		$this->assertSame( 'PENDING', $found->status );
+		$this->assertSame( 'PAYSHOP', $found->method ); // @phpstan-ignore-line property.notFound
+		$this->assertSame( 'PENDING', $found->status ); // @phpstan-ignore-line property.notFound
 	}
 }
