@@ -152,10 +152,25 @@ class IfthenpayLpPaymentProcessor {
 			return;
 		}
 
-		$txid   = IfthenpayLpTransactionRepository::decode_method_data( $record )['transaction_id'] ?? '';
-		$source = $record->settled_by ?? __( 'ifthenpay confirmation', 'ifthenpay-payments-for-latepoint' ); // @phpstan-ignore-line property.notFound
+		$method_data = IfthenpayLpTransactionRepository::decode_method_data( $record );
+		$source      = $record->settled_by ?? __( 'ifthenpay confirmation', 'ifthenpay-payments-for-latepoint' ); // @phpstan-ignore-line property.notFound
 
-		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, 'ifthenpay transaction ID', $txid, $source );
+		// A real, ifthenpay-verified txid (the polling/manual-recheck paths) takes precedence; a
+		// webhook-settled row never has one (see IfthenpayLpCallbackRestController::settle_realtime_locked()'s
+		// own comment on why) and falls back to its own, honestly-labelled request_id instead —
+		// never shown as a "transaction ID", since it genuinely is not one.
+		if ( ! empty( $method_data['transaction_id'] ) ) {
+			$identifier_label = 'ifthenpay transaction ID';
+			$identifier_value = $method_data['transaction_id'];
+		} elseif ( ! empty( $method_data['callback_request_id'] ) ) {
+			$identifier_label = 'ifthenpay request ID';
+			$identifier_value = $method_data['callback_request_id'];
+		} else {
+			$identifier_label = '';
+			$identifier_value = '';
+		}
+
+		$notes = IfthenpayLpSettlement::build_transaction_notes( $record, $identifier_label, $identifier_value, $source );
 		$transaction->update_attributes( array( 'notes' => $notes ) );
 	}
 

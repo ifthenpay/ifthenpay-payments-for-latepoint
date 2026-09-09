@@ -188,6 +188,38 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
+	 * A link to the standalone "ifthenpay for LatePoint" admin page (Settings → ifthenpay for
+	 * LatePoint) — the callback re-registration and manual-recheck/cancel tools that used to only
+	 * be reachable via WP-CLI. Placing it inside LatePoint's own Settings → Payments tab is what
+	 * makes the connection to LatePoint obvious in the first place, without the tools page itself
+	 * living inside LatePoint's own admin UI.
+	 *
+	 * Called from add_settings_fields() only once at least one gateway key exists (the same gate
+	 * render_payments_configuration() itself is under) — a merchant still onboarding (no Backoffice
+	 * Key yet, or one with no gateway keys, the normal first-run state) has no callback or payment
+	 * to troubleshoot yet, so showing this any earlier would only be premature noise during setup.
+	 * Uses the same `.sub-section-row` structure every other row in this form already uses (own
+	 * label column, own content column) rather than a bespoke box: this tab stacks every payment
+	 * processor's own settings one after another with no dividing wrapper around any of them, so
+	 * anything that doesn't share that same row structure reads as belonging to whichever section
+	 * happens to render next (Stripe, in practice) instead of clearly being its own row.
+	 */
+	public static function render_tools_page_link(): void {
+		?>
+		<div class="sub-section-row">
+			<div class="sub-section-label">
+				<h3><?php echo esc_html__( 'Advanced Tools', 'ifthenpay-payments-for-latepoint' ); ?></h3>
+			</div>
+			<div class="sub-section-content">
+				<a href="<?php echo esc_url( admin_url( 'options-general.php?page=ifthenpay-lp-tools' ) ); ?>">
+					<?php esc_html_e( 'Re-register the callback URL, and recheck or cancel a stuck payment →', 'ifthenpay-payments-for-latepoint' ); ?>
+				</a>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * The selected gateway's available payment methods, split into "Pay Now Configuration" and
 	 * "Pay Later Configuration" — the same split IfthenpayLpPayByLinkMethodEligibility::is_listed_in_pay_by_link()
 	 * applies at checkout, made visible here so a merchant sees why Multibanco/Payshop behave

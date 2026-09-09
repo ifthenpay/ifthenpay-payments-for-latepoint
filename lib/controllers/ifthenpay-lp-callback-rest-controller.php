@@ -157,14 +157,20 @@ class IfthenpayLpCallbackRestController {
 			);
 		}
 
-		// Not a txid — the callback's own request_id, the only correlation handle it carries. Kept
-		// under the same method_data key record_verification() already uses for either shape.
+		// Never a txid, and never stored as one: ifthenpay confirmed a Pay By Link webhook's own
+		// request_id is not accepted by the transaction-status endpoint, and no separate "check by
+		// request_id" endpoint exists either — it is a genuinely different, unrelated identifier
+		// from the one the realtime polling/manual-recheck paths verify against ifthenpay directly.
+		// A race where this webhook settles the row before the browser's own redirect finishes
+		// used to leave this value mislabeled as the transaction ID in the transaction's own notes
+		// (backfill_realtime_transaction_notes()) — stored under its own method_data key instead, so
+		// that reader can tell the two apart and label each correctly.
 		$confirmation = (object) array(
 			'payment_method' => $params->method,
 			'amount'         => $params->amount,
 			'order_id'       => $params->reference,
 		);
-		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, 'callback', true );
+		IfthenpayLpTransactionRepository::record_verification( $params->reference, $params->request_id, $confirmation, 'callback', true, 'callback_request_id' );
 
 		return array(
 			'status' => 200,

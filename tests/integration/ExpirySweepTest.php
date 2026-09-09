@@ -159,4 +159,68 @@ class ExpirySweepTest extends WP_UnitTestCase {
 		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-realtime-expired-001' );
 		$this->assertSame( 'PENDING', $record->status ); // @phpstan-ignore-line property.notFound
 	}
+
+	/**
+	 * The cancel_now() call — the ifthenpay Tools page's own manual Cancel action — gives up on a stuck
+	 * deferred payment on demand, not gated on expiry: a reference with plenty of time left is
+	 * still cancelled, and the booking releases its slot exactly as if the sweep itself had reached
+	 * it.
+	 */
+	public function test_cancel_now_cancels_a_not_yet_expired_row(): void {
+		$fixture = $this->seed_expired_row(
+			'tok-cancel-now-001',
+			'REQ-CANCEL-NOW-001',
+			gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS )
+		);
+
+		$this->assertTrue( IfthenpayLpExpirySweep::cancel_now( 'tok-cancel-now-001' ) );
+
+		$booking = new OsBookingModel( $fixture->booking->id );
+		$this->assertSame( LATEPOINT_BOOKING_STATUS_CANCELLED, $booking->status );
+
+		$record = IfthenpayLpTransactionRepository::find_by_token( 'tok-cancel-now-001' );
+		$this->assertSame( 'CANCELLED', $record->status ); // @phpstan-ignore-line property.notFound
+	}
+
+	/**
+	 * A row that already settled is never retroactively cancelled — the exact race the shared lock
+	 * exists to prevent, on the manual path too.
+	 */
+	public function test_cancel_now_does_not_touch_an_already_settled_row(): void {
+		$fixture = $this->seed_expired_row( 'tok-cancel-now-settled', 'REQ-CANCEL-NOW-SETTLED' );
+		OsBookingHelper::change_booking_status( $fixture->booking->id, LATEPOINT_BOOKING_STATUS_APPROVED );
+		IfthenpayLpTransactionRepository::mark_settled( 'tok-cancel-now-settled', 'callback' );
+
+		$this->assertFalse( IfthenpayLpExpirySweep::cancel_now( 'tok-cancel-now-settled' ) );
+
+		$booking = new OsBookingModel( $fixture->booking->id );
+		$this->assertSame( LATEPOINT_BOOKING_STATUS_APPROVED, $booking->status );
+	}
+
+	/**
+	 * A realtime row has no request_id — nothing here applies to it, reported as a clean no-op
+	 * rather than attempting to lock on a request_id that doesn't exist.
+	 */
+	public function test_cancel_now_is_a_no_op_for_a_realtime_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'      => 'tok-cancel-now-realtime',
+				'intent_id'  => $fixture->order_intent->id,
+				'kind'       => 'realtime',
+				'method'     => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+				'expires_at' => gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ),
+			)
+		);
+
+		$this->assertFalse( IfthenpayLpExpirySweep::cancel_now( 'tok-cancel-now-realtime' ) );
+	}
+
+	/**
+	 * An unknown token is a clean false, not an error — the Tools page maps this straight to a
+	 * generic "could not cancel" notice.
+	 */
+	public function test_cancel_now_is_a_no_op_for_an_unknown_token(): void {
+		$this->assertFalse( IfthenpayLpExpirySweep::cancel_now( 'tok-does-not-exist' ) );
+	}
 }

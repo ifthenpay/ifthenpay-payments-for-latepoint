@@ -75,6 +75,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-checkout-controller.php';
 			include_once __DIR__ . '/lib/controllers/payments-ifthenpay-settings-controller.php';
 			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-callback-rest-controller.php';
+			include_once __DIR__ . '/lib/controllers/ifthenpay-lp-tools-page-controller.php';
 		}
 
 		/**
@@ -165,6 +166,7 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			$this->register_cron_hooks();
 			$this->register_reference_display_hooks();
 			$this->register_lifecycle_hooks();
+			$this->register_admin_menu_hooks();
 		}
 
 		private function register_bootstrap_hooks(): void {
@@ -237,6 +239,16 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 			add_action( 'latepoint_customer_dashboard_after_booking_info_tile', array( $this, 'render_reference_on_dashboard_tile' ) );
 			add_action( 'latepoint_booking_full_summary_head_info_after', array( $this, 'render_reference_on_dashboard_tile' ) );
 			add_filter( 'latepoint_process_prepare_data_for_run', array( $this, 'append_reference_to_email_content' ) );
+		}
+
+		/**
+		 * A standalone WP admin page (Settings → ifthenpay Tools) — deliberately outside LatePoint's
+		 * own admin UI, so a merchant/support agent can re-register the callback URL and re-check a
+		 * stuck deferred payment from wp-admin, without needing WP-CLI/shell access the way
+		 * IfthenpayLpCliCommands's own two commands otherwise require.
+		 */
+		private function register_admin_menu_hooks(): void {
+			add_action( 'admin_menu', array( 'IfthenpayLpToolsPageController', 'add_page' ) );
 		}
 
 		private function register_lifecycle_hooks(): void {
@@ -563,7 +575,10 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 
 			// Nothing here below a missing gateway key: a Payment Methods list that can only ever
 			// say "No accounts" has nothing a merchant can act on — the connection notice
-			// (localized_vars_for_admin(), surfaced as a toast) already says why.
+			// (localized_vars_for_admin(), surfaced as a toast) already says why. The same gate
+			// covers render_tools_page_link(): a merchant still onboarding (no Backoffice Key yet,
+			// or one with no gateway keys — the normal first-run state) has no callback or payment
+			// to troubleshoot yet, so showing "Advanced Tools" here would only be premature noise.
 			if ( array() !== $gatewaykeys ) {
 				IfthenpayLpAdminFormRenderer::render_payments_configuration(
 					$selected_gateway_key,
@@ -578,6 +593,8 @@ if ( ! class_exists( 'IfthenpayPaymentsForLatepoint' ) ) :
 				if ( $gateway_key ) {
 					IfthenpayLpAdminFormRenderer::render_callback_status( IfthenpayLpCallbackRegistration::get_status( $gateway_key ) );
 				}
+
+				IfthenpayLpAdminFormRenderer::render_tools_page_link();
 			}
 		}
 

@@ -32,7 +32,18 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 				OsStepsHelper::$cart_object,
 				OsStepsHelper::$restrictions,
 				OsStepsHelper::$presets,
-				$booking_url
+				$booking_url,
+				// Every LatePoint-core caller of this method passes its own customer id explicitly
+				// (steps_controller.php, razorpay/stripe/paypal_connect_controller.php) — omitting it
+				// falls back to OsAuthHelper::get_logged_in_customer_id(), which is unconditionally
+				// false whenever a merchant has "hide login/register tabs" enabled
+				// (is_customer_auth_disabled()), even though a real, already-saved guest customer
+				// (OsStepsHelper::set_customer_object() re-loads them by their own resubmitted uuid,
+				// steps_helper.php:1174-1180) is sitting right here. Without this, customer_id stays
+				// empty, OsOrderIntentModel's own presence validation rejects the save, and this
+				// method silently receives an unsaved (id=0) intent — corrupting intent_id downstream
+				// and breaking get_page_url_with_intent()'s own resume link.
+				OsStepsHelper::get_customer_object_id()
 			);
 
 			$this->send_ifthenpay_options( $order_intent, $amount );
@@ -98,7 +109,21 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 			}
 
 			try {
-				$token       = $intent_model->intent_key;
+				// Never $intent_model->intent_key: LatePoint reuses the identical order_intent row —
+				// same id, same intent_key — across every checkout attempt on the same cart cookie
+				// until it actually converts (OsOrderIntentHelper::create_or_update_order_intent()'s
+				// own reuse path, verified against core; intent_key is only ever set once, in
+				// before_create()). A customer who pays, then loses their connection before the
+				// booking form submits, and retries, would otherwise mint a second live Pay By Link
+				// under the exact same token as the first — a real second charge at ifthenpay whose
+				// local insert() then silently fails on this table's own UNIQUE(token), unnoticed,
+				// with no local record of it ever existing. A fresh token per call is what
+				// build_pay_by_link_payload()'s own 'otp' => 'true' comment already assumes ("each
+				// checkout attempt mints its own") — nothing downstream needs it to equal intent_key:
+				// LatePoint's own read-back is $intent_model->get_payment_data_value('token'), sourced
+				// from whatever this response's own 'token' round-trips through front.js, never
+				// intent_key directly (verified against core's process_payment_by_intent() consumer).
+				$token       = wp_generate_password( 20, false );
 				$gateway_key = OsSettingsHelper::get_settings_value( 'ifthenpay_gateway_key' );
 				$payload     = IfthenpayLpDataFormatter::build_pay_by_link_payload( $intent_model, $token, $amount );
 
@@ -117,26 +142,49 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 
 				$api_result = IfthenpayLpPayByLink::create( $gateway_key, $payload );
 
-				IfthenpayLpTransactionRepository::insert(
+				$inserted = IfthenpayLpTransactionRepository::insert(
 					array(
-						'token'         => $token,
-						'intent_id'     => $intent_model->id,
-						'kind'          => 'realtime',
-						'method'        => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
+						'token'             => $token,
+						'intent_id'         => $intent_model->id,
+						'kind'              => 'realtime',
+						'method'            => IfthenpayLpTransactionRepository::METHOD_PAYBYLINK,
 						// Same formatted value already sent to ifthenpay in $payload — lets
 						// IfthenpayLpSettlement::settle_locked() actually run its amount-mismatch
 						// guard for a realtime payment, same as it already does for a deferred one;
 						// that guard is a no-op whenever a record's own amount is null.
-						'amount'        => $payload['amount'],
-						'paybylink_url' => $api_result->redirect_url,
-						'pin_code'      => $api_result->pin_code,
+						'amount'            => $payload['amount'],
+						'paybylink_url'     => $api_result->redirect_url,
+						'pin_code'          => $api_result->pin_code,
 						// Needed so the inbound callback route (ifthenpay-lp/v1/callback) can
 						// authenticate a real async notification for this payment, on gateways
 						// where ifthenpay also sends one for realtime methods — without this, every
 						// such callback would fail anti-phishing verification against an empty key.
-						'gateway_key'   => $gateway_key,
+						'gateway_key'       => $gateway_key,
+						// Captured now, never re-derived later from the shared order/transaction
+						// intent — see build_unclaimed_snapshot()'s own docblock for why that would be
+						// unreliable. Its own column, not method_data: the two hold entirely unrelated
+						// kinds of information (settlement/verification metadata vs. a checkout-time
+						// identity/booking capture) — see
+						// IfthenpayLpTransactionRepository::decode_checkout_snapshot()'s own docblock.
+						// Feeds find_unclaimed_realtime(), the ifthenpay Tools page's own listing for a
+						// realtime payment that settled but was never claimed by a real booking.
+						'checkout_snapshot' => wp_json_encode( self::build_unclaimed_snapshot( $intent_model ) ),
 					)
 				);
+
+				// A real Pay By Link now exists at ifthenpay regardless — this only decides whether
+				// the customer is told about it. Reporting success over a row we never actually
+				// stored would leave that live link completely untracked: no callback/polling path
+				// could ever settle it, since neither has a local row to find by token.
+				if ( false === $inserted ) {
+					$this->send_json(
+						array(
+							'status'  => LATEPOINT_STATUS_ERROR,
+							'message' => __( 'Could not start this payment right now. Please try again or contact the site owner.', 'ifthenpay-payments-for-latepoint' ),
+						)
+					);
+					return;
+				}
 
 				$this->send_json(
 					array(
@@ -161,6 +209,91 @@ if ( ! class_exists( 'OsPaymentsIfthenpayCheckoutController' ) ) :
 					)
 				);
 			}
+		}
+
+		/**
+		 * Identity/booking snapshot for a realtime payment, captured now rather than re-derived
+		 * later from the shared order/transaction intent. LatePoint reuses the identical
+		 * order_intent row (same id) across every checkout attempt on the same cart cookie until it
+		 * actually converts, and on that reuse path unconditionally overwrites both `customer_id`
+		 * (sourced from session/login state, not the cart — OsOrderIntentHelper::create_or_update_order_intent())
+		 * and `cart_items_data`, with no persisted history. A later attempt — even by a genuinely
+		 * different person on a shared/kiosk browser — can silently overwrite both fields, so reading
+		 * either back off the intent after the fact is unreliable. This snapshot is what
+		 * IfthenpayLpTransactionRepository::find_unclaimed_realtime() actually shows a merchant —
+		 * never the live intent row.
+		 *
+		 * @param object $intent_model An OrderIntent or TransactionIntent instance.
+		 * @return array<string,mixed>
+		 */
+		private static function build_unclaimed_snapshot( $intent_model ): array {
+			$snapshot = array();
+
+			if ( ! empty( $intent_model->customer_id ) ) {
+				// Reliable once non-empty for either intent type: the invoice/transaction path
+				// always sets it from the invoice's own existing order
+				// (OsTransactionIntentHelper::create_or_update_transaction_intent()); on the
+				// order-booking path it's only ever non-empty for an already-logged-in customer.
+				$snapshot['customer_id'] = (int) $intent_model->customer_id;
+			} elseif ( $intent_model instanceof OsOrderIntentModel ) {
+				// A guest order-booking checkout: OsStepsHelper::set_customer_object() (already run,
+				// via set_required_objects() in get_order_ifthenpay_options()) builds a real
+				// OsCustomerModel with the submitted name/email/phone but deliberately does not save
+				// it — "will be saved on the confirmation step" — so customer_id above is empty even
+				// though the identity itself is already known. get_customer_object() is the only
+				// reliable read of it at this exact point; same pattern LatePoint core's own
+				// razorpay_connect_controller.php uses at the equivalent point in its own checkout.
+				$customer                   = OsStepsHelper::get_customer_object();
+				$snapshot['customer_name']  = $customer->full_name;
+				$snapshot['customer_email'] = $customer->email;
+				$snapshot['customer_phone'] = $customer->phone;
+			}
+
+			if ( $intent_model instanceof OsOrderIntentModel ) {
+				$snapshot['booking_summary'] = self::summarize_cart_items( (string) $intent_model->cart_items_data );
+			}
+
+			return $snapshot;
+		}
+
+		/**
+		 * A best-effort, human-readable line per booking item in the cart at this exact moment — raw
+		 * item_data parsing, not build_cart_object()/OsCartItemModel::build_original_object_from_item_data():
+		 * cart_items_data is already in hand as a string here, and only display strings are needed,
+		 * not a real booking object. Multiple items (a multi-service cart) are joined, not just the
+		 * first — a merchant resolving this with the customer needs the whole picture.
+		 *
+		 * @param string $cart_items_data The intent's own cart_items_data column value.
+		 */
+		private static function summarize_cart_items( string $cart_items_data ): string {
+			$items = json_decode( $cart_items_data, true );
+			if ( ! is_array( $items ) ) {
+				return '';
+			}
+
+			$lines = array();
+			foreach ( $items as $item ) {
+				if ( ( $item['variant'] ?? '' ) !== LATEPOINT_ITEM_VARIANT_BOOKING ) {
+					continue;
+				}
+
+				$data         = $item['item_data'] ?? array();
+				$service_name = '';
+				if ( ! empty( $data['service_id'] ) ) {
+					$service      = new OsServiceModel( (int) $data['service_id'] );
+					$service_name = $service->is_new_record() ? '' : $service->name;
+				}
+
+				$lines[] = sprintf(
+					/* translators: 1: service name, 2: appointment date, 3: appointment time */
+					__( '%1$s on %2$s @ %3$s', 'ifthenpay-payments-for-latepoint' ),
+					'' !== $service_name ? $service_name : __( 'Unknown service', 'ifthenpay-payments-for-latepoint' ),
+					$data['start_date'] ?? '?',
+					isset( $data['start_time'] ) ? OsTimeHelper::minutes_to_hours_and_minutes( (int) $data['start_time'] ) : '?'
+				);
+			}
+
+			return implode( '; ', $lines );
 		}
 
 		/**
