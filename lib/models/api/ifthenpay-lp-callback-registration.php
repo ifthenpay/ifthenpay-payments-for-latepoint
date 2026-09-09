@@ -41,7 +41,8 @@ class IfthenpayLpCallbackRegistration {
 			self::store_status(
 				$gateway_key,
 				false,
-				__( 'The callback URL is too long (over 300 characters) — likely a long domain with a subdirectory install.', 'ifthenpay-payments-for-latepoint' )
+				__( 'The callback URL is too long (over 300 characters) — likely a long domain with a subdirectory install.', 'ifthenpay-payments-for-latepoint' ),
+				$callback_url
 			);
 			return false;
 		}
@@ -58,7 +59,7 @@ class IfthenpayLpCallbackRegistration {
 				false
 			);
 		} catch ( IfthenpayLpApiException $e ) {
-			self::store_status( $gateway_key, false, $e->getMessage() );
+			self::store_status( $gateway_key, false, $e->getMessage(), $callback_url );
 			return false;
 		}
 
@@ -66,7 +67,8 @@ class IfthenpayLpCallbackRegistration {
 		self::store_status(
 			$gateway_key,
 			$success,
-			$success ? '' : __( 'ifthenpay did not accept this callback URL.', 'ifthenpay-payments-for-latepoint' )
+			$success ? '' : __( 'ifthenpay did not accept this callback URL.', 'ifthenpay-payments-for-latepoint' ),
+			$callback_url
 		);
 
 		return $success;
@@ -90,10 +92,13 @@ class IfthenpayLpCallbackRegistration {
 
 	/**
 	 * The last recorded registration outcome for a gateway key, or null if none was ever
-	 * attempted (e.g. a fresh install, or a gateway key that was never saved).
+	 * attempted (e.g. a fresh install, or a gateway key that was never saved). `callback_url` is
+	 * the exact URL that attempt actually submitted — not necessarily what build_callback_url()
+	 * would compute right now, if the site's own URL changed since — so support can compare what
+	 * ifthenpay has on file for this gateway key against what the site would send today.
 	 *
 	 * @param string $gateway_key The gateway key to look up.
-	 * @return array{success:bool,message:string,registered_at:int}|null
+	 * @return array{success:bool,message:string,registered_at:int,callback_url:string}|null
 	 */
 	public static function get_status( string $gateway_key ): ?array {
 		$statuses = get_option( self::STATUS_OPTION, array() );
@@ -106,8 +111,11 @@ class IfthenpayLpCallbackRegistration {
 	 * the placeholder query string is appended with whichever separator that leaves needed — never
 	 * built with add_query_arg(), which would URL-encode the literal `[...]` tokens ifthenpay's own
 	 * substitution engine expects verbatim.
+	 *
+	 * Public so a caller only wanting to preview what the *next* registration would submit — e.g.
+	 * the ifthenpay Tools page, before any registration has ever run — doesn't need its own copy.
 	 */
-	private static function build_callback_url(): string {
+	public static function build_callback_url(): string {
 		$base      = rest_url( 'ifthenpay-lp/v1/callback' );
 		$separator = ( false === strpos( $base, '?' ) ) ? '?' : '&';
 
@@ -118,16 +126,18 @@ class IfthenpayLpCallbackRegistration {
 	/**
 	 * Records one registration outcome, replacing any previous one for the same gateway key.
 	 *
-	 * @param string $gateway_key The gateway key this outcome belongs to.
-	 * @param bool   $success     Whether registration succeeded.
-	 * @param string $message     Empty on success; the reason on failure.
+	 * @param string $gateway_key  The gateway key this outcome belongs to.
+	 * @param bool   $success      Whether registration succeeded.
+	 * @param string $message      Empty on success; the reason on failure.
+	 * @param string $callback_url The exact URL this attempt submitted (or tried to).
 	 */
-	private static function store_status( string $gateway_key, bool $success, string $message ): void {
+	private static function store_status( string $gateway_key, bool $success, string $message, string $callback_url ): void {
 		$statuses                 = get_option( self::STATUS_OPTION, array() );
 		$statuses[ $gateway_key ] = array(
 			'success'       => $success,
 			'message'       => $message,
 			'registered_at' => time(),
+			'callback_url'  => $callback_url,
 		);
 		update_option( self::STATUS_OPTION, $statuses );
 	}

@@ -41,12 +41,12 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A realtime, PAID row with a recorded txid gets its transaction's notes backfilled — with the
-	 * *real* source it was settled through (the row's own `settled_by` column, set by
-	 * IfthenpayLpTransactionRepository::mark_settled()/record_verification() at settlement time),
-	 * here simulating a webhook-settled row specifically: proving this isn't hardcoded to "polling"
-	 * regardless of which mechanism actually confirmed the payment (a real bug an earlier version
-	 * had).
+	 * A realtime, PAID row with a recorded, ifthenpay-verified txid — the polling path's own shape,
+	 * which calls IfthenpayLpTransactionStatus::check() before recording it — gets its
+	 * transaction's notes backfilled with the *real* source it was settled through (the row's own
+	 * `settled_by` column, set by IfthenpayLpTransactionRepository::mark_settled()/record_verification()
+	 * at settlement time), proving this isn't hardcoded to "polling" regardless of which mechanism
+	 * actually confirmed the payment (a real bug an earlier version had).
 	 */
 	public function test_backfills_notes_for_a_realtime_paid_transaction(): void {
 		$fixture = ifthenpay_lp_create_order_fixture();
@@ -57,7 +57,7 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 				'kind'        => 'realtime',
 				'method'      => 'MBWAY',
 				'status'      => 'PAID',
-				'settled_by'  => 'callback',
+				'settled_by'  => 'polling',
 				'method_data' => wp_json_encode( array( 'transaction_id' => 'TXID-NOTES-001' ) ),
 			)
 		);
@@ -66,7 +66,38 @@ class RealtimeTransactionNotesTest extends WP_UnitTestCase {
 		IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes( $transaction );
 
 		$reloaded = new OsTransactionModel( $transaction->id );
-		$this->assertSame( "ifthenpay transaction ID: TXID-NOTES-001\nSettled via: callback", $reloaded->notes );
+		$this->assertSame( "ifthenpay transaction ID: TXID-NOTES-001\nSettled via: polling", $reloaded->notes );
+	}
+
+	/**
+	 * A realtime row the webhook settled — carrying only its own `callback_request_id`, never a
+	 * `transaction_id` (see IfthenpayLpCallbackRestController::settle_realtime_locked()'s own
+	 * comment on why: ifthenpay confirmed a Pay By Link webhook's own request_id is not accepted by
+	 * the transaction-status endpoint, and no separate "check by request_id" endpoint exists
+	 * either) — is labelled "ifthenpay request ID", never "ifthenpay transaction ID". A real bug:
+	 * when the webhook races ahead of the browser's own redirect and settles the row first, this
+	 * value used to be stored under the same key a genuinely verified txid uses and shown to the
+	 * merchant mislabelled as one.
+	 */
+	public function test_backfills_a_request_id_line_not_a_transaction_id_for_a_webhook_settled_row(): void {
+		$fixture = ifthenpay_lp_create_order_fixture();
+		IfthenpayLpTransactionRepository::insert(
+			array(
+				'token'       => 'tok-realtime-webhook-race',
+				'intent_id'   => $fixture->order_intent->id,
+				'kind'        => 'realtime',
+				'method'      => 'MBWAY',
+				'status'      => 'PAID',
+				'settled_by'  => 'callback',
+				'method_data' => wp_json_encode( array( 'callback_request_id' => 'REQ-WEBHOOK-001' ) ),
+			)
+		);
+		$transaction = $this->create_transaction( $fixture, 'tok-realtime-webhook-race' );
+
+		IfthenpayLpPaymentProcessor::backfill_realtime_transaction_notes( $transaction );
+
+		$reloaded = new OsTransactionModel( $transaction->id );
+		$this->assertSame( "ifthenpay request ID: REQ-WEBHOOK-001\nSettled via: callback", $reloaded->notes );
 	}
 
 	/**
