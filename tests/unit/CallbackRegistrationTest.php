@@ -12,11 +12,9 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-api-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-credential-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-transport-exception.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-api-client.php';
-require_once dirname( __DIR__, 2 ) . '/lib/helpers/ifthenpay-lp-callback-registration.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-exceptions.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-api-client.php';
+require_once dirname( __DIR__, 2 ) . '/lib/models/api/ifthenpay-lp-callback-registration.php';
 require_once __DIR__ . '/../support/class-wp-error-stub.php';
 require_once __DIR__ . '/../support/ifthenpay-http-fixtures.php';
 
@@ -148,7 +146,7 @@ final class CallbackRegistrationTest extends TestCase {
 	 * attempted — a specific, named failure, not a request ifthenpay would have to reject.
 	 */
 	public function test_url_over_300_characters_fails_without_a_network_call(): void {
-		Functions\when( 'rest_url' )->justReturn( 'https://' . str_repeat( 'a', 300 ) . '.example.test/wp-json/ifthenpay/v1/callback' );
+		Functions\when( 'rest_url' )->justReturn( 'https://' . str_repeat( 'a', 300 ) . '.example.test/wp-json/ifthenpay-lp/v1/callback' );
 		Functions\expect( 'wp_remote_request' )->never();
 
 		$this->assertFalse( IfthenpayLpCallbackRegistration::register( 'GATEWAY-4' ) );

@@ -1,6 +1,6 @@
 <?php
 /**
- * Proves two things in IfthenpayAdminFormRenderer, both used by Backoffice Configuration's own
+ * Proves two things in IfthenpayLpAdminFormRenderer, both used by Backoffice Configuration's own
  * Gateway Key row and by the "Connect" preview's `gateway_key_html` response field:
  *
  * - resolve_selected_gateway_key(): the saved `ifthenpay_gateway_key` setting when it still names
@@ -18,7 +18,7 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-admin-form-renderer.php';
+require_once dirname( __DIR__, 2 ) . '/lib/views/ifthenpay-lp-admin-form-renderer.php';
 require_once __DIR__ . '/../support/class-os-settings-helper-stub.php';
 require_once __DIR__ . '/../support/class-os-form-helper-stub.php';
 
@@ -59,14 +59,14 @@ final class GatewayKeyRowTest extends TestCase {
 	public function test_no_gatewaykeys_resolves_to_empty_string(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-1';
 
-		$this->assertSame( '', IfthenpayAdminFormRenderer::resolve_selected_gateway_key( array() ) );
+		$this->assertSame( '', IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key( array() ) );
 	}
 
 	/**
 	 * Nothing saved yet: falls back to the first gateway key.
 	 */
 	public function test_no_saved_key_resolves_to_first_gatewaykey(): void {
-		$resolved = IfthenpayAdminFormRenderer::resolve_selected_gateway_key(
+		$resolved = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key(
 			array(
 				'GATEWAY-1' => 'GATEWAY-1',
 				'GATEWAY-2' => 'GATEWAY-2',
@@ -82,7 +82,7 @@ final class GatewayKeyRowTest extends TestCase {
 	public function test_saved_key_still_present_is_kept(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'GATEWAY-2';
 
-		$resolved = IfthenpayAdminFormRenderer::resolve_selected_gateway_key(
+		$resolved = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key(
 			array(
 				'GATEWAY-1' => 'GATEWAY-1',
 				'GATEWAY-2' => 'GATEWAY-2',
@@ -100,7 +100,7 @@ final class GatewayKeyRowTest extends TestCase {
 	public function test_stale_saved_key_falls_back_to_first_gatewaykey(): void {
 		OsSettingsHelper::$values['ifthenpay_gateway_key'] = 'OLD-GATEWAY-FROM-A-DIFFERENT-KEY';
 
-		$resolved = IfthenpayAdminFormRenderer::resolve_selected_gateway_key(
+		$resolved = IfthenpayLpAdminFormRenderer::resolve_selected_gateway_key(
 			array( 'GATEWAY-1' => 'GATEWAY-1' )
 		);
 
@@ -111,7 +111,7 @@ final class GatewayKeyRowTest extends TestCase {
 	 * No gateway keys: the row renders nothing at all, not an empty `<select>`.
 	 */
 	public function test_render_gateway_key_row_with_no_gatewaykeys_is_empty(): void {
-		$html = IfthenpayAdminFormRenderer::render_gateway_key_row( array(), '' );
+		$html = IfthenpayLpAdminFormRenderer::render_gateway_key_row( array(), '' );
 
 		$this->assertSame( '', $html );
 	}
@@ -120,7 +120,7 @@ final class GatewayKeyRowTest extends TestCase {
 	 * With gateway keys, the row renders the `<select>` with the resolved key selected.
 	 */
 	public function test_render_gateway_key_row_with_gatewaykeys_renders_select(): void {
-		$html = IfthenpayAdminFormRenderer::render_gateway_key_row(
+		$html = IfthenpayLpAdminFormRenderer::render_gateway_key_row(
 			array( 'GATEWAY-1' => 'GATEWAY-1' ),
 			'GATEWAY-1'
 		);
