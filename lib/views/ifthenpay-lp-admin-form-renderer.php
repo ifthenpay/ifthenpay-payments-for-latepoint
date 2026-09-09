@@ -251,9 +251,9 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * Multibanco (functional) and Payshop (not yet functional) — their own section, since nothing
-	 * in Pay Now Configuration (Gateway Key, Default Method, Description) applies to them, and
-	 * Multibanco has its own setting (reference validity) nothing else needs.
+	 * Multibanco and Payshop — their own section, since nothing in Pay Now Configuration (Gateway
+	 * Key, Default Method, Description) applies to them, and each has its own timing settings
+	 * (reference validity, minimum lead time) nothing else needs.
 	 *
 	 * @param array<string,array{position:int,image:string,tooltip:string,label:string}> $deferred_catalog     Deferred slice of the catalog.
 	 * @param array<string,string>                                                       $accounts_for_gateway `{methodCode: accountKey}` for the currently selected gateway only.
@@ -271,11 +271,44 @@ class IfthenpayLpAdminFormRenderer {
 			<div class="sub-section-content">
 				<div class="label-with-description">
 					<h3><?php echo esc_html__( 'Payment Methods', 'ifthenpay-payments-for-latepoint' ); ?></h3>
-					<div class="label-desc"><?php echo esc_html__( 'Multibanco lets customers pay by reference instead of on the spot. Other methods here are not yet functional.', 'ifthenpay-payments-for-latepoint' ); ?></div>
+					<div class="label-desc"><?php echo esc_html__( 'Multibanco and Payshop let customers pay by reference instead of on the spot.', 'ifthenpay-payments-for-latepoint' ); ?></div>
 				</div>
 				<?php
+				self::render_booking_status_warning();
 				self::render_methods_list( $deferred_catalog, $accounts_for_gateway, $enabled_methods );
-				self::render_multibanco_timing_fields();
+				self::render_timing_section_intro();
+				self::render_timing_fields(
+					__( 'Multibanco', 'ifthenpay-payments-for-latepoint' ),
+					$deferred_catalog['MB']['image'] ?? '',
+					array(
+						'field'   => 'ifthenpay_multibanco_validity_days',
+						'default' => IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
+						'min'     => IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
+						'max'     => IfthenpayLpMultibancoValidityValidation::MAX_DAYS,
+					),
+					array(
+						'field'   => 'ifthenpay_multibanco_lead_time_days',
+						'default' => IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
+						'min'     => IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
+						'max'     => IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS,
+					)
+				);
+				self::render_timing_fields(
+					__( 'Payshop', 'ifthenpay-payments-for-latepoint' ),
+					$deferred_catalog['PAYSHOP']['image'] ?? '',
+					array(
+						'field'   => 'ifthenpay_payshop_validity_days',
+						'default' => IfthenpayLpPaymentProcessor::DEFAULT_PAYSHOP_VALIDITY_DAYS,
+						'min'     => IfthenpayLpPayshopValidityValidation::MIN_DAYS,
+						'max'     => IfthenpayLpPayshopValidityValidation::MAX_DAYS,
+					),
+					array(
+						'field'   => 'ifthenpay_payshop_lead_time_days',
+						'default' => IfthenpayLpPaymentMethodAvailability::DEFAULT_PAYSHOP_LEAD_TIME_DAYS,
+						'min'     => IfthenpayLpPayshopLeadTimeValidation::MIN_DAYS,
+						'max'     => IfthenpayLpPayshopLeadTimeValidation::MAX_DAYS,
+					)
+				);
 				?>
 			</div>
 		</div>
@@ -283,75 +316,135 @@ class IfthenpayLpAdminFormRenderer {
 	}
 
 	/**
-	 * The two settings that together keep a Multibanco reference inside a real payment window:
-	 * how long it stays payable (also clamped at payment time against the appointment itself, so it
-	 * can never outlive it) and how close to the appointment it can still be offered at all. Side by
-	 * side — a merchant reading
-	 * one naturally wants to see the other; e.g. "3-day validity" only means something in
-	 * combination with "offered starting 2 days out". Save-time range validation for both is
-	 * IfthenpayLpWholeDaysSettingValidation, wired up in the main plugin file via each setting's own
-	 * validator; left blank, each side has its own default applied elsewhere at the moment it
-	 * matters (IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
-	 * IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS).
+	 * Warns when a Multibanco/Payshop booking can't block its own slot for the whole time its
+	 * reference stays outstanding — LatePoint only blocks a slot for a booking whose status is in
+	 * `timeslot_blocking_statuses` (`approved` only, by default); a deferred checkout's booking gets
+	 * whatever `default_booking_status` says (also `approved` by default, but a common merchant
+	 * choice for manual-approval businesses is `pending`). If those two disagree, a deferred booking
+	 * sits unpaid *and* unblocked for the entire multi-hour/day reference window — a real
+	 * double-booking risk, and a much longer exposure than LatePoint's own same-session manual-review
+	 * delay. This only ever informs: it reads two LatePoint-owned global settings and links to where
+	 * the merchant can change them (LatePoint → Settings → General), it never touches them itself —
+	 * this add-on doesn't own that setting and shouldn't override a merchant's deliberate choice.
+	 *
+	 * Deliberately does not account for a service's own `override_default_booking_status` — cross-
+	 * referencing every service's own override against the blocking-statuses list for a warning this
+	 * targeted is real added complexity for a smaller slice of merchants; the global default is the
+	 * common case this covers.
 	 */
-	private static function render_multibanco_timing_fields(): void {
+	private static function render_booking_status_warning(): void {
+		$default_status    = (string) OsSettingsHelper::get_settings_value( 'default_booking_status', LATEPOINT_BOOKING_STATUS_APPROVED );
+		$blocking_statuses = OsBookingHelper::get_timeslot_blocking_statuses();
+		if ( in_array( $default_status, $blocking_statuses, true ) ) {
+			return;
+		}
 		?>
-		<div class="label-with-description">
-			<h3><?php echo esc_html__( 'Timing', 'ifthenpay-payments-for-latepoint' ); ?></h3>
-			<div class="label-desc"><?php echo esc_html__( 'Multibanco needs a real payment window: how long a reference stays open once issued, and how soon before the appointment it can still be offered at all.', 'ifthenpay-payments-for-latepoint' ); ?></div>
+		<div class="ifthenpay-booking-status-warning">
+			<?php
+			echo esc_html__( "Your default booking status doesn't block its own time slot, so a Multibanco/Payshop booking can sit unpaid without holding the calendar for as long as its reference stays valid.", 'ifthenpay-payments-for-latepoint' );
+			?>
+			<a href="<?php echo esc_url( OsRouterHelper::build_link( OsRouterHelper::build_route_name( 'settings', 'general' ) ) ); ?>">
+				<?php echo esc_html__( 'Review in Settings → General', 'ifthenpay-payments-for-latepoint' ); ?>
+			</a>
 		</div>
-		<div class="os-row">
-			<div class="os-col-6">
-				<?php
-				echo OsFormHelper::number_field(
-					'settings[ifthenpay_multibanco_validity_days]',
-					esc_html__( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
-					esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_validity_days' ) ),
-					IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
-					IfthenpayLpMultibancoValidityValidation::MAX_DAYS,
-					array(
-						'theme'       => 'simple',
-						'placeholder' => (string) IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
-					)
-				);
-				?>
-				<p class="ifthenpay-field-note">
-					<?php
-					printf(
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						esc_html__( 'How long a customer has to pay before the reference expires and the slot is released. Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
-						IfthenpayLpPaymentProcessor::DEFAULT_MULTIBANCO_VALIDITY_DAYS,
-						IfthenpayLpMultibancoValidityValidation::MIN_DAYS,
-						IfthenpayLpMultibancoValidityValidation::MAX_DAYS
-					);
-					?>
-				</p>
+		<?php
+	}
+
+	/**
+	 * The two field concepts, explained once — Multibanco and Payshop's own sections below repeat
+	 * only the numbers (their own defaults/ranges differ), not this explanation, since the concepts
+	 * themselves don't differ between methods. Saying it twice was the actual redundancy the
+	 * previous per-method "Timing" heading + full-sentence field notes produced; it also caused the
+	 * two methods' rows to visibly disalign, since one method's longer note would wrap onto a
+	 * second line while the other's stayed on one.
+	 */
+	private static function render_timing_section_intro(): void {
+		?>
+		<div class="label-with-description ifthenpay-timing-heading">
+			<h3><?php echo esc_html__( 'Timing', 'ifthenpay-payments-for-latepoint' ); ?></h3>
+			<div class="label-desc">
+				<?php echo esc_html__( 'Reference Validity is how long a reference stays payable once issued, before the slot is released. Minimum Lead Time is how soon before the appointment a method can still be offered at all.', 'ifthenpay-payments-for-latepoint' ); ?>
 			</div>
-			<div class="os-col-6">
-				<?php
-				echo OsFormHelper::number_field(
-					'settings[ifthenpay_multibanco_lead_time_days]',
-					esc_html__( 'Minimum Lead Time (days)', 'ifthenpay-payments-for-latepoint' ),
-					esc_attr( OsSettingsHelper::get_settings_value( 'ifthenpay_multibanco_lead_time_days' ) ),
-					IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
-					IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS,
-					array(
-						'theme'       => 'simple',
-						'placeholder' => (string) IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
-					)
-				);
-				?>
-				<p class="ifthenpay-field-note">
+		</div>
+		<?php
+	}
+
+	/**
+	 * One method's own Reference Validity + Minimum Lead Time fields — the pair that together keep
+	 * a deferred reference inside a real payment window (also clamped at payment time against the
+	 * appointment itself, so it can never outlive it). Shared by Multibanco and Payshop's own
+	 * sections (render_pay_later_configuration(), directly below render_timing_section_intro()'s
+	 * shared explanation) — the two settings pairs are independent, only the rendering shape is
+	 * identical. Save-time range validation for both fields is IfthenpayLpWholeDaysSettingValidation,
+	 * wired up in the main plugin file via each setting's own validator.
+	 *
+	 * @param string                                          $method_label Method name, e.g. "Multibanco".
+	 * @param string                                          $icon_url     Same icon shown for this method in render_methods_list() — pairs the heading with that row above it.
+	 * @param array{field:string,default:int,min:int,max:int} $validity     Reference Validity field config.
+	 * @param array{field:string,default:int,min:int,max:int} $lead_time    Minimum Lead Time field config.
+	 */
+	private static function render_timing_fields( string $method_label, string $icon_url, array $validity, array $lead_time ): void {
+		?>
+		<div class="ifthenpay-timing-method">
+			<div class="ifthenpay-timing-method-heading">
+				<?php if ( '' !== $icon_url ) : ?>
+					<img src="<?php echo esc_url( $icon_url ); ?>" class="ifthenpay-method-icon" alt="" />
+				<?php endif; ?>
+				<span><?php echo esc_html( $method_label ); ?></span>
+			</div>
+			<div class="os-row">
+				<div class="os-col-6">
 					<?php
-					printf(
-						/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
-						esc_html__( "Multibanco won't be offered for an appointment sooner than this. Default %1\$d, accepts %2\$d–%3\$d.", 'ifthenpay-payments-for-latepoint' ),
-						IfthenpayLpPaymentMethodAvailability::DEFAULT_MULTIBANCO_LEAD_TIME_DAYS,
-						IfthenpayLpMultibancoLeadTimeValidation::MIN_DAYS,
-						IfthenpayLpMultibancoLeadTimeValidation::MAX_DAYS
+					echo OsFormHelper::number_field(
+						'settings[' . $validity['field'] . ']',
+						esc_html__( 'Reference Validity (days)', 'ifthenpay-payments-for-latepoint' ),
+						esc_attr( OsSettingsHelper::get_settings_value( $validity['field'] ) ),
+						$validity['min'],
+						$validity['max'],
+						array(
+							'theme'       => 'simple',
+							'placeholder' => (string) $validity['default'],
+						)
 					);
 					?>
-				</p>
+					<p class="ifthenpay-field-note">
+						<?php
+						printf(
+							/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+							esc_html__( 'Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
+							$validity['default'],
+							$validity['min'],
+							$validity['max']
+						);
+						?>
+					</p>
+				</div>
+				<div class="os-col-6">
+					<?php
+					echo OsFormHelper::number_field(
+						'settings[' . $lead_time['field'] . ']',
+						esc_html__( 'Minimum Lead Time (days)', 'ifthenpay-payments-for-latepoint' ),
+						esc_attr( OsSettingsHelper::get_settings_value( $lead_time['field'] ) ),
+						$lead_time['min'],
+						$lead_time['max'],
+						array(
+							'theme'       => 'simple',
+							'placeholder' => (string) $lead_time['default'],
+						)
+					);
+					?>
+					<p class="ifthenpay-field-note">
+						<?php
+						printf(
+							/* translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days */
+							esc_html__( 'Default %1$d, accepts %2$d–%3$d.', 'ifthenpay-payments-for-latepoint' ),
+							$lead_time['default'],
+							$lead_time['min'],
+							$lead_time['max']
+						);
+						?>
+					</p>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -360,9 +453,10 @@ class IfthenpayLpAdminFormRenderer {
 	/**
 	 * The method codes currently enabled. Which account each one uses is looked up live from the
 	 * gateway dataset at checkout time (IfthenpayLpDataFormatter::build_accounts_string()) instead of
-	 * being stored here too. Public: checkout-time gating (see the main plugin file's
-	 * is_multibanco_usable()) reads the same saved list this form renders checkboxes from — one
-	 * setting covers both "Pay Now" and "Pay Later Configuration", the split is display-only.
+	 * being stored here too. Public: checkout-time gating (see
+	 * IfthenpayLpPaymentMethodAvailability::is_deferred_method_usable()) reads the same saved list
+	 * this form renders checkboxes from — one setting covers both "Pay Now" and "Pay Later
+	 * Configuration", the split is display-only.
 	 *
 	 * @return string[]
 	 */

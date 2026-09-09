@@ -42,6 +42,32 @@ final class CallbackParamsTest extends TestCase {
 	}
 
 	/**
+	 * The reverse: a request shaped for the old, per-method Multibanco registration (`key`,
+	 * `orderId`) is just as unrecognisable as Payshop's own old shape — the same single template
+	 * covers every method, so neither method's traditional shape is special-cased here or
+	 * accidentally accepted because it happens to share a field name (`amount`, `reference`) with
+	 * ours.
+	 */
+	public function test_multibanco_shaped_request_is_rejected_for_missing_required_params(): void {
+		$params = IfthenpayLpCallbackParams::from_array( ifthenpay_lp_callback_fixture_params( 'multibanco-shaped.txt' ) );
+
+		$this->assertNull( $params );
+	}
+
+	/**
+	 * A well-shaped Payshop notification parses exactly like Multibanco's own — same five fields,
+	 * only `method` differs.
+	 */
+	public function test_valid_payshop_fixture_parses_every_field(): void {
+		$params = IfthenpayLpCallbackParams::from_array( ifthenpay_lp_callback_fixture_params( 'valid-payshop.txt' ) );
+
+		$this->assertNotNull( $params );
+		$this->assertSame( 'lp-order-tok-payshop1', $params->reference );
+		$this->assertSame( 'PAYSHOP', $params->method );
+		$this->assertSame( 'REQ-VALID-PAYSHOP-0001', $params->request_id );
+	}
+
+	/**
 	 * Missing any one of the three required parameters is rejected, not just all of them.
 	 */
 	public function test_missing_apk_is_rejected(): void {

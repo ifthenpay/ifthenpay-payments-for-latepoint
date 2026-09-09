@@ -13,7 +13,7 @@
  * only makes sense for a record created from an *order* intent (a booking checkout). LatePoint's
  * OsTransactionIntentModel::convert_to_transaction() (paying an existing invoice directly) aborts
  * outright on a non-success payment result instead of committing unpaid the way an order intent
- * does — verified against LatePoint 5.6.10 source — so a deferred method cannot currently be
+ * does — verified against LatePoint 5.6.9 source — so a deferred method cannot currently be
  * offered on that checkout path at all. Every record this function is ever asked to settle is
  * therefore assumed to carry an order-intent id.
  *
@@ -98,8 +98,8 @@ class IfthenpayLpSettlement {
 
 		$order_id = OsOrderIntentHelper::is_converted( (int) $record->intent_id );
 		if ( ! $order_id ) {
-			// Checkout may simply still be mid-flight (see the file docblock's ordering-tolerance
-			// note) — not a rejection, a reason to have the caller ask again.
+			// Checkout may simply still be mid-flight — not a rejection, a reason to have the caller
+			// ask again (see the callback controller's own handling of this same outcome).
 			return IfthenpayLpSettlementResult::failed( 'order_not_ready' );
 		}
 
@@ -112,11 +112,21 @@ class IfthenpayLpSettlement {
 			return IfthenpayLpSettlementResult::rejected( 'order_not_settleable' );
 		}
 
-		if ( ! self::apply_state_change( $record, $order, $request_id, $source ) ) {
+		$transaction = self::apply_state_change( $record, $order, $request_id, $source );
+		if ( null === $transaction ) {
 			return IfthenpayLpSettlementResult::failed( 'state_change_failed' );
 		}
 
-		IfthenpayLpTransactionRepository::mark_settled( $record->token );
+		// Stamped before the event fires, not after — a listener reacting synchronously to
+		// latepoint_transaction_created (e.g. IfthenpayLpProcessSeeder's own "Payment Received"
+		// email) reads this add-on's own repository row via IfthenpayLpReferenceDisplay::for_order(),
+		// and must see it already PAID, not the still-PENDING row that existed a moment ago.
+		// Firing the event first (as apply_state_change() itself used to, right after saving the
+		// LatePoint transaction) sent that email showing "pay this reference" instructions for a
+		// reference that had, from the customer's own point of view, just been paid.
+		IfthenpayLpTransactionRepository::mark_settled( $record->token, $source );
+
+		do_action( 'latepoint_transaction_created', $transaction );
 
 		return IfthenpayLpSettlementResult::settled();
 	}
@@ -143,6 +153,9 @@ class IfthenpayLpSettlement {
 	 * inconsistent, and fire no event (so no notifications). Only the repository's own settled_at is
 	 * stamped by the caller, and only once every step here has actually succeeded.
 	 *
+	 * Returns the saved OsTransactionModel rather than firing `latepoint_transaction_created`
+	 * itself — see settle_locked()'s own comment on why that event fires only after mark_settled().
+	 *
 	 * @param object       $record     The repository row (see IfthenpayLpTransactionRepository).
 	 * @param OsOrderModel $order      The already-loaded, already-validated order.
 	 * @param string       $request_id ifthenpay's identifier for this payment — recorded in
@@ -150,7 +163,7 @@ class IfthenpayLpSettlement {
 	 *                                 build_transaction_notes()).
 	 * @param string       $source     'callback' | 'polling' | 'manual' — recorded in `notes`.
 	 */
-	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id, string $source ): bool {
+	private static function apply_state_change( object $record, OsOrderModel $order, string $request_id, string $source ): ?OsTransactionModel {
 		$transaction                  = new OsTransactionModel();
 		$transaction->token           = (string) $record->token;
 		$transaction->payment_method  = $record->method;
@@ -169,9 +182,8 @@ class IfthenpayLpSettlement {
 		}
 
 		if ( ! $transaction->save() ) {
-			return false;
+			return null;
 		}
-		do_action( 'latepoint_transaction_created', $transaction );
 
 		if ( ! $invoice->is_new_record() ) {
 			$invoice->update_attributes( array( 'status' => LATEPOINT_INVOICE_STATUS_PAID ) );
@@ -183,7 +195,7 @@ class IfthenpayLpSettlement {
 			OsBookingHelper::change_booking_status( $booking->id, LATEPOINT_BOOKING_STATUS_APPROVED );
 		}
 
-		return true;
+		return $transaction;
 	}
 
 	/**
@@ -211,8 +223,13 @@ class IfthenpayLpSettlement {
 			$lines[] = $identifier_label . ': ' . $identifier_value;
 		}
 
-		if ( ! empty( $record->entity ) && ! empty( $record->reference ) ) {
-			$lines[] = 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;
+		// Payshop rows carry no entity (a reference stands alone there), unlike Multibanco's — this
+		// must not fall back to requiring both, or a real Payshop reference silently disappears from
+		// the note entirely instead of just dropping its (correctly absent) Entity label.
+		if ( ! empty( $record->reference ) ) {
+			$lines[] = empty( $record->entity )
+				? 'Reference: ' . $record->reference
+				: 'Entity: ' . $record->entity . ' | Reference: ' . $record->reference;
 		}
 
 		$lines[] = 'Settled via: ' . $source;

@@ -75,7 +75,7 @@ class IfthenpayLpManualRecheck {
 
 		// Also corrects `method` to the confirmed value in the same write, whenever order_id
 		// matches — settling itself still happens below, through settle_payment(), not here.
-		IfthenpayLpTransactionRepository::record_verification( $token, (string) $record->request_id, $confirmation );
+		IfthenpayLpTransactionRepository::record_verification( $token, (string) $record->request_id, $confirmation, 'manual' );
 
 		// The txid is real and completed, but for a different Pay By Link than this one — never
 		// settle on it. See the class docblock: this is the check that closes the gap where any

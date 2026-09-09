@@ -54,6 +54,46 @@ class SettlementTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The settled transaction's own notes carry Entity + Reference for a Multibanco row, and
+	 * Reference alone (no dangling "Entity:" label, and — the actual bug this proves — no dropped
+	 * Reference either) for a Payshop one, which carries no entity at all. An earlier version of
+	 * build_transaction_notes() required both entity AND reference non-empty before showing either,
+	 * which silently dropped Payshop's own reference from the note entirely instead of just omitting
+	 * its Entity label.
+	 */
+	public function test_settled_notes_show_reference_for_both_methods(): void {
+		$mb_fixture = ifthenpay_lp_create_order_fixture();
+		ifthenpay_lp_insert_pending_transaction_row(
+			$mb_fixture,
+			'REQ-NOTES-MB-001',
+			array(
+				'token'     => 'TOK-NOTES-MB-001',
+				'entity'    => '12345',
+				'reference' => '123456789',
+			)
+		);
+		IfthenpayLpSettlement::settle_payment( 'REQ-NOTES-MB-001', array( 'amount' => '25.00' ), 'callback' );
+		$mb_transaction = ( new OsTransactionModel() )->where( array( 'token' => 'TOK-NOTES-MB-001' ) )->set_limit( 1 )->get_results_as_models();
+		$this->assertStringContainsString( 'Entity: 12345 | Reference: 123456789', $mb_transaction->notes );
+
+		$payshop_fixture = ifthenpay_lp_create_order_fixture();
+		ifthenpay_lp_insert_pending_transaction_row(
+			$payshop_fixture,
+			'REQ-NOTES-PAYSHOP-001',
+			array(
+				'token'     => 'TOK-NOTES-PAYSHOP-001',
+				'method'    => 'PAYSHOP',
+				'entity'    => null,
+				'reference' => '987654321',
+			)
+		);
+		IfthenpayLpSettlement::settle_payment( 'REQ-NOTES-PAYSHOP-001', array( 'amount' => '25.00' ), 'callback' );
+		$payshop_transaction = ( new OsTransactionModel() )->where( array( 'token' => 'TOK-NOTES-PAYSHOP-001' ) )->set_limit( 1 )->get_results_as_models();
+		$this->assertStringContainsString( 'Reference: 987654321', $payshop_transaction->notes );
+		$this->assertStringNotContainsString( 'Entity:', $payshop_transaction->notes );
+	}
+
+	/**
 	 * A second, identical notification is a no-op — still reports success (already-settled), but
 	 * creates no second transaction and triggers no further booking/order state changes at all.
 	 *

@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class IfthenpayLpTransactionRepository {
 
-	private const SCHEMA_VERSION        = '1.0.0';
+	private const SCHEMA_VERSION        = '1.1.0';
 	private const SCHEMA_VERSION_OPTION = 'ifthenpay_lp_transactions_schema_version';
 	private const CACHE_GROUP           = 'ifthenpay_lp_transactions';
 
@@ -28,9 +28,11 @@ class IfthenpayLpTransactionRepository {
 	public const METHOD_PAYBYLINK = 'PAYBYLINK';
 
 	/**
-	 * The fully qualified table name.
+	 * The fully qualified table name — public so a caller needing to join against this table
+	 * directly (IfthenpayLpLapsedAppointmentDigest) doesn't have to re-derive `$wpdb->prefix .
+	 * 'ifthenpay_transactions'` on its own.
 	 */
-	private static function table_name(): string {
+	public static function table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'ifthenpay_transactions';
 	}
@@ -75,6 +77,7 @@ class IfthenpayLpTransactionRepository {
 			pin_code VARCHAR(255) DEFAULT NULL,
 			paybylink_url VARCHAR(255) DEFAULT NULL,
 			settled_at DATETIME DEFAULT NULL,
+			settled_by VARCHAR(20) DEFAULT NULL,
 			method_data LONGTEXT DEFAULT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -162,6 +165,71 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
+	 * The customer dashboard's own batch-prefetch: warms find_by_intent_id()'s own wp_cache entry
+	 * for every one of $customer_id's own order intents in 2 queries total, regardless of how many
+	 * bookings that customer has. Without this, for_order()/for_booking() (IfthenpayLpReferenceDisplay)
+	 * each run their own find_by_intent_id() call once per booking tile LatePoint's dashboard
+	 * renders (`latepoint_customer_dashboard_after_booking_info_tile`, once per booking in a loop) —
+	 * this is called once, before that loop starts
+	 * (`latepoint_customer_dashboard_before_appointments`), so every one of those later calls
+	 * transparently hits cache instead. Deliberately does not also prefetch/cache the
+	 * OsOrderItemModel/OsOrderIntentModel::where() lookups those same callers make on the way here —
+	 * only this add-on's own table is this repository's concern; reaching into LatePoint's own model
+	 * layer to cache its lookups too would mean duplicating LatePoint's own ORM behavior. So this
+	 * takes the add-on's own per-dashboard query cost from O(3N) to O(2N + 2), not O(1)/O(N) — 2
+	 * batch queries here, plus LatePoint's own unavoidable 2 lookups per booking.
+	 *
+	 * `order_intents` has its own `customer_id` column, separate from `order_id` — that's what makes
+	 * a one-query prefetch possible without needing the specific booking list LatePoint's own
+	 * `latepoint_customer_dashboard_before_appointments` hook doesn't pass (only `$customer`).
+	 *
+	 * @param int $customer_id The dashboard's own logged-in customer.
+	 */
+	public static function prime_cache_for_customer( int $customer_id ): void {
+		global $wpdb;
+
+		// Own perf-critical priming path, same justification as find_expired_pending();
+		// LATEPOINT_TABLE_ORDER_INTENTS has no user-controlled part, the %d placeholder covers the
+		// only real value.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$intent_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT id FROM `' . LATEPOINT_TABLE_ORDER_INTENTS . '` WHERE customer_id = %d AND order_id IS NOT NULL',
+				$customer_id
+			)
+		);
+		// phpcs:enable
+		if ( ! $intent_ids ) {
+			return;
+		}
+
+		$table        = self::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $intent_ids ), '%d' ) );
+		// $table has no user-controlled part; $placeholders is a fixed count of %d literals, one per
+		// entry in $intent_ids, which $wpdb->prepare() itself fills in and %d-casts (a single array
+		// argument after the query is WordPress core's own documented way to fill N placeholders at
+		// once, not an unprepared value).
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM `{$table}` WHERE intent_id IN ({$placeholders})", $intent_ids )
+		);
+		// phpcs:enable
+
+		$by_intent = array();
+		foreach ( $rows as $row ) {
+			$by_intent[ (int) $row->intent_id ] = $row;
+		}
+
+		foreach ( $intent_ids as $id ) {
+			// The exact key shape find_one() computes for 'intent_id' — must match exactly, and
+			// negative-cache a miss (false, not skipped) the same way find_one() does, so a later
+			// find_by_intent_id() for a customer-owned intent with no transaction row never falls
+			// through to a real query either.
+			wp_cache_set( 'intent_id_' . (string) $id, $by_intent[ (int) $id ] ?? false, self::CACHE_GROUP );
+		}
+	}
+
+	/**
 	 * Sets the status column.
 	 *
 	 * @param string $token  Our correlation handle.
@@ -172,18 +240,22 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Stamps a record settled — status PAID and settled_at now, together, in one update. Written
-	 * last inside settle_payment()'s locked section, only once the LatePoint state change it
-	 * guards has actually succeeded (see IfthenpayLpSettlement).
+	 * Stamps a record settled — status PAID, settled_at, and settled_by (real, queryable columns,
+	 * not method_data) all together, in one update. Written last inside settle_payment()'s locked
+	 * section, only once the LatePoint state change it guards has actually succeeded (see
+	 * IfthenpayLpSettlement).
 	 *
-	 * @param string $token Our correlation handle.
+	 * @param string $token  Our correlation handle.
+	 * @param string $source 'callback' | 'polling' | 'manual' — same vocabulary as
+	 *                        IfthenpayLpSettlement::settle_payment()'s own $source.
 	 */
-	public static function mark_settled( string $token ): bool {
+	public static function mark_settled( string $token, string $source ): bool {
 		return self::update_columns(
 			$token,
 			array(
 				'status'     => 'PAID',
 				'settled_at' => current_time( 'mysql', true ),
+				'settled_by' => $source,
 			)
 		);
 	}
@@ -203,7 +275,7 @@ class IfthenpayLpTransactionRepository {
 
 		$merged = array_merge( self::decode_method_data( $record ), $data );
 
-		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ) );
+		return self::update_columns( $token, array( 'method_data' => wp_json_encode( $merged ) ), $record );
 	}
 
 	/**
@@ -228,13 +300,19 @@ class IfthenpayLpTransactionRepository {
 	 * Records an IfthenpayLpTransactionStatus::check() confirmation into method_data — always,
 	 * regardless of whether $confirmation->order_id ends up matching this row's own token, so a
 	 * mismatch is explainable later (verified_order_id here vs. token) instead of looking identical
-	 * to a genuine "ifthenpay never confirmed it" case. When it does match, `method` is corrected to
-	 * the confirmed value in the same write — and, when $settle is true, so is settling the row
-	 * (status PAID + settled_at), the same shape as mark_settled(). All of this is one
-	 * find_by_token() and one update_columns() call, not up to three: the realtime polling path
-	 * and manual re-check both used to chain record+correct-method(+settle) as separate calls, each
-	 * paying for its own re-fetch since every write here clears the token cache entry the next
-	 * one's own internal fetch would otherwise hit.
+	 * to a genuine "ifthenpay never confirmed it" case. `ifthenpay_response` is the endpoint's own
+	 * raw, decoded JSON body (`$confirmation->raw`, when the caller set it — check() itself always
+	 * does; the callback route's own locally-built stand-in $confirmation does not, since a webhook
+	 * is received, not fetched from an endpoint) — kept verbatim alongside the narrower
+	 * `verified_*` fields already derived from it, for support/dispute lookups that need to see
+	 * exactly what ifthenpay actually returned, not just what this add-on made of it. When
+	 * order_id matches, `method` is corrected to the confirmed value in the same write — and, when
+	 * $settle is true, so is settling the row (status PAID + settled_at + settled_by), the same
+	 * shape as mark_settled(). All of this is one find_by_token() and one update_columns() call,
+	 * not up to three: the realtime polling path and manual re-check both used to chain
+	 * record+correct-method(+settle) as separate calls, each paying for its own re-fetch since
+	 * every write here clears the token cache entry the next one's own internal fetch would
+	 * otherwise hit.
 	 *
 	 * @param string $token          Our correlation handle.
 	 * @param string $transaction_id The identifier checked with ifthenpay — a txid for a realtime
@@ -242,12 +320,18 @@ class IfthenpayLpTransactionRepository {
 	 *                                IfthenpayLpTransactionStatus's own docblock on why the two
 	 *                                sometimes coincide and sometimes don't).
 	 * @param object $confirmation   As returned by IfthenpayLpTransactionStatus::check().
+	 * @param string $source         'callback' | 'polling' | 'manual' — same vocabulary as
+	 *                                IfthenpayLpSettlement::settle_payment()'s own $source. Only
+	 *                                written to the row (as settled_by) when $settle is true; the
+	 *                                manual re-check path passes 'manual' here for self-documentation
+	 *                                even though it settles separately, through settle_payment(),
+	 *                                which stamps settled_by itself via mark_settled().
 	 * @param bool   $settle         Whether to also mark the row settled when order_id matches —
 	 *                                the realtime polling path settles here directly; manual
 	 *                                re-check settles separately, through settle_payment().
-	 * @phpstan-param object{payment_method:string,amount:string,order_id:string} $confirmation
+	 * @phpstan-param object{payment_method:string,amount:string,order_id:string,raw?:array<string,mixed>} $confirmation
 	 */
-	public static function record_verification( string $token, string $transaction_id, object $confirmation, bool $settle = false ): bool {
+	public static function record_verification( string $token, string $transaction_id, object $confirmation, string $source, bool $settle = false ): bool {
 		$record = self::find_by_token( $token );
 		if ( ! $record ) {
 			return false;
@@ -262,6 +346,9 @@ class IfthenpayLpTransactionRepository {
 				'verified_order_id'       => $confirmation->order_id,
 			)
 		);
+		if ( isset( $confirmation->raw ) ) {
+			$method_data['ifthenpay_response'] = $confirmation->raw;
+		}
 
 		$columns = array( 'method_data' => wp_json_encode( $method_data ) );
 		if ( $confirmation->order_id === $token ) {
@@ -269,6 +356,7 @@ class IfthenpayLpTransactionRepository {
 			if ( $settle ) {
 				$columns['status']     = 'PAID';
 				$columns['settled_at'] = current_time( 'mysql', true );
+				$columns['settled_by'] = $source;
 			}
 		}
 
@@ -276,11 +364,17 @@ class IfthenpayLpTransactionRepository {
 	}
 
 	/**
-	 * Shared column update by token, with cache invalidation. A row is cacheable by either of two
-	 * unique columns (find_by_token(), find_by_request_id()) — both entries are cleared, not just
-	 * the one this method was called with, or a caller that only ever looks a row up by the other
-	 * column (settle_payment() always looks up by request_id) would keep seeing a stale, pre-update
-	 * copy for the lifetime of that cache entry.
+	 * Shared column update by token, with cache invalidation. A row is cacheable by any of three
+	 * unique-ish columns (find_by_token(), find_by_request_id(), find_by_intent_id()) — all three
+	 * entries are cleared, not just the one this method was called with, or a caller that only ever
+	 * looks a row up by one of the other columns (settle_payment() always looks up by request_id;
+	 * IfthenpayLpReferenceDisplay::for_order() always looks up by intent_id) would keep seeing a
+	 * stale, pre-update copy for the lifetime of that cache entry — exactly what happened before
+	 * IfthenpayLpSettlement started firing `latepoint_transaction_created` only after this method's
+	 * own mark_settled() call: a listener reading via find_by_intent_id() in the same request, before
+	 * intent_id was ever accounted for here, could still have observed a stale PENDING row even with
+	 * that ordering fixed, the moment some other caller read it via intent_id earlier in the same
+	 * request. This closes that gap at its source rather than relying on call-order alone.
 	 *
 	 * @param string              $token  Our correlation handle.
 	 * @param array<string,mixed> $data   Column => value.
@@ -301,6 +395,9 @@ class IfthenpayLpTransactionRepository {
 			// falsy in PHP but must still have its cache entry cleared.
 			if ( $before && null !== $before->request_id && '' !== $before->request_id ) {
 				wp_cache_delete( "request_id_{$before->request_id}", self::CACHE_GROUP );
+			}
+			if ( $before && null !== $before->intent_id && '' !== $before->intent_id ) {
+				wp_cache_delete( 'intent_id_' . $before->intent_id, self::CACHE_GROUP );
 			}
 		}
 
