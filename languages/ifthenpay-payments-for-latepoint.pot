@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-02T12:30:43+00:00\n"
+"POT-Creation-Date: 2026-09-09T10:44:19+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: ifthenpay-payments-for-latepoint\n"
@@ -31,7 +31,7 @@ msgstr ""
 
 #. Author of the plugin
 #: ifthenpay-payments-for-latepoint.php
-#: ifthenpay-payments-for-latepoint.php:344
+#: lib/models/ifthenpay-lp-payment-method-availability.php:81
 msgid "ifthenpay"
 msgstr ""
 
@@ -40,95 +40,316 @@ msgstr ""
 msgid "https://ifthenpay.com/"
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:163
-msgid "Missing payment token"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:173
-msgid "Payment record not found"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:191
-msgid "Payment was cancelled"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:192
-msgid "Payment failed"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:300
-#: lib/views/ifthenpay-admin-form-renderer.php:368
-msgid "No accounts."
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:301
-#: lib/views/ifthenpay-admin-form-renderer.php:369
-msgid "Activate"
-msgstr ""
-
-#: ifthenpay-payments-for-latepoint.php:302
+#: ifthenpay-payments-for-latepoint.php:532
 msgid "Validation failed."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:303
+#: ifthenpay-payments-for-latepoint.php:533
 msgid "Server error. Please try again."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:304
+#: ifthenpay-payments-for-latepoint.php:534
 #: lib/controllers/payments-ifthenpay-settings-controller.php:139
 msgid "Your activation request has been sent to support."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:305
+#: ifthenpay-payments-for-latepoint.php:535
 msgid "Failed to send activation request."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:306
+#: ifthenpay-payments-for-latepoint.php:536
 msgid "Disconnect this Backoffice Key? This clears the Gateway Key and Payment Methods configured under it right away."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:320
+#: ifthenpay-payments-for-latepoint.php:550
 msgid "⚠️ Please do not close this window until your payment completes. You’ll be redirected to the store page automatically."
 msgstr ""
 
-#: ifthenpay-payments-for-latepoint.php:321
+#: ifthenpay-payments-for-latepoint.php:551
 msgid "Request failed."
 msgstr ""
 
-#: lib/cli/ifthenpay-lp-cli-commands.php:36
+#: ifthenpay-payments-for-latepoint.php:552
+msgid "We could not confirm your payment in time, so your booking was not completed. If a payment was taken, contact us with your reference and we will resolve it — otherwise, please try again."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:774
+msgid "ifthenpay: a \"Payment Received Notification\" process was added so customers hear back once a Multibanco or Payshop reference is actually paid."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:776
+msgid "Customize it"
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:784
+msgid "ifthenpay: you already have an automation set up for payment events, so we added our own \"Payment Received Notification\" without turning it on — enable it in Automation if you'd rather use it instead of yours."
+msgstr ""
+
+#: ifthenpay-payments-for-latepoint.php:786
+msgid "Review both"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-cli-commands.php:38
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:132
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:266
 msgid "No Gateway Key is saved yet — configure the ifthenpay payment processor first."
 msgstr ""
 
 #. translators: %s: gateway key
-#: lib/cli/ifthenpay-lp-cli-commands.php:44
+#: lib/controllers/ifthenpay-lp-cli-commands.php:46
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:141
 #, php-format
 msgid "Callback URL registered for gateway key %s."
 msgstr ""
 
 #. translators: 1: gateway key, 2: failure reason
-#: lib/cli/ifthenpay-lp-cli-commands.php:55
+#: lib/controllers/ifthenpay-lp-cli-commands.php:57
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:153
 #, php-format
 msgid "Registration failed for gateway key %1$s: %2$s"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-checkout-controller.php:46
-msgid "Invalid invoice ID"
+#: lib/controllers/ifthenpay-lp-cli-commands.php:92
+msgid "Usage: wp ifthenpay recheck-payment <token>"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-checkout-controller.php:71
+#: lib/controllers/ifthenpay-lp-cli-commands.php:95
+msgid "No payment record found for that token."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:35
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:36
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:57
+msgid "ifthenpay for LatePoint"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:51
+msgid "You do not have permission to access this page."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:58
+msgid "Advanced tools for the ifthenpay payment integration with LatePoint — re-register the callback URL, and recheck or cancel a stuck deferred payment."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:92
+msgid "This action could not be verified. Please try again."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:189
+msgid "Payment cancelled and the booking released."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:195
+msgid "Could not cancel this payment — it may have just settled, or already been handled."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:211
+msgid "Marked resolved."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:217
+msgid "Could not mark this payment resolved. Please try again."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:233
+msgid "Marked unresolved — back on the Unclaimed list."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:239
+msgid "Could not mark this payment unresolved. Please try again."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:253
+msgid "Callback URL"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:259
+msgid "Re-register Callback URL"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:279
+msgid "Not registered yet. This is the URL a registration would submit:"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:281
+msgid "Registered. The URL currently on file with ifthenpay for this gateway key:"
+msgstr ""
+
+#. translators: %s: failure reason
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:285
+#, php-format
+msgid "Not registered: %s"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:289
+msgid "The URL the last attempt tried to submit, for comparison:"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:294
+msgid "Copy"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:316
+msgid "Copied!"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:333
+msgid "Outstanding Deferred Payments"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:336
+msgid "Nothing outstanding."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:343
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:468
+msgid "Token"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:344
+msgid "Request ID"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:345
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:469
+msgid "Customer"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:346
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:470
+msgid "Contact"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:347
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:472
+msgid "Method"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:348
+#: lib/views/ifthenpay-lp-reference-display.php:218
+msgid "Entity"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:349
+#: lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php:165
+#: lib/views/ifthenpay-lp-reference-display.php:225
+msgid "Reference"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:350
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:473
+#: lib/views/ifthenpay-lp-reference-display.php:179
+#: lib/views/ifthenpay-lp-reference-display.php:230
+msgid "Amount"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:351
+msgid "Expires"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:352
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:479
+msgid "Action"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:384
+msgid "Recheck"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:386
+msgid "Cancel this payment and release the booking's slot? This cannot be undone."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:390
+msgid "Cancel"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:451
+msgid "Unclaimed Realtime Payments"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:461
+msgid "No resolved payments yet."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:462
+msgid "Nothing unclaimed."
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:471
+msgid "Booking (reconstructed at checkout time)"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:474
+msgid "Settled"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:477
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:534
+msgid "Resolved"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:508
+msgid "Unresolve"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:508
+msgid "Mark Resolved"
+msgstr ""
+
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:533
+msgid "Unclaimed"
+msgstr ""
+
+#. translators: %s: human-readable time difference, e.g. "2 hours"
+#: lib/controllers/ifthenpay-lp-tools-page-controller.php:549
+#, php-format
+msgid "%s ago"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:78
+msgid "Invalid invoice"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:105
 msgid "Nothing to pay"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-checkout-controller.php:132
-msgid "Payment completed"
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:137
+msgid "No payment methods are currently enabled. Please contact the site owner."
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-checkout-controller.php:140
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:183
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:208
+msgid "Could not start this payment right now. Please try again or contact the site owner."
+msgstr ""
+
+#. translators: 1: service name, 2: appointment date, 3: appointment time
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:289
+#, php-format
+msgid "%1$s on %2$s @ %3$s"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:290
+msgid "Unknown service"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:361
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:406
+#: lib/models/ifthenpay-lp-payment-processor.php:106
+msgid "Payment record not found"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:444
 msgid "Payment cancelled"
 msgstr ""
 
-#: lib/controllers/payments-ifthenpay-checkout-controller.php:149
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:449
 msgid "Payment failed due to payment verification error"
+msgstr ""
+
+#: lib/controllers/payments-ifthenpay-checkout-controller.php:479
+msgid "Payment completed"
 msgstr ""
 
 #: lib/controllers/payments-ifthenpay-settings-controller.php:33
@@ -143,131 +364,356 @@ msgstr ""
 msgid "Failed to send the activation email. Please try again later."
 msgstr ""
 
-#: lib/helpers/ifthenpay-api-client.php:53
-msgid "Invalid response (GET) from ifthenpay API."
-msgstr ""
-
-#. translators: %1$s: order id, %2$s: admin description
-#: lib/helpers/ifthenpay-data-formatter.php:103
-#, php-format
-msgid "Order #%1$s - %2$s"
-msgstr ""
-
-#: lib/helpers/ifthenpay-lp-api-client.php:87
+#: lib/models/api/ifthenpay-lp-api-client.php:87
 msgid "The request payload could not be encoded as JSON."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-api-client.php:105
+#: lib/models/api/ifthenpay-lp-api-client.php:105
 msgid "ifthenpay rejected the credentials used for this request."
 msgstr ""
 
 #. translators: %d: HTTP status code
-#: lib/helpers/ifthenpay-lp-api-client.php:114
+#: lib/models/api/ifthenpay-lp-api-client.php:114
 #, php-format
 msgid "ifthenpay returned an unexpected server error (%d)."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-api-client.php:130
+#: lib/models/api/ifthenpay-lp-api-client.php:130
 msgid "ifthenpay returned a response that could not be parsed as JSON."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-backoffice-key-validation.php:34
-msgid "Invalid Backoffice Key format. Expected 1234-5678-9012-3456."
-msgstr ""
-
-#: lib/helpers/ifthenpay-lp-backoffice-key-validation.php:40
-msgid "ifthenpay did not recognize this Backoffice Key."
-msgstr ""
-
-#: lib/helpers/ifthenpay-lp-callback-registration.php:47
+#: lib/models/api/ifthenpay-lp-callback-registration.php:44
 msgid "The callback URL is too long (over 300 characters) — likely a long domain with a subdirectory install."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-callback-registration.php:72
+#: lib/models/api/ifthenpay-lp-callback-registration.php:70
 msgid "ifthenpay did not accept this callback URL."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-multibanco-reference.php:62
+#: lib/models/api/ifthenpay-lp-multibanco-reference.php:62
 msgid "ifthenpay rejected the Multibanco reference request."
 msgstr ""
 
-#: lib/helpers/ifthenpay-lp-pay-by-link.php:44
+#: lib/models/api/ifthenpay-lp-pay-by-link.php:44
 msgid "ifthenpay returned an incomplete Pay By Link response."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:39
+#: lib/models/api/ifthenpay-lp-payshop-reference.php:73
+msgid "ifthenpay rejected the Payshop reference request."
+msgstr ""
+
+#: lib/models/api/ifthenpay-lp-transaction-status.php:71
+msgid "ifthenpay returned an unexpected response while verifying this transaction."
+msgstr ""
+
+#. translators: %1$s: intent id, %2$s: admin description
+#: lib/models/ifthenpay-lp-data-formatter.php:113
+#, php-format
+msgid "Intent #%1$s - %2$s"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-method-availability.php:56
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:313
+msgid "Multibanco"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-method-availability.php:57
+msgid "Multibanco reference"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-method-availability.php:63
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:329
+msgid "Payshop"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-method-availability.php:64
+msgid "Payshop reference"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:81
+msgid "Multibanco is not available for this payment. Please choose another method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:84
+msgid "Payshop is not available for this payment. Please choose another method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:101
+msgid "Missing payment token"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:119
+msgid "Payment was cancelled"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:120
+msgid "Payment failed"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:156
+msgid "ifthenpay confirmation"
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:221
+msgid "Multibanco is not currently available. Please choose another payment method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:239
+msgid "Could not generate a Multibanco reference right now. Please try again or choose another payment method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:283
+msgid "Payshop is not currently available. Please choose another payment method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-payment-processor.php:303
+msgid "Could not generate a Payshop reference right now. Please try again or choose another payment method."
+msgstr ""
+
+#: lib/models/ifthenpay-lp-process-seeder.php:79
+msgid "Payment Received"
+msgstr ""
+
+#. translators: %d: number of lapsed bookings in this digest
+#: lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php:116
+#, php-format
+msgid "%d appointment passed with no payment recorded"
+msgid_plural "%d appointments passed with no payment recorded"
+msgstr[0] ""
+msgstr[1] ""
+
+#: lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php:120
+msgid "These appointments have already happened, and their order is not marked fully paid yet. This is not a judgment on the customer — they may have paid in cash, or the payment may still be on its way. No booking status has been changed."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php:155
+msgid "none on file"
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-lapsed-appointment-digest.php:167
+msgid "Confirmation"
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:116
+msgid "Payment confirmed and settled."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:118
+msgid "Missing payment reference."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:120
+msgid "Payment record not found."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:122
+msgid "ifthenpay does not recognise this payment as completed — nothing was settled."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:124
+msgid "ifthenpay confirms this transaction, but it belongs to a different booking — nothing was settled."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:126
+msgid "This payment does not support manual re-check — it settles automatically once ifthenpay confirms it (inbound callback) or the customer returns to complete checkout."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:128
+msgid "This payment could not be settled — the stored details no longer match (amount, or the order is no longer open)."
+msgstr ""
+
+#: lib/models/settlement/ifthenpay-lp-manual-recheck.php:130
+msgid "Could not settle this payment right now. Please try again shortly."
+msgstr ""
+
+#: lib/models/validation/ifthenpay-lp-backoffice-key-validation.php:34
+msgid "Invalid Backoffice Key format. Expected 1234-5678-9012-3456."
+msgstr ""
+
+#: lib/models/validation/ifthenpay-lp-backoffice-key-validation.php:40
+msgid "ifthenpay did not recognize this Backoffice Key."
+msgstr ""
+
+#: lib/models/validation/ifthenpay-lp-multibanco-lead-time-validation.php:38
+#: lib/models/validation/ifthenpay-lp-payshop-lead-time-validation.php:38
+msgid "Minimum lead time"
+msgstr ""
+
+#: lib/models/validation/ifthenpay-lp-multibanco-validity-validation.php:44
+#: lib/models/validation/ifthenpay-lp-payshop-validity-validation.php:40
+msgid "Reference validity"
+msgstr ""
+
+#. translators: %s: field name
+#: lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php:40
+#, php-format
+msgid "%s must be a whole number of days."
+msgstr ""
+
+#. translators: 1: field name, 2: minimum accepted days, 3: maximum accepted days
+#: lib/models/validation/ifthenpay-lp-whole-days-setting-validation.php:47
+#, php-format
+msgid "%1$s must be between %2$d and %3$d days."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:39
 msgid "Backoffice Configuration"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:47
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:47
 msgid "Backoffice Key"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:65
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:65
 msgid "Connect"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:68
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:68
 msgid "Disconnect"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:71
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:71
 msgid "Connecting..."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:145
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:145
 msgid "Could not check the connection to ifthenpay right now. This does not affect your saved settings — try reloading in a moment."
 msgstr ""
 
 #. translators: %s: ifthenpay helpdesk link
-#: lib/views/ifthenpay-admin-form-renderer.php:154
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:154
 #, php-format
 msgid "Connected, but no gateway keys yet for LatePoint context. Ask ifthenpay to provision one — contact %s."
 msgstr ""
 
 #. translators: %s: reason the callback registration failed
-#: lib/views/ifthenpay-admin-form-renderer.php:180
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:180
 #, php-format
 msgid "The payment notification URL could not be registered with ifthenpay: %s"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:224
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:211
+msgid "Advanced Tools"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:215
+msgid "Re-register the callback URL, and recheck or cancel a stuck payment →"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:256
 msgid "Pay Now Configuration"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:241
-#: lib/views/ifthenpay-admin-form-renderer.php:280
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:272
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:305
 msgid "Payment Methods"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:242
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:273
 msgid "Enable at least one to accept payments."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:276
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:301
 msgid "Pay Later Configuration"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:281
-msgid "Not yet functional — checking a method here has no effect at checkout for now."
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:306
+msgid "Multibanco and Payshop let customers pay by reference instead of on the spot."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:323
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:376
+msgid "Your default booking status doesn't block its own time slot, so a Multibanco/Payshop booking can sit unpaid without holding the calendar for as long as its reference stays valid."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:379
+msgid "Review in Settings → General"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:396
+msgid "Timing"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:398
+msgid "Reference Validity is how long a reference stays payable once issued, before the slot is released. Minimum Lead Time is how soon before the appointment a method can still be offered at all."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:432
+msgid "Reference Validity (days)"
+msgstr ""
+
+#. translators: 1: default days, 2: minimum accepted days, 3: maximum accepted days
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:446
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:472
+#, php-format
+msgid "Default %1$d, accepts %2$d–%3$d."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:458
+msgid "Minimum Lead Time (days)"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:516
 msgid "Gateway Key"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:407
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:580
+msgid "No accounts."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:581
+msgid "Activate"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:619
 msgid "Select Method"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:428
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:640
 msgid "Default Method"
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:438
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:650
 msgid "Google Pay and Apple Pay can’t be set as default."
 msgstr ""
 
-#: lib/views/ifthenpay-admin-form-renderer.php:456
+#: lib/views/ifthenpay-lp-admin-form-renderer.php:668
 msgid "Description"
+msgstr ""
+
+#. translators: %s: ifthenpay order id/token.
+#: lib/views/ifthenpay-lp-reference-display.php:115
+#, php-format
+msgid "Order: #%s"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:174
+msgid "Status"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:175
+msgid "Paid"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:195
+msgid "Pay at a Payshop agent or CTT, using the Reference below."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:198
+msgid "Pay at any Multibanco ATM or via your bank's homebanking app, using the Entity and Reference below."
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:238
+msgid "Pay by"
+msgstr ""
+
+#. translators: %s: human-readable "pay by" deadline date.
+#: lib/views/ifthenpay-lp-reference-display.php:298
+#: lib/views/ifthenpay-lp-reference-display.php:419
+#, php-format
+msgid "Pay by: %s"
+msgstr ""
+
+#: lib/views/ifthenpay-lp-reference-display.php:306
+#: lib/views/ifthenpay-lp-reference-display.php:428
+msgid "Powered by"
 msgstr ""
